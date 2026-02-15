@@ -12,6 +12,7 @@ interface NavItem {
   path: string;
   icon: string;
   permissions?: string[];
+  superuserOnly?: boolean;
 }
 
 @Component({
@@ -34,6 +35,7 @@ export class AppShellComponent {
     { label: 'Roles', path: '/roles', icon: 'bi-shield-check', permissions: ['roles.manage'] },
     { label: 'Permissions', path: '/permissions', icon: 'bi-key', permissions: ['permissions.manage'] },
     { label: 'Reports', path: '/reports', icon: 'bi-bar-chart-line', permissions: ['reports.read'] },
+    { label: 'Settings', path: '/settings', icon: 'bi-sliders', permissions: ['settings.update'], superuserOnly: true },
     { label: 'Items', path: '/items', icon: 'bi-box-seam', permissions: ['items.read'] },
     { label: 'Customers', path: '/customers', icon: 'bi-person-vcard', permissions: ['organizations.read'] },
     { label: 'Vendors', path: '/vendors', icon: 'bi-truck', permissions: ['vendors.read'] },
@@ -81,9 +83,12 @@ export class AppShellComponent {
   }
 
   get visibleNavItems(): NavItem[] {
-    return this.navItems.filter((item) =>
-      this.auth.hasAnyPermission(item.permissions || [])
-    );
+    return this.navItems.filter((item) => {
+      if (item.superuserOnly && !this.organizationContext.isSuperuser()) {
+        return false;
+      }
+      return this.auth.hasAnyPermission(item.permissions || []);
+    });
   }
 
   get canSwitchOrganization(): boolean {

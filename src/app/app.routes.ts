@@ -22,6 +22,7 @@ import { RolesPageComponent } from './pages/roles-page.component';
 import { RoleDetailPageComponent } from './pages/role-detail-page.component';
 import { SalesInvoicesPageComponent } from './pages/sales-invoices-page.component';
 import { SalesInvoiceDetailPageComponent } from './pages/sales-invoice-detail-page.component';
+import { SettingsPageComponent } from './pages/settings-page.component';
 import { UsersPageComponent } from './pages/users-page.component';
 import { VendorsPageComponent } from './pages/vendors-page.component';
 import { UserDetailPageComponent } from './pages/user-detail-page.component';
@@ -42,6 +43,7 @@ export const routes: Routes = [
       { path: 'roles/:id', component: RoleDetailPageComponent, canActivate: [permissionGuard], data: { permissions: ['roles.manage'] } },
       { path: 'permissions', component: PermissionsPageComponent, canActivate: [permissionGuard], data: { permissions: ['permissions.manage'] } },
       { path: 'reports', component: ReportsPageComponent, canActivate: [permissionGuard], data: { permissions: ['reports.read'] } },
+      { path: 'settings', component: SettingsPageComponent, canActivate: [permissionGuard], data: { permissions: ['settings.update'] } },
       { path: 'items', component: ItemsPageComponent, canActivate: [permissionGuard], data: { permissions: ['items.read'] } },
       { path: 'orders', component: OrdersPageComponent, canActivate: [permissionGuard], data: { permissions: ['orders.read'] } },
       { path: 'orders/create', component: CreateOrderPageComponent, canActivate: [permissionGuard], data: { permissions: ['orders.create'] } },

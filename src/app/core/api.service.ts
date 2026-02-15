@@ -26,4 +26,8 @@ export class ApiService {
   get<T>(endpoint: string): Observable<ApiResponse<T>> {
     return this.http.get<ApiResponse<T>>(endpoint);
   }
+
+  put<T>(endpoint: string, payload: Record<string, unknown>): Observable<ApiResponse<T>> {
+    return this.http.put<ApiResponse<T>>(endpoint, payload);
+  }
 }
