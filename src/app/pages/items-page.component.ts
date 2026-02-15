@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -44,13 +44,8 @@ interface OrganizationOption {
   templateUrl: './items-page.component.html',
 })
 export class ItemsPageComponent {
-  private readonly api: ApiService;
-  private readonly auth: AuthService;
-
-  constructor(api: ApiService, auth: AuthService) {
-    this.api = api;
-    this.auth = auth;
-  }
+  private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
 
   readonly rows = signal<ItemRow[]>([]);
   readonly loading = signal(false);
@@ -76,6 +71,10 @@ export class ItemsPageComponent {
 
   get currentOrganizationId(): string {
     return this.auth.currentUser()?.organizationId || '';
+  }
+
+  get currentOrganizationCurrency(): string {
+    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
   ngOnInit(): void {
@@ -183,7 +182,7 @@ export class ItemsPageComponent {
       unit: row.unit || '',
       price: row.price ?? 0,
       discountedPrice: row.discountedPrice ?? 0,
-      currency: row.currency || 'USD',
+      currency: row.currency || this.currentOrganizationCurrency,
       stock: row.stock ?? 0,
       reorderLevel: row.reorderLevel ?? 0,
       taxRate: row.taxRate ?? 0,
@@ -328,7 +327,7 @@ export class ItemsPageComponent {
       unit: 'pcs',
       price: 0,
       discountedPrice: 0,
-      currency: 'USD',
+      currency: this.currentOrganizationCurrency,
       stock: 0,
       reorderLevel: 0,
       taxRate: 0,
@@ -349,7 +348,6 @@ export class ItemsPageComponent {
       unit: this.optionalString(form['unit']),
       price: this.optionalNumber(form['price']),
       discountedPrice: this.optionalNumber(form['discountedPrice']),
-      currency: this.optionalString(form['currency']),
       stock: this.optionalNumber(form['stock']),
       reorderLevel: this.optionalNumber(form['reorderLevel']),
       taxRate: this.optionalNumber(form['taxRate']),

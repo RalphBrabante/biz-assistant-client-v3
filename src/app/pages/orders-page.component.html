@@ -70,13 +70,12 @@
             <th>Status</th>
             <th>Payment</th>
             <th>Total</th>
-            <th>Snapshots</th>
             <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngIf="!loading && rows.length === 0">
-            <td colspan="6" class="text-center text-secondary py-4">No orders found.</td>
+            <td colspan="5" class="text-center text-secondary py-4">No orders found.</td>
           </tr>
           <tr *ngFor="let row of rows">
             <td>{{ row['orderNumber'] }}</td>
@@ -91,7 +90,6 @@
               </span>
             </td>
             <td>{{ row['totalAmount'] }}</td>
-            <td>{{ orderedCount(row) }}</td>
             <td class="text-end">
               <div class="d-inline-flex gap-2">
                 <a

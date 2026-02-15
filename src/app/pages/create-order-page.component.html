@@ -50,6 +50,9 @@
             {{ customerLabel(customer) }}
           </option>
         </select>
+        <div class="small mt-2" *ngIf="customerSearchPerformed" [ngClass]="customerResults.length > 0 ? 'text-success' : 'text-secondary'">
+          {{ customerSearchStatus }}
+        </div>
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">Selected Customer Details</label>

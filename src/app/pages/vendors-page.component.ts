@@ -1,90 +1,84 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
-interface OrganizationRow {
+interface VendorRow {
   id: string;
+  organizationId: string;
   name: string;
   legalName?: string;
   taxId?: string;
+  contactPerson?: string;
+  contactEmail?: string;
+  phone?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
   state?: string;
   postalCode?: string;
   country?: string;
-  currency?: string;
-  contactName?: string;
-  contactEmail?: string;
-  phone?: string;
-  website?: string;
-  industry?: string;
-  employeeCount?: number;
+  paymentTerms?: string;
   notes?: string;
-  isActive?: boolean;
+  status?: string;
+  organization?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+  };
 }
 
 @Component({
-  selector: 'app-organizations-page',
+  selector: 'app-vendors-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
-  templateUrl: './organizations-page.component.html',
+  imports: [CommonModule, FormsModule, TooltipDirective],
+  templateUrl: './vendors-page.component.html',
 })
-export class OrganizationsPageComponent {
-  private readonly api = inject(ApiService);
-  private readonly auth = inject(AuthService);
+export class VendorsPageComponent {
+  private readonly api: ApiService;
+  private readonly auth: AuthService;
 
-  readonly rows = signal<OrganizationRow[]>([]);
+  constructor(api: ApiService, auth: AuthService) {
+    this.api = api;
+    this.auth = auth;
+  }
+
+  readonly rows = signal<VendorRow[]>([]);
   readonly loading = signal(false);
   readonly submitting = signal(false);
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
+  readonly isEditModalOpen = signal(false);
 
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
+
   page = 1;
   pageSize = 20;
   total = 0;
   totalPages = 1;
   readonly pageSizeOptions = [10, 20, 50, 100];
 
-  createForm: Record<string, unknown> = this.newOrgForm();
+  createForm: Record<string, unknown> = this.newVendorForm();
   editingId = '';
-  editForm: Record<string, unknown> = this.newOrgForm();
+  editForm: Record<string, unknown> = this.newVendorForm();
 
-  readonly filteredRows = computed(() => {
-    const q = this.filter().trim().toLowerCase();
-    if (!q) {
-      return this.rows();
-    }
-
-    return this.rows().filter((row) => {
-      return (
-        String(row.name || '').toLowerCase().includes(q) ||
-        String(row.legalName || '').toLowerCase().includes(q) ||
-        String(row.contactEmail || '').toLowerCase().includes(q) ||
-        String(row.city || '').toLowerCase().includes(q)
-      );
-    });
-  });
+  get currentUserId(): string {
+    return this.auth.currentUser()?.id || '';
+  }
 
   ngOnInit(): void {
     this.load();
   }
 
-  get currentOrganizationCurrency(): string {
-    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
-  }
-
   load(): void {
     this.loading.set(true);
     this.error.set('');
+
     const q = this.filter().trim();
     const params = new URLSearchParams({
       page: String(this.page),
@@ -94,10 +88,11 @@ export class OrganizationsPageComponent {
       params.set('q', q);
     }
 
-    this.api.list<OrganizationRow>(`/api/v1/organizations?${params.toString()}`).subscribe({
-      next: (response: ApiResponse<OrganizationRow[]>) => {
+    this.api.list<VendorRow>(`/api/v1/vendors?${params.toString()}`).subscribe({
+      next: (response: ApiResponse<VendorRow[]>) => {
         this.loading.set(false);
         this.rows.set(response.data || []);
+
         const meta = response.meta || {};
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
@@ -110,13 +105,13 @@ export class OrganizationsPageComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Unable to load organizations.');
+        this.error.set(err?.error?.message || 'Unable to load vendors.');
       },
     });
   }
 
   openCreateModal(): void {
-    this.createForm = this.newOrgForm();
+    this.createForm = this.newVendorForm();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -126,54 +121,61 @@ export class OrganizationsPageComponent {
     this.isCreateModalOpen.set(false);
   }
 
-  createOrganization(): void {
+  createVendor(): void {
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(this.createForm);
+    const payload = this.buildPayload({
+      ...this.createForm,
+      createdBy: this.currentUserId,
+      updatedBy: this.currentUserId,
+    });
 
-    this.api.create<OrganizationRow>('/api/v1/organizations', payload).subscribe({
+    this.api.create<VendorRow>('/api/v1/vendors', payload).subscribe({
       next: (response) => {
         this.submitting.set(false);
         this.isCreateModalOpen.set(false);
-        this.message.set(response.message || 'Organization created successfully.');
+        this.message.set(response.message || 'Vendor created successfully.');
+        this.page = 1;
         this.load();
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to create organization.');
+        this.error.set(err?.error?.message || 'Unable to create vendor.');
       },
     });
   }
 
-  startEdit(row: OrganizationRow): void {
+  openEditModal(row: VendorRow): void {
     this.editingId = row.id;
     this.editForm = {
       name: row.name || '',
       legalName: row.legalName || '',
       taxId: row.taxId || '',
+      contactPerson: row.contactPerson || '',
+      contactEmail: row.contactEmail || '',
+      phone: row.phone || '',
       addressLine1: row.addressLine1 || '',
       addressLine2: row.addressLine2 || '',
       city: row.city || '',
       state: row.state || '',
       postalCode: row.postalCode || '',
       country: row.country || 'United States',
-      currency: row.currency || this.currentOrganizationCurrency,
-      contactName: row.contactName || '',
-      contactEmail: row.contactEmail || '',
-      phone: row.phone || '',
-      website: row.website || '',
-      industry: row.industry || '',
-      employeeCount: row.employeeCount ?? 0,
+      paymentTerms: row.paymentTerms || '',
       notes: row.notes || '',
-      isActive: row.isActive !== false,
+      status: row.status || 'active',
+      updatedBy: this.currentUserId,
     };
+    this.error.set('');
+    this.message.set('');
+    this.isEditModalOpen.set(true);
   }
 
-  cancelEdit(): void {
+  closeEditModal(): void {
     this.editingId = '';
-    this.editForm = this.newOrgForm();
+    this.editForm = this.newVendorForm();
+    this.isEditModalOpen.set(false);
   }
 
   saveEdit(): void {
@@ -185,41 +187,44 @@ export class OrganizationsPageComponent {
     this.error.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(this.editForm);
+    const payload = this.buildPayload({
+      ...this.editForm,
+      updatedBy: this.currentUserId,
+    });
 
-    this.api.update<OrganizationRow>('/api/v1/organizations', this.editingId, payload).subscribe({
+    this.api.update<VendorRow>('/api/v1/vendors', this.editingId, payload).subscribe({
       next: (response) => {
         this.submitting.set(false);
-        this.message.set(response.message || 'Organization updated successfully.');
-        this.cancelEdit();
+        this.message.set(response.message || 'Vendor updated successfully.');
+        this.closeEditModal();
         this.load();
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to update organization.');
+        this.error.set(err?.error?.message || 'Unable to update vendor.');
       },
     });
   }
 
-  removeOrganization(id: string): void {
+  removeVendor(id: string): void {
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');
 
-    this.api.remove('/api/v1/organizations', id).subscribe({
+    this.api.remove('/api/v1/vendors', id).subscribe({
       next: (response) => {
         this.deletingId.set('');
-        this.message.set(response.message || 'Organization deleted successfully.');
+        this.message.set(response.message || 'Vendor deleted successfully.');
         this.load();
       },
       error: (err) => {
         this.deletingId.set('');
-        this.error.set(err?.error?.message || 'Unable to delete organization.');
+        this.error.set(err?.error?.message || 'Unable to delete vendor.');
       },
     });
   }
 
-  trackById(_index: number, row: OrganizationRow): string {
+  trackById(_index: number, row: VendorRow): string {
     return row.id;
   }
 
@@ -244,66 +249,65 @@ export class OrganizationsPageComponent {
     this.load();
   }
 
-  private newOrgForm(): Record<string, unknown> {
+  statusBadgeClass(status: string | undefined): string {
+    switch (String(status || '').toLowerCase()) {
+      case 'active':
+        return 'text-bg-success';
+      case 'inactive':
+        return 'text-bg-secondary';
+      case 'blocked':
+        return 'text-bg-danger';
+      default:
+        return 'text-bg-light';
+    }
+  }
+
+  private newVendorForm(): Record<string, unknown> {
     return {
       name: '',
       legalName: '',
       taxId: '',
+      contactPerson: '',
+      contactEmail: '',
+      phone: '',
       addressLine1: '',
       addressLine2: '',
       city: '',
       state: '',
       postalCode: '',
       country: 'United States',
-      currency: this.currentOrganizationCurrency,
-      contactName: '',
-      contactEmail: '',
-      phone: '',
-      website: '',
-      industry: '',
-      employeeCount: 0,
+      paymentTerms: '',
       notes: '',
-      isActive: true,
+      status: 'active',
+      createdBy: '',
+      updatedBy: '',
     };
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
     return {
-      name: this.asString(form['name']),
+      name: this.optionalString(form['name']),
       legalName: this.optionalString(form['legalName']),
       taxId: this.optionalString(form['taxId']),
-      addressLine1: this.asString(form['addressLine1']),
+      contactPerson: this.optionalString(form['contactPerson']),
+      contactEmail: this.optionalString(form['contactEmail']),
+      phone: this.optionalString(form['phone']),
+      addressLine1: this.optionalString(form['addressLine1']),
       addressLine2: this.optionalString(form['addressLine2']),
-      city: this.asString(form['city']),
+      city: this.optionalString(form['city']),
       state: this.optionalString(form['state']),
       postalCode: this.optionalString(form['postalCode']),
       country: this.optionalString(form['country']),
-      currency: this.optionalString(form['currency']),
-      contactName: this.optionalString(form['contactName']),
-      contactEmail: this.asString(form['contactEmail']),
-      phone: this.asString(form['phone']),
-      website: this.optionalString(form['website']),
-      industry: this.optionalString(form['industry']),
-      employeeCount: this.optionalNumber(form['employeeCount']),
+      paymentTerms: this.optionalString(form['paymentTerms']),
       notes: this.optionalString(form['notes']),
-      isActive: Boolean(form['isActive']),
+      status: this.optionalString(form['status']),
+      createdBy: this.optionalString(form['createdBy']),
+      updatedBy: this.optionalString(form['updatedBy']),
     };
-  }
-
-  private asString(value: unknown): string {
-    return String(value || '').trim();
   }
 
   private optionalString(value: unknown): string | undefined {
     const cleaned = String(value || '').trim();
     return cleaned ? cleaned : undefined;
-  }
-
-  private optionalNumber(value: unknown): number | undefined {
-    if (value === '' || value === null || value === undefined) {
-      return undefined;
-    }
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : undefined;
   }
 }

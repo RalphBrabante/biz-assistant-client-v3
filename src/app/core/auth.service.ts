@@ -7,6 +7,7 @@ interface CurrentUser {
   lastName?: string;
   status?: string;
   organizationId?: string;
+  currency?: string;
 }
 
 @Injectable({ providedIn: 'root' })

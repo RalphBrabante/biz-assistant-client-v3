@@ -161,6 +161,10 @@
         <label class="form-label">Country</label>
         <input class="form-control" [(ngModel)]="editForm['country']" />
       </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Currency</label>
+        <input class="form-control" [(ngModel)]="editForm['currency']" placeholder="USD" />
+      </div>
 
       <div class="col-12 col-md-4">
         <label class="form-label">Contact Name</label>
@@ -262,6 +266,10 @@
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Country</label>
             <input class="form-control" [(ngModel)]="createForm['country']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Currency</label>
+            <input class="form-control" [(ngModel)]="createForm['currency']" placeholder="USD" />
           </div>
 
           <div class="col-12 col-md-4">

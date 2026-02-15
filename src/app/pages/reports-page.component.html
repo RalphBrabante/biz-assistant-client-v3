@@ -1,0 +1,271 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Tax Filing</div>
+        <h1 class="h3 mb-2">Quarterly Reports</h1>
+        <p class="text-secondary mb-0">Generate and save quarterly totals for both sales invoices and expenses.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-md-3">
+        <label class="form-label fw-semibold">Year</label>
+        <select class="form-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event); onFilterChange()">
+          <option *ngFor="let year of availableYears()" [value]="year">{{ year }}</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label fw-semibold">Quarter</label>
+        <select class="form-select" [ngModel]="selectedQuarter()" (ngModelChange)="selectedQuarter.set($event); onFilterChange()">
+          <option [value]="1">Q1</option>
+          <option [value]="2">Q2</option>
+          <option [value]="3">Q3</option>
+          <option [value]="4">Q4</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <h2 class="h5 mb-1">Quarterly Sales Reports</h2>
+      <div class="text-secondary small">Based on sales invoices for selected quarter.</div>
+    </div>
+    <button class="btn btn-primary" [disabled]="generatingSales()" (click)="generateQuarterlySalesReport()">
+      <i class="bi bi-calculator me-1"></i>{{ generatingSales() ? 'Generating...' : 'Generate Sales Report' }}
+    </button>
+  </div>
+
+  <div class="px-4" *ngIf="salesMessage()">
+    <div class="alert alert-success mb-3">{{ salesMessage() }}</div>
+  </div>
+  <div class="px-4" *ngIf="salesError()">
+    <div class="alert alert-danger mb-3">{{ salesError() }}</div>
+  </div>
+
+  <section class="row g-3 px-4 pb-4" *ngIf="latestSalesReport() as report">
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Invoice Count</div>
+          <div class="display-6 fw-semibold">{{ report.invoiceCount }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Subtotal</div>
+          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.subtotalAmount, report.currency) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Tax</div>
+          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.taxAmount, report.currency) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Total</div>
+          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.totalAmount, report.currency) }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="px-4 pb-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Rows</label>
+        <select class="form-select" [ngModel]="salesPageSize" (ngModelChange)="onSalesPageSizeChange($event)">
+          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Saved</div>
+          <div class="stat-value">{{ salesTotal }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Page</div>
+          <div class="stat-value">{{ salesPage }} / {{ salesTotalPages }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Quarter</th>
+          <th>Period</th>
+          <th>Invoices</th>
+          <th>Subtotal</th>
+          <th>Tax</th>
+          <th>Discount</th>
+          <th>Total</th>
+          <th>Generated</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="!loadingSales() && salesRows().length === 0">
+          <td colspan="8" class="text-center text-secondary py-4">No sales reports found.</td>
+        </tr>
+        <tr *ngFor="let row of salesRows(); trackBy: trackById">
+          <td><span class="badge rounded-pill text-bg-primary">{{ quarterLabel(row.quarter) }}</span></td>
+          <td>{{ row.periodStart }} to {{ row.periodEnd }}</td>
+          <td>{{ row.invoiceCount }}</td>
+          <td>{{ toCurrency(row.subtotalAmount, row.currency) }}</td>
+          <td>{{ toCurrency(row.taxAmount, row.currency) }}</td>
+          <td>{{ toCurrency(row.discountAmount, row.currency) }}</td>
+          <td class="fw-semibold">{{ toCurrency(row.totalAmount, row.currency) }}</td>
+          <td>{{ row.generatedAt | date : 'medium' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+    <div class="small text-secondary">Showing {{ salesRows().length }} of {{ salesTotal }} sales reports</div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToSalesPage(1)" [disabled]="loadingSales() || salesPage <= 1">First</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToSalesPage(salesPage - 1)" [disabled]="loadingSales() || salesPage <= 1">Prev</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToSalesPage(salesPage + 1)" [disabled]="loadingSales() || salesPage >= salesTotalPages">Next</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToSalesPage(salesTotalPages)" [disabled]="loadingSales() || salesPage >= salesTotalPages">Last</button>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <h2 class="h5 mb-1">Quarterly Expense Reports</h2>
+      <div class="text-secondary small">Based on expenses for selected quarter (excluding cancelled).</div>
+    </div>
+    <button class="btn btn-outline-primary" [disabled]="generatingExpenses()" (click)="generateQuarterlyExpenseReport()">
+      <i class="bi bi-calculator me-1"></i>{{ generatingExpenses() ? 'Generating...' : 'Generate Expense Report' }}
+    </button>
+  </div>
+
+  <div class="px-4" *ngIf="expenseMessage()">
+    <div class="alert alert-success mb-3">{{ expenseMessage() }}</div>
+  </div>
+  <div class="px-4" *ngIf="expenseError()">
+    <div class="alert alert-danger mb-3">{{ expenseError() }}</div>
+  </div>
+
+  <section class="row g-3 px-4 pb-4" *ngIf="latestExpenseReport() as report">
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Expense Count</div>
+          <div class="display-6 fw-semibold">{{ report.expenseCount }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Amount</div>
+          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.amount, report.currency) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Tax</div>
+          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.taxAmount, report.currency) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-3">
+      <div class="card border-0 bg-light rounded-4 h-100">
+        <div class="card-body">
+          <div class="text-secondary small">Total</div>
+          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.totalAmount, report.currency) }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="px-4 pb-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Rows</label>
+        <select class="form-select" [ngModel]="expensePageSize" (ngModelChange)="onExpensePageSizeChange($event)">
+          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Saved</div>
+          <div class="stat-value">{{ expenseTotal }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Page</div>
+          <div class="stat-value">{{ expensePage }} / {{ expenseTotalPages }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Quarter</th>
+          <th>Period</th>
+          <th>Expenses</th>
+          <th>Amount</th>
+          <th>Tax</th>
+          <th>Discount</th>
+          <th>Total</th>
+          <th>Generated</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="!loadingExpenses() && expenseRows().length === 0">
+          <td colspan="8" class="text-center text-secondary py-4">No expense reports found.</td>
+        </tr>
+        <tr *ngFor="let row of expenseRows(); trackBy: trackById">
+          <td><span class="badge rounded-pill text-bg-warning">{{ quarterLabel(row.quarter) }}</span></td>
+          <td>{{ row.periodStart }} to {{ row.periodEnd }}</td>
+          <td>{{ row.expenseCount }}</td>
+          <td>{{ toCurrency(row.amount, row.currency) }}</td>
+          <td>{{ toCurrency(row.taxAmount, row.currency) }}</td>
+          <td>{{ toCurrency(row.discountAmount, row.currency) }}</td>
+          <td class="fw-semibold">{{ toCurrency(row.totalAmount, row.currency) }}</td>
+          <td>{{ row.generatedAt | date : 'medium' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+    <div class="small text-secondary">Showing {{ expenseRows().length }} of {{ expenseTotal }} expense reports</div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToExpensePage(1)" [disabled]="loadingExpenses() || expensePage <= 1">First</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToExpensePage(expensePage - 1)" [disabled]="loadingExpenses() || expensePage <= 1">Prev</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToExpensePage(expensePage + 1)" [disabled]="loadingExpenses() || expensePage >= expenseTotalPages">Next</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToExpensePage(expenseTotalPages)" [disabled]="loadingExpenses() || expensePage >= expenseTotalPages">Last</button>
+    </div>
+  </div>
+</section>

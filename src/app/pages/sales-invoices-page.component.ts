@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
@@ -34,13 +34,8 @@ interface SalesInvoiceRow {
   templateUrl: './sales-invoices-page.component.html',
 })
 export class SalesInvoicesPageComponent {
-  private readonly api: ApiService;
-  private readonly auth: AuthService;
-
-  constructor(api: ApiService, auth: AuthService) {
-    this.api = api;
-    this.auth = auth;
-  }
+  private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
 
   readonly rows = signal<SalesInvoiceRow[]>([]);
   readonly loading = signal(false);
@@ -77,6 +72,10 @@ export class SalesInvoicesPageComponent {
 
   get currentOrganizationId(): string {
     return this.auth.currentUser()?.organizationId || '';
+  }
+
+  get currentOrganizationCurrency(): string {
+    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
   ngOnInit(): void {
@@ -243,7 +242,7 @@ export class SalesInvoicesPageComponent {
       dueDate: '',
       status: 'draft',
       paymentStatus: 'unpaid',
-      currency: 'USD',
+      currency: this.currentOrganizationCurrency,
       subtotalAmount: 0,
       taxAmount: 0,
       discountAmount: 0,
@@ -264,7 +263,6 @@ export class SalesInvoicesPageComponent {
       dueDate: this.optionalString(form['dueDate']),
       status: this.optionalString(form['status']),
       paymentStatus: this.optionalString(form['paymentStatus']),
-      currency: this.optionalString(form['currency']),
       subtotalAmount: this.optionalNumber(form['subtotalAmount']),
       taxAmount: this.optionalNumber(form['taxAmount']),
       discountAmount: this.optionalNumber(form['discountAmount']),

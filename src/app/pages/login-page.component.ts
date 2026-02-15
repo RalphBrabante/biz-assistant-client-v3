@@ -14,6 +14,8 @@ interface LoginPayload {
     firstName?: string;
     lastName?: string;
     status?: string;
+    organizationId?: string;
+    currency?: string;
   };
 }
 

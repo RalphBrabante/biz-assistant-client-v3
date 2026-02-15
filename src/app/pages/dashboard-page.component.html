@@ -1,17 +1,108 @@
-<section class="card border-0 shadow-sm rounded-4">
-  <div class="card-body p-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-      <div>
-        <h1 class="h4 mb-1">Dashboard</h1>
-        <p class="text-secondary mb-0">System status and quick API workspace overview.</p>
-      </div>
-      <button class="btn btn-outline-primary" (click)="refresh()" [disabled]="loading">
-        {{ loading ? 'Refreshing...' : 'Refresh' }}
-      </button>
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+      <div class="text-uppercase small fw-semibold text-secondary mb-2">Overview</div>
+      <h1 class="h3 mb-2">Dashboard</h1>
+      <p class="text-secondary mb-0">Live business metrics and service health.</p>
     </div>
-
-    <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
-
-    <pre *ngIf="health" class="bg-body-tertiary rounded-3 p-3 mb-0 small">{{ health | json }}</pre>
+    <button class="btn btn-outline-dark" (click)="refresh()" [disabled]="loading">
+      <i class="bi bi-arrow-clockwise me-1"></i>{{ loading ? 'Refreshing...' : 'Refresh' }}
+    </button>
   </div>
+</section>
+
+<div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+
+<section class="row g-3 mb-4" *ngIf="metrics as m">
+  <div class="col-6 col-md-4 col-xl-3">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="small text-secondary text-uppercase">Items</div>
+        <div class="h3 mb-0">{{ m.totalItems }}</div>
+      </div>
+    </article>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="small text-secondary text-uppercase">Customers</div>
+        <div class="h3 mb-0">{{ m.totalCustomers }}</div>
+      </div>
+    </article>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="small text-secondary text-uppercase">Orders</div>
+        <div class="h3 mb-0">{{ m.totalOrders }}</div>
+      </div>
+    </article>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="small text-secondary text-uppercase">Users</div>
+        <div class="h3 mb-0">{{ m.totalUsers }}</div>
+      </div>
+    </article>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="small text-secondary text-uppercase">Organizations</div>
+        <div class="h3 mb-0">{{ m.totalOrganizations }}</div>
+      </div>
+    </article>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="small text-secondary text-uppercase">Licenses</div>
+        <div class="h3 mb-0">{{ m.totalLicenses }}</div>
+      </div>
+    </article>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body">
+        <div class="small text-secondary text-uppercase">Sales Invoices</div>
+        <div class="h3 mb-0">{{ m.totalSalesInvoices }}</div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="row g-4">
+  <div class="col-12 col-xl-7">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body p-4">
+        <h2 class="h5 mb-3">Orders by Status</h2>
+        <div class="d-flex flex-column gap-3">
+          <div *ngFor="let row of orderStatusCounts">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>{{ row.label }}</span>
+              <strong>{{ row.value }}</strong>
+            </div>
+            <div class="progress" style="height: 10px;">
+              <div class="progress-bar" [ngClass]="row.className" [style.width.%]="orderStatusWidth(row.value)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="col-12 col-xl-5">
+    <article class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body p-4">
+        <h2 class="h5 mb-3">System Health</h2>
+        <pre *ngIf="health" class="bg-body-tertiary rounded-3 p-3 mb-0 small">{{ health | json }}</pre>
+        <div *ngIf="!health && !loading" class="text-secondary small">Health endpoint not available.</div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section *ngIf="loading" class="small text-secondary mt-3">
+  Loading dashboard metrics...
 </section>

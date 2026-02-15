@@ -61,6 +61,8 @@ export class CreateOrderPageComponent {
   customerResults: CustomerRow[] = [];
   selectedCustomerId = '';
   searchingCustomers = false;
+  customerSearchPerformed = false;
+  customerSearchStatus = '';
 
   catalogLoading = false;
   submitting = false;
@@ -69,6 +71,10 @@ export class CreateOrderPageComponent {
 
   get currentOrganizationId(): string {
     return this.auth.currentUser()?.organizationId || '';
+  }
+
+  get currentOrganizationCurrency(): string {
+    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
   searchItems(): void {
@@ -103,6 +109,8 @@ export class CreateOrderPageComponent {
     }
 
     this.searchingCustomers = true;
+    this.customerSearchPerformed = true;
+    this.customerSearchStatus = '';
     this.error = '';
 
     const query = encodeURIComponent(this.customerSearchQuery.trim());
@@ -113,9 +121,16 @@ export class CreateOrderPageComponent {
       next: (response: ApiResponse<CustomerRow[]>) => {
         this.searchingCustomers = false;
         this.customerResults = (response.data || []).filter((row) => row.isActive !== false);
+        const count = this.customerResults.length;
+        this.customerSearchStatus =
+          count > 0
+            ? `${count} customer${count > 1 ? 's' : ''} found. Please select one.`
+            : 'No matching customers found.';
       },
       error: (err) => {
         this.searchingCustomers = false;
+        this.customerResults = [];
+        this.customerSearchStatus = 'Customer search failed.';
         this.error = err?.error?.message || 'Unable to search customers.';
       },
     });
@@ -244,7 +259,7 @@ export class CreateOrderPageComponent {
       status: this.status,
       paymentStatus: this.paymentStatus,
       fulfillmentStatus: this.fulfillmentStatus,
-      currency: 'USD',
+      currency: this.currentOrganizationCurrency,
       subtotalAmount: this.subtotalAmount,
       taxAmount: this.taxAmount,
       discountAmount: this.discountAmount,
