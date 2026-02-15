@@ -1,0 +1,210 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Checkout</div>
+        <h1 class="h3 mb-2">Create Order</h1>
+        <p class="text-secondary mb-0">Search items, add to cart, and place order like an ecommerce flow.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-dark" routerLink="/orders">
+          <i class="bi bi-arrow-left me-1"></i>Back to Orders
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+<div *ngIf="message" class="alert alert-success">{{ message }}</div>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">Order Details</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">Order Number</label>
+        <input class="form-control" [ngModel]="orderNumber" name="orderNumber" readonly />
+      </div>
+      <div class="col-12 col-md-8">
+        <label class="form-label">Customer (search by name or tax ID)</label>
+        <div class="input-group">
+          <input
+            class="form-control"
+            [(ngModel)]="customerSearchQuery"
+            name="customerSearchQuery"
+            placeholder="Type customer name or tax ID"
+            (keyup.enter)="searchCustomers()"
+          />
+          <button class="btn btn-outline-primary" type="button" (click)="searchCustomers()" [disabled]="searchingCustomers">
+            <i class="bi bi-search me-1"></i>{{ searchingCustomers ? 'Searching...' : 'Search Customer' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label">Select Customer</label>
+        <select class="form-select" [(ngModel)]="selectedCustomerId" name="selectedCustomerId">
+          <option value="">Select customer</option>
+          <option *ngFor="let customer of customerResults" [value]="customer.id">
+            {{ customerLabel(customer) }}
+          </option>
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Selected Customer Details</label>
+        <input
+          class="form-control"
+          [value]="selectedCustomer ? (selectedCustomer.name + ' | Tax ID: ' + selectedCustomer.taxId) : 'No customer selected'"
+          readonly
+        />
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" [(ngModel)]="status" name="status">
+          <option value="pending">pending</option>
+          <option value="confirmed">confirmed</option>
+          <option value="fulfilled">fulfilled</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Payment Status</label>
+        <select class="form-select" [(ngModel)]="paymentStatus" name="paymentStatus">
+          <option value="unpaid">unpaid</option>
+          <option value="partial">partial</option>
+          <option value="paid">paid</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Fulfillment Status</label>
+        <select class="form-select" [(ngModel)]="fulfillmentStatus" name="fulfillmentStatus">
+          <option value="unfulfilled">unfulfilled</option>
+          <option value="partial">partial</option>
+          <option value="fulfilled">fulfilled</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Shipping Amount</label>
+        <input type="number" class="form-control" [(ngModel)]="shippingAmount" name="shippingAmount" />
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Notes</label>
+        <textarea rows="2" class="form-control" [(ngModel)]="notes" name="notes"></textarea>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="row g-4">
+  <div class="col-12 col-xl-7">
+    <section class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body p-4">
+        <h2 class="h5 mb-3">Item Search</h2>
+        <div class="input-group mb-3">
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Search items by name, sku, category"
+            [(ngModel)]="searchQuery"
+            name="searchQuery"
+            (keyup.enter)="searchItems()"
+          />
+          <button class="btn btn-primary" type="button" (click)="searchItems()" [disabled]="catalogLoading">
+            <i class="bi bi-search me-1"></i>{{ catalogLoading ? 'Searching...' : 'Search' }}
+          </button>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6" *ngFor="let item of catalogItems">
+            <article class="border rounded-3 p-3 h-100 d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div class="fw-semibold">{{ item.name }}</div>
+                  <div class="small text-secondary">{{ item.sku || 'No SKU' }} | {{ item.category || 'General' }}</div>
+                </div>
+                <span class="badge text-bg-light border">{{ item.stock ?? 0 }} in stock</span>
+              </div>
+
+              <div class="mt-3 fw-semibold">
+                {{ itemUnitPrice(item) | number: '1.2-2' }} {{ item.currency || 'USD' }}
+              </div>
+
+              <button
+                class="btn btn-outline-primary mt-auto"
+                type="button"
+                (click)="addToCart(item)"
+                [disabled]="item.type === 'product' && !canIncreaseItem(item)"
+              >
+                <i class="bi bi-cart-plus me-1"></i>Add to Order
+              </button>
+            </article>
+          </div>
+
+          <div class="col-12" *ngIf="!catalogLoading && catalogItems.length === 0">
+            <div class="text-secondary small">No items loaded. Search using your organization context.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-12 col-xl-5">
+    <section class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body p-4 d-flex flex-column">
+        <h2 class="h5 mb-3">Order Cart</h2>
+
+        <div *ngIf="cart.length === 0" class="text-secondary small">No items yet. Add items from search.</div>
+
+        <div class="d-flex flex-column gap-3" *ngIf="cart.length > 0">
+          <div class="border rounded-3 p-3" *ngFor="let row of cart">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold">{{ row.item.name }}</div>
+                <div class="small text-secondary">{{ row.item.sku || 'No SKU' }}</div>
+              </div>
+              <button class="btn btn-sm btn-outline-danger" type="button" (click)="removeFromCart(row.item.id)">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mt-3">
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="decrease(row.item.id)">-</button>
+              <input class="form-control form-control-sm text-center" style="max-width: 70px" [value]="row.quantity" readonly />
+              <button
+                class="btn btn-sm btn-outline-secondary"
+                type="button"
+                (click)="increase(row.item.id)"
+                [disabled]="row.item.type === 'product' && row.quantity >= maxStock(row.item)"
+              >
+                +
+              </button>
+              <div class="ms-auto fw-semibold">{{ itemLineTotal(row) | number: '1.2-2' }}</div>
+            </div>
+            <div class="small text-secondary mt-2" *ngIf="row.item.type === 'product'">
+              Available stock: {{ maxStock(row.item) }}
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-3" />
+
+        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ subtotalAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ taxAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ discountAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-3"><span>Shipping</span><strong>{{ shippingAmount | number: '1.2-2' }}</strong></div>
+
+        <div class="d-flex justify-content-between fs-5 mb-3">
+          <span class="fw-semibold">Total</span>
+          <strong>{{ totalAmount | number: '1.2-2' }}</strong>
+        </div>
+
+        <button class="btn btn-primary btn-lg mt-auto" type="button" [disabled]="submitting" (click)="placeOrder()">
+          <i class="bi bi-bag-check me-1"></i>{{ submitting ? 'Placing Order...' : 'Place Order' }}
+        </button>
+      </div>
+    </section>
+  </div>
+</div>

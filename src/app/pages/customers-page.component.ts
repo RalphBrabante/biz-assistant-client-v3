@@ -1,0 +1,377 @@
+import { CommonModule } from '@angular/common';
+import { Component, computed, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ApiService } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
+import { ApiResponse } from '../core/types';
+import { TooltipDirective } from '../shared/tooltip.directive';
+
+interface CustomerRow {
+  id: string;
+  organizationId: string;
+  customerCode?: string;
+  type?: string;
+  name: string;
+  legalName?: string;
+  taxId: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  creditLimit?: number;
+  paymentTermsDays?: number;
+  status?: string;
+  notes?: string;
+  isActive?: boolean;
+  organization?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+  };
+}
+
+@Component({
+  selector: 'app-customers-page',
+  standalone: true,
+  imports: [CommonModule, FormsModule, TooltipDirective],
+  templateUrl: './customers-page.component.html',
+})
+export class CustomersPageComponent {
+  private readonly api: ApiService;
+  private readonly auth: AuthService;
+
+  constructor(api: ApiService, auth: AuthService) {
+    this.api = api;
+    this.auth = auth;
+  }
+
+  readonly rows = signal<CustomerRow[]>([]);
+  readonly loading = signal(false);
+  readonly submitting = signal(false);
+  readonly deletingId = signal('');
+  readonly isCreateModalOpen = signal(false);
+  readonly isEditModalOpen = signal(false);
+
+  readonly message = signal('');
+  readonly error = signal('');
+  readonly filter = signal('');
+  page = 1;
+  pageSize = 20;
+  total = 0;
+  totalPages = 1;
+  readonly pageSizeOptions = [10, 20, 50, 100];
+
+  createForm: Record<string, unknown> = this.newCustomerForm();
+  editingId = '';
+  editForm: Record<string, unknown> = this.newCustomerForm();
+
+  readonly filteredRows = computed(() => {
+    const q = this.filter().trim().toLowerCase();
+    if (!q) {
+      return this.rows();
+    }
+
+    return this.rows().filter((row) => {
+      return (
+        String(row.name || '').toLowerCase().includes(q) ||
+        String(row.legalName || '').toLowerCase().includes(q) ||
+        String(row.taxId || '').toLowerCase().includes(q) ||
+        String(row.email || '').toLowerCase().includes(q) ||
+        String(row.customerCode || '').toLowerCase().includes(q) ||
+        String(row.organization?.name || '').toLowerCase().includes(q)
+      );
+    });
+  });
+
+  get currentOrganizationId(): string {
+    return this.auth.currentUser()?.organizationId || '';
+  }
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.loading.set(true);
+    this.error.set('');
+    const q = this.filter().trim();
+    const params = new URLSearchParams({
+      page: String(this.page),
+      limit: String(this.pageSize),
+    });
+    if (q) {
+      params.set('q', q);
+    }
+
+    this.api.list<CustomerRow>(`/api/v1/customers?${params.toString()}`).subscribe({
+      next: (response: ApiResponse<CustomerRow[]>) => {
+        this.loading.set(false);
+        this.rows.set(response.data || []);
+        const meta = response.meta || {};
+        this.total = Number(meta.total || 0);
+        this.totalPages = Math.max(1, Number(meta.totalPages || 1));
+        this.page = Math.max(1, Number(meta.page || this.page));
+        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+        if (this.page > this.totalPages) {
+          this.page = this.totalPages;
+          this.load();
+        }
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Unable to load customers.');
+      },
+    });
+  }
+
+  openCreateModal(): void {
+    this.createForm = this.newCustomerForm();
+    this.error.set('');
+    this.message.set('');
+    this.isCreateModalOpen.set(true);
+  }
+
+  closeCreateModal(): void {
+    this.isCreateModalOpen.set(false);
+  }
+
+  createCustomer(): void {
+    if (!this.currentOrganizationId.trim()) {
+      this.error.set('Logged in user has no organization assigned.');
+      return;
+    }
+
+    this.submitting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const currentUser = this.auth.currentUser();
+    const payload = this.buildPayload({
+      ...this.createForm,
+      organizationId: this.currentOrganizationId,
+      createdBy: currentUser?.id || '',
+      updatedBy: currentUser?.id || '',
+    });
+
+    this.api.create<CustomerRow>('/api/v1/customers', payload).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.isCreateModalOpen.set(false);
+        this.message.set(response.message || 'Customer created successfully.');
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.message || 'Unable to create customer.');
+      },
+    });
+  }
+
+  openEditModal(row: CustomerRow): void {
+    this.editingId = row.id;
+    this.editForm = {
+      organizationId: row.organizationId || '',
+      customerCode: row.customerCode || '',
+      type: row.type || 'business',
+      name: row.name || '',
+      legalName: row.legalName || '',
+      taxId: row.taxId || '',
+      contactPerson: row.contactPerson || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      mobile: row.mobile || '',
+      addressLine1: row.addressLine1 || '',
+      addressLine2: row.addressLine2 || '',
+      city: row.city || '',
+      state: row.state || '',
+      postalCode: row.postalCode || '',
+      country: row.country || 'United States',
+      creditLimit: row.creditLimit ?? 0,
+      paymentTermsDays: row.paymentTermsDays ?? 30,
+      status: row.status || 'active',
+      notes: row.notes || '',
+      isActive: row.isActive !== false,
+    };
+    this.error.set('');
+    this.message.set('');
+    this.isEditModalOpen.set(true);
+  }
+
+  closeEditModal(): void {
+    this.editingId = '';
+    this.editForm = this.newCustomerForm();
+    this.isEditModalOpen.set(false);
+  }
+
+  saveEdit(): void {
+    if (!this.editingId) {
+      return;
+    }
+
+    this.submitting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const currentUser = this.auth.currentUser();
+    const payload = this.buildPayload({
+      ...this.editForm,
+      updatedBy: currentUser?.id || '',
+    });
+
+    this.api.update<CustomerRow>('/api/v1/customers', this.editingId, payload).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.message.set(response.message || 'Customer updated successfully.');
+        this.closeEditModal();
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.message || 'Unable to update customer.');
+      },
+    });
+  }
+
+  removeCustomer(id: string): void {
+    this.deletingId.set(id);
+    this.error.set('');
+    this.message.set('');
+
+    this.api.remove('/api/v1/customers', id).subscribe({
+      next: (response) => {
+        this.deletingId.set('');
+        this.message.set(response.message || 'Customer deleted successfully.');
+        this.load();
+      },
+      error: (err) => {
+        this.deletingId.set('');
+        this.error.set(err?.error?.message || 'Unable to delete customer.');
+      },
+    });
+  }
+
+  trackById(_index: number, row: CustomerRow): string {
+    return row.id;
+  }
+
+  onFilterChange(value: string): void {
+    this.filter.set(value);
+    this.page = 1;
+    this.load();
+  }
+
+  onPageSizeChange(value: string): void {
+    const parsed = Number(value);
+    this.pageSize = Number.isFinite(parsed) ? parsed : 20;
+    this.page = 1;
+    this.load();
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+      return;
+    }
+    this.page = page;
+    this.load();
+  }
+
+  organizationLabel(row: CustomerRow): string {
+    return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
+  }
+
+  customerStatusBadgeClass(status: string | undefined): string {
+    switch (String(status || '').toLowerCase()) {
+      case 'active':
+        return 'text-bg-success';
+      case 'inactive':
+        return 'text-bg-secondary';
+      case 'blocked':
+        return 'text-bg-danger';
+      default:
+        return 'text-bg-light border border-secondary-subtle text-secondary';
+    }
+  }
+
+  customerActiveBadgeClass(isActive: boolean | undefined): string {
+    return isActive ? 'text-bg-success' : 'text-bg-secondary';
+  }
+
+  private newCustomerForm(): Record<string, unknown> {
+    return {
+      organizationId: '',
+      customerCode: '',
+      type: 'business',
+      name: '',
+      legalName: '',
+      taxId: '',
+      contactPerson: '',
+      email: '',
+      phone: '',
+      mobile: '',
+      addressLine1: '',
+      addressLine2: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'United States',
+      creditLimit: 0,
+      paymentTermsDays: 30,
+      status: 'active',
+      notes: '',
+      isActive: true,
+      createdBy: '',
+      updatedBy: '',
+    };
+  }
+
+  private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
+    return {
+      organizationId: this.asString(form['organizationId']),
+      customerCode: this.optionalString(form['customerCode']),
+      type: this.optionalString(form['type']),
+      name: this.asString(form['name']),
+      legalName: this.optionalString(form['legalName']),
+      taxId: this.asString(form['taxId']),
+      contactPerson: this.optionalString(form['contactPerson']),
+      email: this.optionalString(form['email']),
+      phone: this.optionalString(form['phone']),
+      mobile: this.optionalString(form['mobile']),
+      addressLine1: this.optionalString(form['addressLine1']),
+      addressLine2: this.optionalString(form['addressLine2']),
+      city: this.optionalString(form['city']),
+      state: this.optionalString(form['state']),
+      postalCode: this.optionalString(form['postalCode']),
+      country: this.optionalString(form['country']),
+      creditLimit: this.optionalNumber(form['creditLimit']),
+      paymentTermsDays: this.optionalNumber(form['paymentTermsDays']),
+      status: this.optionalString(form['status']),
+      notes: this.optionalString(form['notes']),
+      isActive: Boolean(form['isActive']),
+      createdBy: this.optionalString(form['createdBy']),
+      updatedBy: this.optionalString(form['updatedBy']),
+    };
+  }
+
+  private asString(value: unknown): string {
+    return String(value || '').trim();
+  }
+
+  private optionalString(value: unknown): string | undefined {
+    const cleaned = String(value || '').trim();
+    return cleaned ? cleaned : undefined;
+  }
+
+  private optionalNumber(value: unknown): number | undefined {
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+}

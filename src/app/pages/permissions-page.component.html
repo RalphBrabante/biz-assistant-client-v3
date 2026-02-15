@@ -1,0 +1,202 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Access Control</div>
+        <h1 class="h3 mb-2">Permission Management</h1>
+        <p class="text-secondary mb-0">Manage resources and actions with modal-based creation flow.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-dark" (click)="load()" [disabled]="loading()">
+          {{ loading() ? 'Refreshing...' : 'Refresh' }}
+        </button>
+        <button class="btn btn-primary" (click)="openCreateModal()"><i class="bi bi-plus-lg me-1"></i>Create Permission</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <div class="row g-3 align-items-center">
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">Filter permissions</label>
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Search by name, code, resource, action"
+          [ngModel]="filter()"
+          (ngModelChange)="onFilterChange($event)"
+        />
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Rows per page</label>
+        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Total Permissions</div>
+          <div class="stat-value">{{ total }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Page</div>
+          <div class="stat-value">{{ page }} / {{ totalPages }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
+    <div *ngIf="error()" class="alert alert-danger mt-3 mb-0">{{ error() }}</div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Code</th>
+          <th>Resource</th>
+          <th>Action</th>
+          <th>System</th>
+          <th>Active</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="!loading() && filteredRows().length === 0">
+          <td colspan="7" class="text-center text-secondary py-4">No permissions found.</td>
+        </tr>
+
+        <tr *ngFor="let row of filteredRows(); trackBy: trackById">
+          <ng-container *ngIf="editingId !== row.id; else editRow">
+            <td class="fw-semibold">{{ row.name }}</td>
+            <td><span class="badge text-bg-light border">{{ row.code }}</span></td>
+            <td>{{ row.resource }}</td>
+            <td>{{ row.action }}</td>
+            <td>{{ row.isSystem ? 'Yes' : 'No' }}</td>
+            <td>{{ row.isActive ? 'Yes' : 'No' }}</td>
+            <td class="text-end">
+              <div class="d-inline-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-danger"
+                  type="button"
+                  [disabled]="deletingId() === row.id"
+                  (click)="removePermission(row.id)"
+                  appTooltip
+                  title="Delete"
+                >
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-template #editRow>
+            <td><input class="form-control form-control-sm" [(ngModel)]="editForm['name']" /></td>
+            <td><input class="form-control form-control-sm" [(ngModel)]="editForm['code']" /></td>
+            <td><input class="form-control form-control-sm" [(ngModel)]="editForm['resource']" /></td>
+            <td><input class="form-control form-control-sm" [(ngModel)]="editForm['action']" /></td>
+            <td>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [(ngModel)]="editForm['isSystem']" />
+              </div>
+            </td>
+            <td>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [(ngModel)]="editForm['isActive']" />
+              </div>
+            </td>
+            <td class="text-end">
+              <div class="d-inline-flex gap-2">
+                <button class="btn btn-sm btn-outline-success" type="button" [disabled]="submitting()" (click)="saveEdit()" appTooltip title="Save">
+                  <i class="bi bi-floppy2"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" (click)="cancelEdit()" appTooltip title="Cancel">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </td>
+          </ng-template>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+    <div class="small text-secondary">Showing {{ rows().length }} of {{ total }} permissions</div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(1)" [disabled]="loading() || page <= 1">First</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading() || page <= 1">Prev</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading() || page >= totalPages">Next</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading() || page >= totalPages">Last</button>
+    </div>
+  </div>
+</section>
+
+<div class="modal-backdrop fade show" *ngIf="isCreateModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isCreateModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isCreateModalOpen()"
+  *ngIf="isCreateModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Create New Permission</h5>
+        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Permission Name</label>
+            <input class="form-control" [(ngModel)]="createForm['name']" placeholder="e.g. Manage Users" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Permission Code</label>
+            <input class="form-control" [(ngModel)]="createForm['code']" placeholder="e.g. users.manage" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Resource</label>
+            <input class="form-control" [(ngModel)]="createForm['resource']" placeholder="e.g. users" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Action</label>
+            <input class="form-control" [(ngModel)]="createForm['action']" placeholder="e.g. create" />
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Description</label>
+            <textarea class="form-control" rows="3" [(ngModel)]="createForm['description']"></textarea>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isSystem']" />
+              <label class="form-check-label">System Permission</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isActive']" />
+              <label class="form-check-label">Active</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="createPermission()">
+          {{ submitting() ? 'Creating...' : 'Create Permission' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

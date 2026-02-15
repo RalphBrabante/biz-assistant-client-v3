@@ -1,0 +1,127 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden no-print">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Revenue</div>
+        <h1 class="h3 mb-2">Sales Invoice</h1>
+        <p class="text-secondary mb-0">Manage invoice status and print client-ready copy.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-dark" routerLink="/sales-invoices"><i class="bi bi-arrow-left me-1"></i>Back to Sales Invoices</a>
+        <button class="btn btn-dark" type="button" *ngIf="isPaid && invoice()" (click)="printInvoice()">
+          <i class="bi bi-printer me-1"></i>Print Invoice
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div *ngIf="message()" class="alert alert-success no-print">{{ message() }}</div>
+<div *ngIf="error()" class="alert alert-danger no-print">{{ error() }}</div>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4 no-print" *ngIf="invoice() && !isPaid">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">Status Update</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">Status</label>
+        <select class="form-select" [(ngModel)]="status" [disabled]="submitting()">
+          <option *ngFor="let option of statusOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="button" [disabled]="submitting()" (click)="saveStatus()">
+          {{ submitting() ? 'Saving...' : 'Save Status' }}
+        </button>
+        <button class="btn btn-outline-danger" type="button" [disabled]="submitting()" (click)="markCancelled()">
+          <i class="bi bi-x-octagon me-1"></i>Mark Cancelled
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 print-delivery-sheet" *ngIf="invoice() as row">
+  <div class="card-body p-4 p-lg-5">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+      <div>
+        <h2 class="h4 mb-1">Invoice {{ row.invoiceNumber }}</h2>
+        <div class="text-secondary">Sales Invoice Record</div>
+      </div>
+      <div class="text-end small">
+        <div><strong>Status:</strong> {{ printableStatus }}</div>
+        <div><strong>Payment:</strong> {{ row.paymentStatus || '-' }}</div>
+        <div><strong>Issue Date:</strong> {{ row.issueDate ? (row.issueDate | date: 'mediumDate') : '-' }}</div>
+        <div><strong>Order #:</strong> {{ row.order?.orderNumber || '-' }}</div>
+      </div>
+    </div>
+
+    <div *ngIf="isPaid" class="alert alert-success">
+      This invoice is paid. Editable fields are locked and this is shown as text-only for display/printing.
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary text-uppercase mb-2">Invoice Reference</div>
+          <div><strong>Invoice ID:</strong> {{ row.id }}</div>
+          <div><strong>Order ID:</strong> {{ row.orderId }}</div>
+          <div><strong>Customer:</strong> {{ row.order?.customer?.name || '-' }}</div>
+          <div><strong>Customer Tax ID:</strong> {{ row.order?.customer?.taxId || '-' }}</div>
+          <div><strong>Due Date:</strong> {{ row.dueDate ? (row.dueDate | date: 'mediumDate') : '-' }}</div>
+          <div><strong>Paid At:</strong> {{ row.paidAt ? (row.paidAt | date: 'medium') : '-' }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary text-uppercase mb-2">Amounts</div>
+          <div><strong>Currency:</strong> {{ row.currency || 'USD' }}</div>
+          <div><strong>Subtotal:</strong> {{ itemsSubtotal | number: '1.2-2' }}</div>
+          <div><strong>Tax:</strong> {{ itemsTax | number: '1.2-2' }}</div>
+          <div><strong>Discount:</strong> {{ itemsDiscount | number: '1.2-2' }}</div>
+          <div><strong>Shipping:</strong> {{ orderShippingAmount | number: '1.2-2' }}</div>
+          <div class="fs-5 mt-2"><strong>Total:</strong> {{ itemsTotal | number: '1.2-2' }}</div>
+        </div>
+      </div>
+      <div class="col-12" *ngIf="row.notes">
+        <div class="border rounded-3 p-3">
+          <div class="small text-secondary text-uppercase mb-2">Notes</div>
+          <div>{{ row.notes }}</div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="border rounded-3 p-3">
+          <div class="small text-secondary text-uppercase mb-2">Ordered Items</div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>SKU</th>
+                  <th class="text-end">Qty</th>
+                  <th class="text-end">Unit Price</th>
+                  <th class="text-end">Tax</th>
+                  <th class="text-end">Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let line of orderedItems">
+                  <td>{{ line.name || '-' }}</td>
+                  <td>{{ line.sku || '-' }}</td>
+                  <td class="text-end">{{ line.quantity || 0 }}</td>
+                  <td class="text-end">{{ line.unitPrice || 0 | number: '1.2-2' }}</td>
+                  <td class="text-end">{{ line.lineTax || 0 | number: '1.2-2' }}</td>
+                  <td class="text-end fw-semibold">{{ line.lineTotal || 0 | number: '1.2-2' }}</td>
+                </tr>
+                <tr *ngIf="orderedItems.length === 0">
+                  <td colspan="6" class="text-center text-secondary">No ordered item snapshots found for this invoice.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

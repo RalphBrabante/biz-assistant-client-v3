@@ -1,0 +1,60 @@
+<div class="app-bg min-vh-100">
+  <header class="mobile-topbar d-flex d-lg-none align-items-center justify-content-between px-3 py-2 border-bottom">
+    <div>
+      <div class="fw-bold">GIMO Assistant</div>
+      <div class="small text-secondary">Client Workspace</div>
+    </div>
+    <button class="btn btn-outline-primary btn-sm" type="button" (click)="openSidebar()">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+  </header>
+
+  <div class="sidebar-backdrop d-lg-none" *ngIf="sidebarOpen" (click)="closeSidebar()"></div>
+
+  <div class="app-layout">
+    <aside class="sidebar-panel app-sidebar border-end p-3 p-lg-4" [class.open]="sidebarOpen" [class.collapsed]="sidebarCollapsed">
+      <div class="d-flex justify-content-between align-items-start mb-4">
+        <div class="sidebar-copy">
+          <div class="fw-bold fs-5">GIMO Assistant</div>
+          <div class="text-secondary small">Client Workspace</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-outline-secondary btn-sm d-none d-lg-inline-flex"
+            type="button"
+            (click)="toggleSidebarCollapsed()"
+            [title]="sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'"
+          >
+            <i class="bi" [class.bi-layout-sidebar-inset]="!sidebarCollapsed" [class.bi-layout-sidebar]="sidebarCollapsed"></i>
+          </button>
+          <button class="btn btn-outline-secondary btn-sm d-lg-none" type="button" (click)="closeSidebar()">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <nav class="nav flex-column gap-2 mb-4">
+        <a
+          *ngFor="let item of navItems"
+          class="nav-link rounded-3 px-3 py-2 d-flex align-items-center gap-2"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          (click)="closeSidebarAfterNav()"
+        >
+          <i [ngClass]="['bi', item.icon]"></i>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      </nav>
+
+      <div class="user-block">
+        <div class="small text-secondary mb-2">Signed in as</div>
+        <div class="fw-semibold mb-3">{{ userLabel }}</div>
+        <button class="btn btn-outline-danger btn-sm" (click)="logout()">Sign Out</button>
+      </div>
+    </aside>
+
+    <main class="app-main p-3 p-md-4 p-xl-5">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

@@ -1,0 +1,131 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+      <div class="text-uppercase small fw-semibold text-secondary mb-2">Orders</div>
+      <h1 class="h3 mb-2">Order Management</h1>
+      <p class="text-secondary mb-0">Review and manage placed orders.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-dark" type="button" [disabled]="loading" (click)="load()">
+        <i class="bi bi-arrow-clockwise me-1"></i>{{ loading ? 'Refreshing...' : 'Refresh' }}
+      </button>
+      <a class="btn btn-primary" routerLink="/orders/create">
+        <i class="bi bi-plus-lg me-1"></i>Create Order
+      </a>
+    </div>
+  </div>
+</section>
+
+<div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+
+<section class="card border-0 shadow-sm rounded-4">
+  <div class="card-body border-bottom">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">Search</label>
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Order #, status, payment"
+          [ngModel]="searchQuery"
+          (ngModelChange)="onSearchChange($event)"
+          name="orderSearch"
+        />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()" name="statusFilter">
+          <option value="">All</option>
+          <option value="pending">pending</option>
+          <option value="confirmed">confirmed</option>
+          <option value="fulfilled">fulfilled</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">Payment</label>
+        <select class="form-select" [(ngModel)]="paymentFilter" (ngModelChange)="applyFilters()" name="paymentFilter">
+          <option value="">All</option>
+          <option value="unpaid">unpaid</option>
+          <option value="partial">partial</option>
+          <option value="paid">paid</option>
+          <option value="refunded">refunded</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">Rows per page</label>
+        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Order Number</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th>Total</th>
+            <th>Snapshots</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="!loading && rows.length === 0">
+            <td colspan="6" class="text-center text-secondary py-4">No orders found.</td>
+          </tr>
+          <tr *ngFor="let row of rows">
+            <td>{{ row['orderNumber'] }}</td>
+            <td>
+              <span class="badge rounded-pill" [ngClass]="orderStatusBadgeClass(row['status'])">
+                {{ row['status'] }}
+              </span>
+            </td>
+            <td>
+              <span class="badge rounded-pill" [ngClass]="orderPaymentBadgeClass(row['paymentStatus'])">
+                {{ row['paymentStatus'] }}
+              </span>
+            </td>
+            <td>{{ row['totalAmount'] }}</td>
+            <td>{{ orderedCount(row) }}</td>
+            <td class="text-end">
+              <div class="d-inline-flex gap-2">
+                <a
+                  class="btn btn-sm btn-outline-secondary"
+                  [routerLink]="['/orders', row['id']]"
+                  appTooltip
+                  title="Preview / Edit"
+                >
+                  <i class="bi bi-eye"></i>
+                </a>
+                <button
+                  class="btn btn-sm btn-outline-danger"
+                  type="button"
+                  [disabled]="deletingId === row['id']"
+                  (click)="remove(row['id'])"
+                  appTooltip
+                  title="Delete"
+                >
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+      <div class="small text-secondary">Showing {{ rows.length }} of {{ total }} orders (Page {{ page }} / {{ totalPages }})</div>
+      <div class="btn-group">
+        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(1)" [disabled]="loading || page <= 1">First</button>
+        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading || page <= 1">Prev</button>
+        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading || page >= totalPages">Next</button>
+        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading || page >= totalPages">Last</button>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,29 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { ApiResponse } from './types';
+
+@Injectable({ providedIn: 'root' })
+export class ApiService {
+  constructor(private readonly http: HttpClient) {}
+
+  list<T>(endpoint: string): Observable<ApiResponse<T[]>> {
+    return this.http.get<ApiResponse<T[]>>(endpoint);
+  }
+
+  create<T>(endpoint: string, payload: Record<string, unknown>): Observable<ApiResponse<T>> {
+    return this.http.post<ApiResponse<T>>(endpoint, payload);
+  }
+
+  update<T>(endpoint: string, id: string, payload: Record<string, unknown>): Observable<ApiResponse<T>> {
+    return this.http.put<ApiResponse<T>>(`${endpoint}/${id}`, payload);
+  }
+
+  remove(endpoint: string, id: string): Observable<ApiResponse<unknown>> {
+    return this.http.delete<ApiResponse<unknown>>(`${endpoint}/${id}`);
+  }
+
+  get<T>(endpoint: string): Observable<ApiResponse<T>> {
+    return this.http.get<ApiResponse<T>>(endpoint);
+  }
+}

@@ -1,0 +1,204 @@
+import { CommonModule } from '@angular/common';
+import { Component, computed, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ApiService } from '../core/api.service';
+import { ApiResponse } from '../core/types';
+import { TooltipDirective } from '../shared/tooltip.directive';
+
+interface RoleRow {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  isSystem?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+}
+
+@Component({
+  selector: 'app-roles-page',
+  standalone: true,
+  imports: [CommonModule, FormsModule, TooltipDirective],
+  templateUrl: './roles-page.component.html',
+})
+export class RolesPageComponent {
+  private readonly api: ApiService;
+
+  constructor(api: ApiService) {
+    this.api = api;
+  }
+
+  readonly rows = signal<RoleRow[]>([]);
+  readonly loading = signal(false);
+  readonly submitting = signal(false);
+  readonly deletingId = signal('');
+  readonly isCreateModalOpen = signal(false);
+
+  readonly message = signal('');
+  readonly error = signal('');
+  readonly filter = signal('');
+
+  createForm: Record<string, unknown> = {
+    name: '',
+    code: '',
+    description: '',
+    isSystem: false,
+    isActive: true,
+  };
+
+  editingId = '';
+  editForm: Record<string, unknown> = {
+    name: '',
+    code: '',
+    description: '',
+    isSystem: false,
+    isActive: true,
+  };
+
+  readonly filteredRows = computed(() => {
+    const q = this.filter().trim().toLowerCase();
+    if (!q) {
+      return this.rows();
+    }
+
+    return this.rows().filter((row) => {
+      return (
+        row.name?.toLowerCase().includes(q) ||
+        row.code?.toLowerCase().includes(q) ||
+        String(row.description || '').toLowerCase().includes(q)
+      );
+    });
+  });
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.loading.set(true);
+    this.error.set('');
+
+    this.api.list<RoleRow>('/api/v1/roles').subscribe({
+      next: (response: ApiResponse<RoleRow[]>) => {
+        this.loading.set(false);
+        this.rows.set(response.data || []);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Unable to load roles.');
+      },
+    });
+  }
+
+  openCreateModal(): void {
+    this.createForm = {
+      name: '',
+      code: '',
+      description: '',
+      isSystem: false,
+      isActive: true,
+    };
+    this.error.set('');
+    this.message.set('');
+    this.isCreateModalOpen.set(true);
+  }
+
+  closeCreateModal(): void {
+    this.isCreateModalOpen.set(false);
+  }
+
+  createRole(): void {
+    this.submitting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const payload = {
+      name: String(this.createForm['name'] || '').trim(),
+      code: String(this.createForm['code'] || '').trim().toLowerCase(),
+      description: String(this.createForm['description'] || '').trim() || undefined,
+      isSystem: Boolean(this.createForm['isSystem']),
+      isActive: Boolean(this.createForm['isActive']),
+    };
+
+    this.api.create<RoleRow>('/api/v1/roles', payload).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.isCreateModalOpen.set(false);
+        this.message.set(response.message || 'Role created successfully.');
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.message || 'Unable to create role.');
+      },
+    });
+  }
+
+  startEdit(row: RoleRow): void {
+    this.editingId = row.id;
+    this.editForm = {
+      name: row.name || '',
+      code: row.code || '',
+      description: row.description || '',
+      isSystem: Boolean(row.isSystem),
+      isActive: row.isActive !== false,
+    };
+  }
+
+  cancelEdit(): void {
+    this.editingId = '';
+  }
+
+  saveEdit(): void {
+    if (!this.editingId) {
+      return;
+    }
+
+    this.submitting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const payload = {
+      name: String(this.editForm['name'] || '').trim(),
+      code: String(this.editForm['code'] || '').trim().toLowerCase(),
+      description: String(this.editForm['description'] || '').trim() || undefined,
+      isSystem: Boolean(this.editForm['isSystem']),
+      isActive: Boolean(this.editForm['isActive']),
+    };
+
+    this.api.update<RoleRow>('/api/v1/roles', this.editingId, payload).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.message.set(response.message || 'Role updated successfully.');
+        this.editingId = '';
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.message || 'Unable to update role.');
+      },
+    });
+  }
+
+  removeRole(id: string): void {
+    this.deletingId.set(id);
+    this.error.set('');
+    this.message.set('');
+
+    this.api.remove('/api/v1/roles', id).subscribe({
+      next: (response) => {
+        this.deletingId.set('');
+        this.message.set(response.message || 'Role deleted successfully.');
+        this.load();
+      },
+      error: (err) => {
+        this.deletingId.set('');
+        this.error.set(err?.error?.message || 'Unable to delete role.');
+      },
+    });
+  }
+
+  trackById(_index: number, row: RoleRow): string {
+    return row.id;
+  }
+}

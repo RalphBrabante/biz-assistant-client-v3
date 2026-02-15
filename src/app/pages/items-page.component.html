@@ -1,0 +1,327 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Inventory</div>
+        <h1 class="h3 mb-2">Items</h1>
+        <p class="text-secondary mb-0">Manage products and services with modal-first creation.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-dark" (click)="load()" [disabled]="loading()">
+          {{ loading() ? 'Refreshing...' : 'Refresh' }}
+        </button>
+        <button class="btn btn-primary" (click)="openCreateModal()"><i class="bi bi-plus-lg me-1"></i>Create Item</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <div class="row g-3 align-items-center">
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">Filter items</label>
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Search by name, SKU, category, organization name"
+          [ngModel]="filter()"
+          (ngModelChange)="onFilterChange($event)"
+        />
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Rows per page</label>
+        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Total Items</div>
+          <div class="stat-value">{{ total }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Page</div>
+          <div class="stat-value">{{ page }} / {{ totalPages }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
+    <div *ngIf="error()" class="alert alert-danger mt-3 mb-0">{{ error() }}</div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>SKU</th>
+          <th>Organization</th>
+          <th>Type</th>
+          <th>Price</th>
+          <th>Stock</th>
+          <th>Active</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="!loading() && rows().length === 0">
+          <td colspan="8" class="text-center text-secondary py-4">No items found.</td>
+        </tr>
+
+        <tr *ngFor="let row of rows(); trackBy: trackById">
+          <td class="fw-semibold">{{ row.name }}</td>
+          <td>{{ row.sku || '-' }}</td>
+          <td class="small">{{ organizationLabel(row) }}</td>
+          <td>
+            <span class="badge rounded-pill" [ngClass]="itemTypeBadgeClass(row.type)">
+              {{ row.type || '-' }}
+            </span>
+          </td>
+          <td>{{ row.price ?? 0 }}</td>
+          <td>
+            <span class="badge rounded-pill" [ngClass]="itemStockBadgeClass(row)">
+              {{ row.stock ?? 0 }}
+            </span>
+          </td>
+          <td>
+            <span class="badge rounded-pill" [ngClass]="itemActiveBadgeClass(row.isActive)">
+              {{ row.isActive ? 'Yes' : 'No' }}
+            </span>
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="openEditModal(row)" appTooltip title="Edit">
+                <i class="bi bi-pencil-square"></i>
+              </button>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                type="button"
+                [disabled]="deletingId() === row.id"
+                (click)="removeItem(row.id)"
+                appTooltip
+                title="Delete"
+              >
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+    <div class="small text-secondary">
+      Showing {{ rows().length }} of {{ total }} items
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(1)" [disabled]="loading() || page <= 1">
+        First
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading() || page <= 1">
+        Prev
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading() || page >= totalPages">
+        Next
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading() || page >= totalPages">
+        Last
+      </button>
+    </div>
+  </div>
+</section>
+
+<div class="modal-backdrop fade show" *ngIf="isCreateModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isCreateModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isCreateModalOpen()"
+  *ngIf="isCreateModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Create New Item</h5>
+        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Organization</label>
+            <input class="form-control" [value]="currentOrganizationName" readonly />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Name</label>
+            <input class="form-control" [(ngModel)]="createForm['name']" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">SKU</label>
+            <input class="form-control" [(ngModel)]="createForm['sku']" />
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Type</label>
+            <input class="form-control" [(ngModel)]="createForm['type']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Category</label>
+            <input class="form-control" [(ngModel)]="createForm['category']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Unit</label>
+            <input class="form-control" [(ngModel)]="createForm['unit']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Currency</label>
+            <input class="form-control" [(ngModel)]="createForm['currency']" />
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Price</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['price']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Discounted Price</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['discountedPrice']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Stock</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['stock']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Tax Rate</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['taxRate']" />
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-semibold">Description</label>
+            <textarea rows="2" class="form-control" [(ngModel)]="createForm['description']"></textarea>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Created By (User ID)</label>
+            <input class="form-control" [(ngModel)]="createForm['createdBy']" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Updated By (User ID)</label>
+            <input class="form-control" [(ngModel)]="createForm['updatedBy']" />
+          </div>
+          <div class="col-12 col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isActive']" />
+              <label class="form-check-label">Active</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="createItem()">
+          {{ submitting() ? 'Creating...' : 'Create Item' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="isEditModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isEditModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isEditModalOpen()"
+  *ngIf="isEditModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Edit Item</h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Organization</label>
+            <select class="form-select" [(ngModel)]="editForm['organizationId']">
+              <option *ngFor="let org of organizations()" [value]="org.id">{{ organizationOptionLabel(org) }}</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Name</label>
+            <input class="form-control" [(ngModel)]="editForm['name']" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">SKU</label>
+            <input class="form-control" [(ngModel)]="editForm['sku']" />
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Type</label>
+            <input class="form-control" [(ngModel)]="editForm['type']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Category</label>
+            <input class="form-control" [(ngModel)]="editForm['category']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Unit</label>
+            <input class="form-control" [(ngModel)]="editForm['unit']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Currency</label>
+            <input class="form-control" [(ngModel)]="editForm['currency']" />
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Price</label>
+            <input type="number" class="form-control" [(ngModel)]="editForm['price']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Discounted Price</label>
+            <input type="number" class="form-control" [(ngModel)]="editForm['discountedPrice']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Stock</label>
+            <input type="number" class="form-control" [(ngModel)]="editForm['stock']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Tax Rate</label>
+            <input type="number" class="form-control" [(ngModel)]="editForm['taxRate']" />
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-semibold">Description</label>
+            <textarea rows="2" class="form-control" [(ngModel)]="editForm['description']"></textarea>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Created By (User ID)</label>
+            <input class="form-control" [(ngModel)]="editForm['createdBy']" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Updated By (User ID)</label>
+            <input class="form-control" [(ngModel)]="editForm['updatedBy']" />
+          </div>
+          <div class="col-12 col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" [(ngModel)]="editForm['isActive']" />
+              <label class="form-check-label">Active</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeEditModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
+          {{ submitting() ? 'Saving...' : 'Save Item' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

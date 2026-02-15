@@ -1,0 +1,216 @@
+:root {
+  --bg-main: #f4f6fb;
+  --bg-panel: #ffffff;
+  --bg-sidebar: #f0f4ff;
+  --text-main: #17243a;
+  --text-soft: #54627a;
+  --brand: #0b57d0;
+  --brand-strong: #073b8b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at top right, #d8e8ff 0%, var(--bg-main) 45%);
+  color: var(--text-main);
+}
+
+.auth-bg {
+  background: radial-gradient(circle at top left, #dbe9ff 0%, #eef3ff 40%, #f6f8fc 100%);
+}
+
+.hero-strip {
+  background: linear-gradient(135deg, var(--brand-strong), var(--brand));
+  color: #fff;
+}
+
+.app-bg {
+  background: linear-gradient(180deg, #f9fbff 0%, #f2f5fb 100%);
+}
+
+.mobile-topbar {
+  background: #f7faff;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar-panel {
+  background: var(--bg-sidebar);
+}
+
+.app-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  transition: width 0.2s ease, transform 0.2s ease;
+}
+
+.app-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 26, 49, 0.45);
+  z-index: 1040;
+}
+
+.nav-label {
+  white-space: nowrap;
+}
+
+.nav-link {
+  color: var(--text-main);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.nav-link:hover {
+  background: #e9f0ff;
+  border-color: #d6e3ff;
+}
+
+.nav-link.active {
+  color: #fff;
+  background: linear-gradient(120deg, var(--brand-strong), var(--brand));
+}
+
+.card {
+  background: var(--bg-panel);
+}
+
+.role-hero {
+  background:
+    radial-gradient(circle at top right, #dce9ff 0%, transparent 45%),
+    linear-gradient(180deg, #fdfefe 0%, #f5f8ff 100%);
+}
+
+.stat-chip {
+  border: 1px solid #d7e3ff;
+  background: #f7faff;
+  border-radius: 0.9rem;
+  padding: 0.75rem 1rem;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--brand-strong);
+}
+
+.table .dropdown-menu {
+  border: 1px solid #d8e2f5;
+  box-shadow: 0 12px 26px rgba(23, 36, 58, 0.12);
+}
+
+.table .dropdown-item {
+  color: #1b2a45;
+}
+
+.table .dropdown-item:hover,
+.table .dropdown-item:focus {
+  color: #0a3f95;
+  background-color: #e9f1ff;
+}
+
+.table .dropdown-item.text-danger {
+  color: #c4303a !important;
+}
+
+.table .dropdown-item.text-danger:hover,
+.table .dropdown-item.text-danger:focus {
+  color: #8e1d25 !important;
+  background-color: #ffecee;
+}
+
+.print-delivery-sheet {
+  border: 1px solid #dbe4f5;
+}
+
+@media print {
+  .no-print,
+  .mobile-topbar,
+  .app-sidebar,
+  .sidebar-backdrop {
+    display: none !important;
+  }
+
+  .app-main {
+    padding: 0 !important;
+  }
+
+  .print-delivery-sheet {
+    display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .app-layout {
+    min-height: calc(100vh - 60px);
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1045;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    box-shadow: 0 20px 40px rgba(15, 33, 56, 0.18);
+  }
+
+  .app-sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 992px) {
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .app-sidebar.collapsed {
+    width: 86px;
+  }
+
+  .app-sidebar.collapsed .sidebar-copy,
+  .app-sidebar.collapsed .nav-label,
+  .app-sidebar.collapsed .user-block {
+    display: none;
+  }
+
+  .app-sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+}

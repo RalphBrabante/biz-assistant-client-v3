@@ -1,0 +1,49 @@
+<section class="card border-0 shadow-sm rounded-4">
+  <div class="card-body p-4">
+    <h1 class="h4 mb-2">Dev User Creator</h1>
+    <p class="text-secondary mb-4">Unsecured development endpoint for quick account creation.</p>
+
+    <div *ngIf="message" class="alert alert-success">{{ message }}</div>
+    <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+
+    <form (ngSubmit)="submit()" class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">First Name</label>
+        <input class="form-control" name="firstName" [(ngModel)]="form['firstName']" required />
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Last Name</label>
+        <input class="form-control" name="lastName" [(ngModel)]="form['lastName']" required />
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Email</label>
+        <input class="form-control" type="email" name="email" [(ngModel)]="form['email']" required />
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Password</label>
+        <input class="form-control" type="password" name="password" [(ngModel)]="form['password']" required />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Status</label>
+        <input class="form-control" name="status" [(ngModel)]="form['status']" />
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="isEmailVerified" [(ngModel)]="form['isEmailVerified']" />
+          <label class="form-check-label">Email Verified</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="isActive" [(ngModel)]="form['isActive']" />
+          <label class="form-check-label">Active</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary" type="submit" [disabled]="submitting">
+          {{ submitting ? 'Creating...' : 'Create Dev User' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</section>

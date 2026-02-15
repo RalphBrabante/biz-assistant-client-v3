@@ -1,0 +1,84 @@
+<main class="login-shell py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-10 col-lg-7 col-xl-5">
+        <section class="card border-0 shadow-lg rounded-4 overflow-hidden">
+          <div class="brand-strip px-4 py-3">
+            <span class="badge text-bg-light fw-semibold">GIMO Workspace</span>
+          </div>
+
+          <div class="card-body p-4 p-md-5">
+            <h1 class="h3 mb-2 fw-bold">Welcome Back</h1>
+            <p class="text-secondary mb-4">Sign in to continue to your dashboard.</p>
+
+            <form (ngSubmit)="login()" #loginForm="ngForm" *ngIf="!isLoggedIn" novalidate>
+              <div class="mb-3">
+                <label for="email" class="form-label fw-semibold">Email Address</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  class="form-control form-control-lg"
+                  [(ngModel)]="email"
+                  required
+                  autocomplete="username"
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label for="password" class="form-label fw-semibold">Password</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  class="form-control form-control-lg"
+                  [(ngModel)]="password"
+                  required
+                  autocomplete="current-password"
+                  placeholder="Enter your password"
+                />
+              </div>
+
+              <div class="d-grid mt-4">
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-lg fw-semibold"
+                  [disabled]="isSubmitting || !loginForm.form.valid"
+                >
+                  <span *ngIf="!isSubmitting">Sign In</span>
+                  <span *ngIf="isSubmitting">Signing in...</span>
+                </button>
+              </div>
+            </form>
+
+            <div class="logged-in" *ngIf="isLoggedIn">
+              <div class="alert alert-success border-0 fw-semibold mb-3" role="alert">
+                You are logged in.
+              </div>
+
+              <label class="form-label fw-semibold">Access Token</label>
+              <textarea class="form-control" rows="4" readonly>{{ accessToken }}</textarea>
+
+              <div class="d-grid mt-3">
+                <button class="btn btn-outline-danger fw-semibold" type="button" (click)="logout()">
+                  Log Out
+                </button>
+              </div>
+            </div>
+
+            <div class="alert mt-4 mb-0"
+              [class.alert-danger]="responseCode && responseCode !== 'SUCCESS' && responseCode !== 'CREATED'"
+              [class.alert-info]="!responseCode || responseCode === 'SUCCESS' || responseCode === 'CREATED'"
+              *ngIf="responseCode || responseMessage"
+              role="alert"
+            >
+              <div><strong>Code:</strong> {{ responseCode }}</div>
+              <div><strong>Message:</strong> {{ responseMessage }}</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>

@@ -1,0 +1,25 @@
+.login-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(13, 110, 253, 0.22), transparent 35%),
+    radial-gradient(circle at 80% 15%, rgba(25, 135, 84, 0.18), transparent 35%),
+    linear-gradient(145deg, #f8fbff 0%, #eef4ff 48%, #f5fff8 100%);
+}
+
+.brand-strip {
+  background: linear-gradient(90deg, #0d6efd 0%, #1f7ce8 45%, #20a4f3 100%);
+}
+
+.card {
+  backdrop-filter: blur(4px);
+}
+
+.form-control:focus {
+  border-color: #77aefb;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.18);
+}
+
+textarea.form-control {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}

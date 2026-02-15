@@ -1,0 +1,347 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden no-print">
+  <div class="card-body p-4 p-lg-5 role-hero d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+      <div class="text-uppercase small fw-semibold text-secondary mb-2">Orders</div>
+      <h1 class="h3 mb-2">Order Preview</h1>
+      <p class="text-secondary mb-0">Review and update order details, customer, and ordered items.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" routerLink="/orders">
+        <i class="bi bi-arrow-left me-1"></i>Back to Orders
+      </a>
+      <button class="btn btn-dark" *ngIf="isCompleted" type="button" (click)="printOrder()">
+        <i class="bi bi-printer me-1"></i>Print Order Receipt
+      </button>
+    </div>
+  </div>
+</section>
+
+<div *ngIf="error" class="alert alert-danger no-print">{{ error }}</div>
+<div *ngIf="message" class="alert alert-success no-print">{{ message }}</div>
+<div *ngIf="isCompleted" class="alert alert-warning">
+  This order is completed. Editing is disabled.
+</div>
+<div *ngIf="!isCompleted && isLocked" class="alert alert-warning no-print">
+  Status is set to completed. Fields are locked; save to finalize completion.
+</div>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4 no-print" *ngIf="order && !isCompleted">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">Order Details</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">Order Number</label>
+        <input class="form-control" [value]="order.orderNumber" readonly />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Shipping Amount</label>
+        <input type="number" class="form-control" [(ngModel)]="shippingAmount" [disabled]="isLocked" />
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Status</label>
+        <select class="form-select" [(ngModel)]="status" [disabled]="isCompleted">
+          <option value="pending">pending</option>
+          <option value="confirmed">confirmed</option>
+          <option value="processing">processing</option>
+          <option value="completed">completed</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Payment Status</label>
+        <select class="form-select" [(ngModel)]="paymentStatus" [disabled]="isLocked">
+          <option value="unpaid">unpaid</option>
+          <option value="partially_paid">partially_paid</option>
+          <option value="paid">paid</option>
+          <option value="failed">failed</option>
+          <option value="refunded">refunded</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Fulfillment Status</label>
+        <select class="form-select" [(ngModel)]="fulfillmentStatus" [disabled]="isLocked">
+          <option value="unfulfilled">unfulfilled</option>
+          <option value="partially_fulfilled">partially_fulfilled</option>
+          <option value="fulfilled">fulfilled</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-8">
+        <label class="form-label">Customer Search (name or tax ID)</label>
+        <div class="input-group">
+          <input class="form-control" [(ngModel)]="customerSearchQuery" (keyup.enter)="searchCustomers()" [disabled]="isLocked" />
+          <button class="btn btn-outline-primary" type="button" (click)="searchCustomers()" [disabled]="searchingCustomers || isLocked">
+            <i class="bi bi-search me-1"></i>{{ searchingCustomers ? 'Searching...' : 'Search Customer' }}
+          </button>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Select Customer</label>
+        <select class="form-select" [(ngModel)]="selectedCustomerId" [disabled]="isLocked">
+          <option value="">Select customer</option>
+          <option *ngFor="let row of customerResults" [value]="row.id">{{ customerLabel(row) }}</option>
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Notes</label>
+        <textarea rows="2" class="form-control" [(ngModel)]="notes" [disabled]="isLocked"></textarea>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mt-2 mb-4 no-print" *ngIf="order && isCompleted">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">Order Details</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Order Number</div>
+        <div class="fw-semibold">{{ order.orderNumber }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Status</div>
+        <div class="fw-semibold">{{ order.status || '-' }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Shipping Amount</div>
+        <div class="fw-semibold">{{ shippingAmount | number: '1.2-2' }}</div>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Payment Status</div>
+        <div class="fw-semibold">{{ order.paymentStatus || '-' }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Fulfillment Status</div>
+        <div class="fw-semibold">{{ order.fulfillmentStatus || '-' }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Customer</div>
+        <div class="fw-semibold">{{ selectedCustomer?.name || order.customer?.name || '-' }}</div>
+        <div class="small text-secondary">Tax ID: {{ selectedCustomer?.taxId || order.customer?.taxId || '-' }}</div>
+      </div>
+
+      <div class="col-12">
+        <div class="small text-secondary text-uppercase">Notes</div>
+        <div>{{ order.notes || '-' }}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="row g-4 no-print" *ngIf="order">
+  <div class="col-12 col-xl-7" *ngIf="!isLocked">
+    <section class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body p-4">
+        <h2 class="h5 mb-3">Search Items</h2>
+        <div class="input-group mb-3">
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Search by item name, sku, category"
+            [(ngModel)]="itemSearchQuery"
+            [disabled]="isLocked"
+            (keyup.enter)="searchItems()"
+          />
+          <button class="btn btn-primary" type="button" (click)="searchItems()" [disabled]="catalogLoading || isLocked">
+            <i class="bi bi-search me-1"></i>{{ catalogLoading ? 'Searching...' : 'Search' }}
+          </button>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6" *ngFor="let item of catalogItems">
+            <article class="border rounded-3 p-3 h-100 d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div class="fw-semibold">{{ item.name }}</div>
+                  <div class="small text-secondary">{{ item.sku || 'No SKU' }} | {{ item.category || 'General' }}</div>
+                </div>
+                <span class="badge text-bg-light border">{{ item.stock ?? 0 }} in stock</span>
+              </div>
+              <div class="mt-3 fw-semibold">
+                {{ itemUnitPrice(item) | number: '1.2-2' }} {{ item.currency || 'USD' }}
+              </div>
+              <button class="btn btn-outline-primary mt-auto" type="button" (click)="addToCart(item)" [disabled]="isLocked">
+                <i class="bi bi-cart-plus me-1"></i>Add/Replace
+              </button>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-12" [class.col-xl-5]="!isLocked" [class.col-xl-12]="isLocked" *ngIf="!isCompleted">
+    <section class="card border-0 shadow-sm rounded-4 h-100">
+      <div class="card-body p-4 d-flex flex-column">
+        <h2 class="h5 mb-3">Ordered Items</h2>
+        <div *ngIf="cart.length === 0" class="text-secondary small">No order items. Add items from search.</div>
+
+        <div class="d-flex flex-column gap-3" *ngIf="cart.length > 0">
+          <div class="border rounded-3 p-3" *ngFor="let row of cart">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold">{{ row.item.name }}</div>
+                <div class="small text-secondary">{{ row.item.sku || 'No SKU' }}</div>
+              </div>
+              <button class="btn btn-sm btn-outline-danger" type="button" (click)="removeFromCart(row.item.id)" [disabled]="isLocked">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mt-3">
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="decrease(row.item.id)" [disabled]="isLocked">-</button>
+              <input class="form-control form-control-sm text-center" style="max-width: 70px" [value]="row.quantity" readonly />
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="increase(row.item.id)" [disabled]="isLocked">+</button>
+              <div class="ms-auto fw-semibold">{{ (itemUnitPrice(row.item) * row.quantity) | number: '1.2-2' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-3" />
+        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ subtotalAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ taxAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ discountAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-3"><span>Shipping</span><strong>{{ shippingAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between fs-5 mb-3">
+          <span class="fw-semibold">Total</span>
+          <strong>{{ totalAmount | number: '1.2-2' }}</strong>
+        </div>
+
+        <button class="btn btn-primary btn-lg mt-auto" [disabled]="saving || isCompleted" (click)="saveOrder()">
+          <i class="bi bi-save me-1"></i>{{ saving ? 'Saving...' : (status === 'completed' ? 'Complete Order' : 'Update Order') }}
+        </button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show no-print" *ngIf="showCompleteModal"></div>
+<div
+  class="modal fade show no-print"
+  tabindex="-1"
+  [style.display]="showCompleteModal ? 'block' : 'none'"
+  [attr.aria-hidden]="!showCompleteModal"
+  *ngIf="showCompleteModal"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Complete Order</h5>
+        <button type="button" class="btn-close" (click)="closeCompleteModal()" [disabled]="saving"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <p class="text-secondary mb-3">Provide Sales Invoice ID. This will mark the order as completed and create the sales invoice record.</p>
+        <div *ngIf="completionModalError" class="alert alert-danger py-2">{{ completionModalError }}</div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Sales Invoice ID</label>
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Enter sales invoice id"
+              [(ngModel)]="completionSalesInvoiceId"
+              [disabled]="saving"
+              (keyup.enter)="confirmCompletion()"
+            />
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Issue Date</label>
+            <input
+              type="date"
+              class="form-control"
+              [(ngModel)]="completionSalesInvoiceIssueDate"
+              [disabled]="saving"
+            />
+            <div class="form-text">Defaults to today. You can override it.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeCompleteModal()" [disabled]="saving">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="confirmCompletion()" [disabled]="saving">
+          {{ saving ? 'Completing...' : 'Submit & Complete' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="card border-0 shadow-sm rounded-4 mt-2 mb-4 print-delivery-sheet" *ngIf="order && isCompleted">
+  <div class="card-body p-4 p-lg-5">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+      <div>
+        <h2 class="h4 mb-1">Order Receipt</h2>
+        <div class="text-secondary">Completed Order Client Copy</div>
+      </div>
+      <div class="text-end small">
+        <div><strong>Order #:</strong> {{ order.orderNumber }}</div>
+        <div><strong>Date:</strong> {{ order.createdAt ? (order.createdAt | date: 'mediumDate') : '-' }}</div>
+        <div><strong>Status:</strong> {{ order.status }}</div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-6">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary text-uppercase mb-2">Customer</div>
+          <div class="fw-semibold">{{ selectedCustomer?.name || order.customer?.name || '-' }}</div>
+          <div class="small">Tax ID: {{ selectedCustomer?.taxId || order.customer?.taxId || '-' }}</div>
+          <div class="small text-secondary">Customer ID: {{ selectedCustomerId || order.customerId || '-' }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary text-uppercase mb-2">Order Summary</div>
+          <div class="small"><strong>Payment:</strong> {{ order.paymentStatus }}</div>
+          <div class="small"><strong>Fulfillment:</strong> {{ order.fulfillmentStatus }}</div>
+          <div class="small"><strong>Notes:</strong> {{ order.notes || '-' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive mb-4">
+      <table class="table table-sm table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Item</th>
+            <th>SKU</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Unit Price</th>
+            <th class="text-end">Tax</th>
+            <th class="text-end">Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let line of deliveryLines">
+            <td>{{ line.name || '-' }}</td>
+            <td>{{ line.sku || '-' }}</td>
+            <td class="text-end">{{ line.quantity || 0 }}</td>
+            <td class="text-end">{{ line.unitPrice || 0 | number: '1.2-2' }}</td>
+            <td class="text-end">{{ line.lineTax || 0 | number: '1.2-2' }}</td>
+            <td class="text-end fw-semibold">{{ line.lineTotal || 0 | number: '1.2-2' }}</td>
+          </tr>
+          <tr *ngIf="deliveryLines.length === 0">
+            <td colspan="6" class="text-center text-secondary">No items found for this order.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-end">
+      <div style="min-width: 300px">
+        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ deliverySubtotal | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ deliveryTax | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ deliveryDiscount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Shipping</span><strong>{{ shippingAmount | number: '1.2-2' }}</strong></div>
+        <hr class="my-2" />
+        <div class="d-flex justify-content-between">
+          <span class="fw-semibold">Total</span>
+          <strong>{{ deliveryTotal | number: '1.2-2' }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
