@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
@@ -18,7 +19,7 @@ interface RoleRow {
 @Component({
   selector: 'app-roles-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TooltipDirective],
+  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
   templateUrl: './roles-page.component.html',
 })
 export class RolesPageComponent {

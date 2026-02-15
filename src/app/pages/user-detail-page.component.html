@@ -1,0 +1,138 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Identity</div>
+        <h1 class="h3 mb-2">User Details</h1>
+        <p class="text-secondary mb-0">Edit user profile and manage assigned roles.</p>
+      </div>
+      <a class="btn btn-outline-dark" routerLink="/users"><i class="bi bi-arrow-left me-1"></i>Back to Users</a>
+    </div>
+  </div>
+</section>
+
+<div *ngIf="message()" class="alert alert-success">{{ message() }}</div>
+<div *ngIf="error()" class="alert alert-danger">{{ error() }}</div>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4" *ngIf="user() as row">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">User Information</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">First Name</label>
+        <input class="form-control" [(ngModel)]="form['firstName']" />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Last Name</label>
+        <input class="form-control" [(ngModel)]="form['lastName']" />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" [(ngModel)]="form['email']" />
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Organization ID</label>
+        <input class="form-control" [(ngModel)]="form['organizationId']" />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Status</label>
+        <input class="form-control" [(ngModel)]="form['status']" />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Legacy Role (optional)</label>
+        <input class="form-control" [(ngModel)]="form['role']" />
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Phone</label>
+        <input class="form-control" [(ngModel)]="form['phone']" />
+      </div>
+      <div class="col-12 col-md-8">
+        <label class="form-label">Address</label>
+        <input class="form-control" [(ngModel)]="form['addressLine1']" />
+      </div>
+
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" [(ngModel)]="form['isEmailVerified']" />
+          <label class="form-check-label">Email Verified</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" [(ngModel)]="form['isActive']" />
+          <label class="form-check-label">Active</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">New Password (optional)</label>
+        <input type="password" class="form-control" [(ngModel)]="form['password']" />
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="saveUser()">
+          {{ submitting() ? 'Saving...' : 'Save User' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4" *ngIf="user() as row">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">User Roles</h2>
+
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-12 col-md-8">
+        <label class="form-label">Assign Role</label>
+        <select class="form-select" [(ngModel)]="selectedRoleId">
+          <option value="">Select a role</option>
+          <option *ngFor="let role of assignableRoles()" [value]="role.id">
+            {{ role.name || role.code }}
+          </option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <button class="btn btn-outline-primary w-100" [disabled]="assigning()" (click)="assignRole()">
+          {{ assigning() ? 'Assigning...' : 'Assign Role' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Role</th>
+            <th>Code</th>
+            <th>Assigned At</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="(row.roles || []).length === 0">
+            <td colspan="4" class="text-center text-secondary py-4">No roles assigned.</td>
+          </tr>
+          <tr *ngFor="let role of (row.roles || []); trackBy: trackByRoleId">
+            <td class="fw-semibold">{{ role.name || '-' }}</td>
+            <td>
+              <span class="badge rounded-pill" [ngClass]="roleChipClass(role.code)">{{ role.code || '-' }}</span>
+            </td>
+            <td>{{ role.UserRole?.createdAt ? (role.UserRole?.createdAt | date : 'medium') : '-' }}</td>
+            <td class="text-end">
+              <button
+                class="btn btn-sm btn-outline-danger"
+                type="button"
+                [disabled]="removingRoleId() === role.id"
+                (click)="removeRole(role.id)"
+              >
+                {{ removingRoleId() === role.id ? 'Removing...' : 'Remove' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

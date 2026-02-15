@@ -6,13 +6,13 @@ import { ApiResponse } from '../core/types';
 import { catchError, forkJoin, map, of } from 'rxjs';
 
 interface DashboardMetrics {
-  totalItems: number;
-  totalCustomers: number;
-  totalOrders: number;
-  totalUsers: number;
-  totalOrganizations: number;
-  totalLicenses: number;
-  totalSalesInvoices: number;
+  totalItems: number | null;
+  totalCustomers: number | null;
+  totalOrders: number | null;
+  totalUsers: number | null;
+  totalOrganizations: number | null;
+  totalLicenses: number | null;
+  totalSalesInvoices: number | null;
 }
 
 @Component({
@@ -31,6 +31,34 @@ export class DashboardPageComponent {
   metrics: DashboardMetrics | null = null;
   orderStatusCounts: Array<{ label: string; value: number; className: string }> = [];
 
+  get canViewItems(): boolean {
+    return this.auth.hasPermission('items.read');
+  }
+
+  get canViewCustomers(): boolean {
+    return this.auth.hasPermission('organizations.read');
+  }
+
+  get canViewOrders(): boolean {
+    return this.auth.hasPermission('orders.read');
+  }
+
+  get canViewUsers(): boolean {
+    return this.auth.hasPermission('users.read');
+  }
+
+  get canViewOrganizations(): boolean {
+    return this.auth.hasPermission('organizations.read');
+  }
+
+  get canViewLicenses(): boolean {
+    return this.auth.hasPermission('licenses.read');
+  }
+
+  get canViewSalesInvoices(): boolean {
+    return this.auth.hasPermission('sales_invoices.read');
+  }
+
   ngOnInit(): void {
     this.refresh();
   }
@@ -39,25 +67,34 @@ export class DashboardPageComponent {
     this.loading = true;
     this.error = '';
     const organizationId = this.auth.currentUser()?.organizationId || '';
-    const orgParam = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
+    const roleCodes = (this.auth.currentUser()?.roleCodes || []).map((code) =>
+      String(code || '').toLowerCase()
+    );
+    const isSuperuser = roleCodes.includes('superuser');
+    const orgParam = !isSuperuser && organizationId
+      ? `&organizationId=${encodeURIComponent(organizationId)}`
+      : '';
+    const orgOnlyQuery = !isSuperuser && organizationId
+      ? `?organizationId=${encodeURIComponent(organizationId)}&limit=1`
+      : '?limit=1';
 
     forkJoin({
       health: this.api.get<Record<string, unknown>>('/api/v1/health').pipe(
         map((response) => response.data || null),
         catchError(() => of(null))
       ),
-      totalItems: this.fetchTotal(`/api/v1/items?limit=1${orgParam}`),
-      totalCustomers: this.fetchTotal(`/api/v1/customers?limit=1${orgParam}`),
-      totalOrders: this.fetchTotal(`/api/v1/orders?limit=1${orgParam}`),
-      totalUsers: this.fetchTotal(`/api/v1/users?limit=1${orgParam}`),
-      totalOrganizations: this.fetchTotal('/api/v1/organizations?limit=1'),
-      totalLicenses: this.fetchTotal('/api/v1/licenses?limit=1'),
-      totalSalesInvoices: this.fetchTotal(`/api/v1/sales-invoices?limit=1${orgParam}`),
-      pendingOrders: this.fetchTotal(`/api/v1/orders?limit=1&status=pending${orgParam}`),
-      confirmedOrders: this.fetchTotal(`/api/v1/orders?limit=1&status=confirmed${orgParam}`),
-      processingOrders: this.fetchTotal(`/api/v1/orders?limit=1&status=processing${orgParam}`),
-      completedOrders: this.fetchTotal(`/api/v1/orders?limit=1&status=completed${orgParam}`),
-      cancelledOrders: this.fetchTotal(`/api/v1/orders?limit=1&status=cancelled${orgParam}`),
+      totalItems: this.canViewItems ? this.fetchTotal(`/api/v1/items?limit=1${orgParam}`) : of(null),
+      totalCustomers: this.canViewCustomers ? this.fetchTotal(`/api/v1/customers?limit=1${orgParam}`) : of(null),
+      totalOrders: this.canViewOrders ? this.fetchTotal(`/api/v1/orders?limit=1${orgParam}`) : of(null),
+      totalUsers: this.canViewUsers ? this.fetchTotal(`/api/v1/users?limit=1${orgParam}`) : of(null),
+      totalOrganizations: this.canViewOrganizations ? this.fetchTotal(`/api/v1/organizations${orgOnlyQuery}`) : of(null),
+      totalLicenses: this.canViewLicenses ? this.fetchTotal(`/api/v1/licenses${orgOnlyQuery}`) : of(null),
+      totalSalesInvoices: this.canViewSalesInvoices ? this.fetchTotal(`/api/v1/sales-invoices?limit=1${orgParam}`) : of(null),
+      pendingOrders: this.canViewOrders ? this.fetchTotal(`/api/v1/orders?limit=1&status=pending${orgParam}`) : of(0),
+      confirmedOrders: this.canViewOrders ? this.fetchTotal(`/api/v1/orders?limit=1&status=confirmed${orgParam}`) : of(0),
+      processingOrders: this.canViewOrders ? this.fetchTotal(`/api/v1/orders?limit=1&status=processing${orgParam}`) : of(0),
+      completedOrders: this.canViewOrders ? this.fetchTotal(`/api/v1/orders?limit=1&status=completed${orgParam}`) : of(0),
+      cancelledOrders: this.canViewOrders ? this.fetchTotal(`/api/v1/orders?limit=1&status=cancelled${orgParam}`) : of(0),
     }).subscribe({
       next: (result) => {
         this.loading = false;
@@ -71,13 +108,15 @@ export class DashboardPageComponent {
           totalLicenses: result.totalLicenses,
           totalSalesInvoices: result.totalSalesInvoices,
         };
-        this.orderStatusCounts = [
-          { label: 'Pending', value: result.pendingOrders, className: 'bg-warning' },
-          { label: 'Confirmed', value: result.confirmedOrders, className: 'bg-primary' },
-          { label: 'Processing', value: result.processingOrders, className: 'bg-info' },
-          { label: 'Completed', value: result.completedOrders, className: 'bg-success' },
-          { label: 'Cancelled', value: result.cancelledOrders, className: 'bg-danger' },
-        ];
+        this.orderStatusCounts = this.canViewOrders
+          ? [
+              { label: 'Pending', value: result.pendingOrders, className: 'bg-warning' },
+              { label: 'Confirmed', value: result.confirmedOrders, className: 'bg-primary' },
+              { label: 'Processing', value: result.processingOrders, className: 'bg-info' },
+              { label: 'Completed', value: result.completedOrders, className: 'bg-success' },
+              { label: 'Cancelled', value: result.cancelledOrders, className: 'bg-danger' },
+            ]
+          : [];
       },
       error: () => {
         this.loading = false;
@@ -96,7 +135,7 @@ export class DashboardPageComponent {
 
   private fetchTotal(endpoint: string) {
     return this.api.list<unknown>(endpoint).pipe(
-      map((response: ApiResponse<unknown[]>) => Number(response.meta?.total || 0)),
+      map((response: ApiResponse<unknown[]>) => Number(response.meta?.total || 0) || 0),
       catchError(() => of(0))
     );
   }

@@ -14,7 +14,7 @@
 <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
 
 <section class="row g-3 mb-4" *ngIf="metrics as m">
-  <div class="col-6 col-md-4 col-xl-3">
+  <div class="col-6 col-md-4 col-xl-3" *ngIf="m.totalItems !== null">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body">
         <div class="small text-secondary text-uppercase">Items</div>
@@ -22,7 +22,7 @@
       </div>
     </article>
   </div>
-  <div class="col-6 col-md-4 col-xl-3">
+  <div class="col-6 col-md-4 col-xl-3" *ngIf="m.totalCustomers !== null">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body">
         <div class="small text-secondary text-uppercase">Customers</div>
@@ -30,7 +30,7 @@
       </div>
     </article>
   </div>
-  <div class="col-6 col-md-4 col-xl-3">
+  <div class="col-6 col-md-4 col-xl-3" *ngIf="m.totalOrders !== null">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body">
         <div class="small text-secondary text-uppercase">Orders</div>
@@ -38,7 +38,7 @@
       </div>
     </article>
   </div>
-  <div class="col-6 col-md-4 col-xl-3">
+  <div class="col-6 col-md-4 col-xl-3" *ngIf="m.totalUsers !== null">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body">
         <div class="small text-secondary text-uppercase">Users</div>
@@ -46,7 +46,7 @@
       </div>
     </article>
   </div>
-  <div class="col-6 col-md-4 col-xl-3">
+  <div class="col-6 col-md-4 col-xl-3" *ngIf="m.totalOrganizations !== null">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body">
         <div class="small text-secondary text-uppercase">Organizations</div>
@@ -54,7 +54,7 @@
       </div>
     </article>
   </div>
-  <div class="col-6 col-md-4 col-xl-3">
+  <div class="col-6 col-md-4 col-xl-3" *ngIf="m.totalLicenses !== null">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body">
         <div class="small text-secondary text-uppercase">Licenses</div>
@@ -62,7 +62,7 @@
       </div>
     </article>
   </div>
-  <div class="col-6 col-md-4 col-xl-3">
+  <div class="col-6 col-md-4 col-xl-3" *ngIf="m.totalSalesInvoices !== null">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body">
         <div class="small text-secondary text-uppercase">Sales Invoices</div>
@@ -73,7 +73,7 @@
 </section>
 
 <section class="row g-4">
-  <div class="col-12 col-xl-7">
+  <div class="col-12 col-xl-7" *ngIf="canViewOrders">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body p-4">
         <h2 class="h5 mb-3">Orders by Status</h2>
@@ -92,7 +92,7 @@
     </article>
   </div>
 
-  <div class="col-12 col-xl-5">
+  <div class="col-12" [class.col-xl-5]="canViewOrders" [class.col-xl-12]="!canViewOrders">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body p-4">
         <h2 class="h5 mb-3">System Health</h2>

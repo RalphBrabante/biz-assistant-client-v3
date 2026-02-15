@@ -3,6 +3,7 @@ import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 
 interface QuarterlySalesReportRow {
@@ -46,10 +47,12 @@ interface QuarterlyExpenseReportRow {
 export class ReportsPageComponent {
   private readonly api: ApiService;
   private readonly auth: AuthService;
+  private readonly organizationContext: OrganizationContextService;
 
-  constructor(api: ApiService, auth: AuthService) {
+  constructor(api: ApiService, auth: AuthService, organizationContext: OrganizationContextService) {
     this.api = api;
     this.auth = auth;
+    this.organizationContext = organizationContext;
   }
 
   readonly salesRows = signal<QuarterlySalesReportRow[]>([]);
@@ -90,6 +93,24 @@ export class ReportsPageComponent {
     return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
+  get isSuperuser(): boolean {
+    const roleCodes = (this.auth.currentUser()?.roleCodes || []).map((code) =>
+      String(code || '').toLowerCase()
+    );
+    return roleCodes.includes('superuser');
+  }
+
+  private get orgParamValue(): string {
+    const organizationId = this.organizationContext.getActiveOrganizationId();
+    if (!organizationId) {
+      return '';
+    }
+    if (this.isSuperuser && !this.organizationContext.shouldApplySuperuserScope()) {
+      return '';
+    }
+    return organizationId;
+  }
+
   ngOnInit(): void {
     this.loadSalesReports();
     this.loadExpenseReports();
@@ -105,11 +126,16 @@ export class ReportsPageComponent {
       year: String(this.selectedYear()),
       quarter: String(this.selectedQuarter()),
     });
+    if (this.orgParamValue) {
+      params.set('organizationId', this.orgParamValue);
+    }
 
     this.api.list<QuarterlySalesReportRow>(`/api/v1/reports/quarterly-sales?${params.toString()}`).subscribe({
       next: (response: ApiResponse<QuarterlySalesReportRow[]>) => {
         this.loadingSales.set(false);
-        const rows = response.data || [];
+        const rows = (response.data || []).filter((row) =>
+          this.isSuperuser || row.organizationId === this.orgParamValue
+        );
         this.salesRows.set(rows);
         this.latestSalesReport.set(rows[0] || null);
 
@@ -136,11 +162,16 @@ export class ReportsPageComponent {
       year: String(this.selectedYear()),
       quarter: String(this.selectedQuarter()),
     });
+    if (this.orgParamValue) {
+      params.set('organizationId', this.orgParamValue);
+    }
 
     this.api.list<QuarterlyExpenseReportRow>(`/api/v1/reports/quarterly-expenses?${params.toString()}`).subscribe({
       next: (response: ApiResponse<QuarterlyExpenseReportRow[]>) => {
         this.loadingExpenses.set(false);
-        const rows = response.data || [];
+        const rows = (response.data || []).filter((row) =>
+          this.isSuperuser || row.organizationId === this.orgParamValue
+        );
         this.expenseRows.set(rows);
         this.latestExpenseReport.set(rows[0] || null);
 
@@ -166,6 +197,7 @@ export class ReportsPageComponent {
       year: this.selectedYear(),
       quarter: this.selectedQuarter(),
       currency: this.currentOrganizationCurrency,
+      ...(this.orgParamValue ? { organizationId: this.orgParamValue } : {}),
     };
 
     this.api.create<QuarterlySalesReportRow>('/api/v1/reports/quarterly-sales', payload).subscribe({
@@ -194,6 +226,7 @@ export class ReportsPageComponent {
       year: this.selectedYear(),
       quarter: this.selectedQuarter(),
       currency: this.currentOrganizationCurrency,
+      ...(this.orgParamValue ? { organizationId: this.orgParamValue } : {}),
     };
 
     this.api.create<QuarterlyExpenseReportRow>('/api/v1/reports/quarterly-expenses', payload).subscribe({

@@ -75,9 +75,14 @@
             <td class="text-secondary">{{ row.description || '-' }}</td>
             <td class="text-end">
               <div class="d-inline-flex gap-2">
-                <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
+                <a
+                  class="btn btn-sm btn-outline-secondary"
+                  [routerLink]="['/roles', row.id]"
+                  appTooltip
+                  title="Edit"
+                >
                   <i class="bi bi-pencil-square"></i>
-                </button>
+                </a>
                 <button
                   class="btn btn-sm btn-outline-danger"
                   type="button"

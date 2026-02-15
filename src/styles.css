@@ -8,6 +8,16 @@
   --brand-strong: #073b8b;
 }
 
+[data-bs-theme='dark'] {
+  --bg-main: #0f1724;
+  --bg-panel: #182234;
+  --bg-sidebar: #131d2d;
+  --text-main: #e5edf9;
+  --text-soft: #96a9c5;
+  --brand: #5b9bff;
+  --brand-strong: #3f7de0;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -17,6 +27,7 @@ body {
   font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
   background: radial-gradient(circle at top right, #d8e8ff 0%, var(--bg-main) 45%);
   color: var(--text-main);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .auth-bg {
@@ -143,6 +154,58 @@ body {
 
 .print-delivery-sheet {
   border: 1px solid #dbe4f5;
+}
+
+[data-bs-theme='dark'] body {
+  background: radial-gradient(circle at top right, #1d2a40 0%, var(--bg-main) 45%);
+}
+
+[data-bs-theme='dark'] .auth-bg {
+  background: radial-gradient(circle at top left, #1f2f49 0%, #142238 45%, #0f1724 100%);
+}
+
+[data-bs-theme='dark'] .app-bg {
+  background: linear-gradient(180deg, #101a2a 0%, #0c1523 100%);
+}
+
+[data-bs-theme='dark'] .mobile-topbar {
+  background: #121f32;
+}
+
+[data-bs-theme='dark'] .role-hero {
+  background:
+    radial-gradient(circle at top right, rgba(91, 155, 255, 0.2) 0%, transparent 45%),
+    linear-gradient(180deg, #162438 0%, #121d2e 100%);
+}
+
+[data-bs-theme='dark'] .stat-chip {
+  border-color: #2f425f;
+  background: #18263b;
+}
+
+[data-bs-theme='dark'] .stat-value {
+  color: #a2c5ff;
+}
+
+[data-bs-theme='dark'] .nav-link:hover {
+  background: #1d2d46;
+  border-color: #2e4467;
+}
+
+[data-bs-theme='dark'] .table .dropdown-menu {
+  border-color: #2d415f;
+  background: #182437;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme='dark'] .table .dropdown-item {
+  color: #dce7f7;
+}
+
+[data-bs-theme='dark'] .table .dropdown-item:hover,
+[data-bs-theme='dark'] .table .dropdown-item:focus {
+  color: #fff;
+  background-color: #2a3f5f;
 }
 
 @media print {

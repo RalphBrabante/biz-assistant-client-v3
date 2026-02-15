@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
@@ -46,6 +47,7 @@ interface OrganizationOption {
 export class ItemsPageComponent {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly organizationContext = inject(OrganizationContextService);
 
   readonly rows = signal<ItemRow[]>([]);
   readonly loading = signal(false);
@@ -70,7 +72,15 @@ export class ItemsPageComponent {
   editForm: Record<string, unknown> = this.newItemForm();
 
   get currentOrganizationId(): string {
-    return this.auth.currentUser()?.organizationId || '';
+    return this.organizationContext.getActiveOrganizationId();
+  }
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
+  }
+
+  get canReadOrganizations(): boolean {
+    return this.isSuperuser || this.auth.hasPermission('organizations.read');
   }
 
   get currentOrganizationCurrency(): string {
@@ -79,7 +89,11 @@ export class ItemsPageComponent {
 
   ngOnInit(): void {
     this.load();
-    this.loadOrganizations();
+    if (this.canReadOrganizations) {
+      this.loadOrganizations();
+    } else {
+      this.organizations.set([]);
+    }
   }
 
   load(): void {
@@ -313,7 +327,11 @@ export class ItemsPageComponent {
   }
 
   get currentOrganizationName(): string {
-    return this.organizationOptionLabelById(this.currentOrganizationId) || 'Unknown organization';
+    return (
+      this.organizationOptionLabelById(this.currentOrganizationId) ||
+      this.auth.currentUser()?.organizationId ||
+      'Current organization'
+    );
   }
 
   private newItemForm(): Record<string, unknown> {

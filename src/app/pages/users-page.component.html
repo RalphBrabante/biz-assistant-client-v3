@@ -98,6 +98,14 @@
           </td>
           <td class="text-end">
             <div class="d-inline-flex gap-2">
+              <a
+                class="btn btn-sm btn-outline-primary"
+                [routerLink]="['/users', row.id]"
+                appTooltip
+                title="Open User Details"
+              >
+                <i class="bi bi-person-vcard"></i>
+              </a>
               <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
                 <i class="bi bi-pencil-square"></i>
               </button>

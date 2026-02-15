@@ -244,9 +244,14 @@
         <div class="row g-3">
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Organization</label>
-            <select class="form-select" [(ngModel)]="editForm['organizationId']">
-              <option *ngFor="let org of organizations()" [value]="org.id">{{ organizationOptionLabel(org) }}</option>
-            </select>
+            <ng-container *ngIf="isSuperuser; else fixedOrgField">
+              <select class="form-select" [(ngModel)]="editForm['organizationId']">
+                <option *ngFor="let org of organizations()" [value]="org.id">{{ organizationOptionLabel(org) }}</option>
+              </select>
+            </ng-container>
+            <ng-template #fixedOrgField>
+              <input class="form-control" [value]="currentOrganizationName" readonly />
+            </ng-template>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Name</label>

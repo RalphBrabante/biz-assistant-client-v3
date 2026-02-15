@@ -4,6 +4,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
+import { ThemeService } from '../core/theme.service';
 import { ApiResponse } from '../core/types';
 
 interface LoginPayload {
@@ -16,6 +17,8 @@ interface LoginPayload {
     status?: string;
     organizationId?: string;
     currency?: string;
+    roleCodes?: string[];
+    permissionCodes?: string[];
   };
 }
 
@@ -28,12 +31,17 @@ interface LoginPayload {
 export class LoginPageComponent {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
 
   email = 'ralphjohnbrabante@gmail.com';
   password = 'Default123!';
   loading = false;
   error = '';
+
+  toggleTheme(): void {
+    this.theme.toggle();
+  }
 
   submit(): void {
     this.loading = true;

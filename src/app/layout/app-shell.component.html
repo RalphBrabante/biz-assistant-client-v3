@@ -4,9 +4,19 @@
       <div class="fw-bold">GIMO Assistant</div>
       <div class="small text-secondary">Client Workspace</div>
     </div>
-    <button class="btn btn-outline-primary btn-sm" type="button" (click)="openSidebar()">
-      <i class="bi bi-list fs-5"></i>
-    </button>
+    <div class="d-flex gap-2">
+      <button
+        class="btn btn-outline-secondary btn-sm"
+        type="button"
+        (click)="toggleTheme()"
+        [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+      >
+        <i class="bi" [class.bi-moon-stars]="!theme.isDark()" [class.bi-sun]="theme.isDark()"></i>
+      </button>
+      <button class="btn btn-outline-primary btn-sm" type="button" (click)="openSidebar()">
+        <i class="bi bi-list fs-5"></i>
+      </button>
+    </div>
   </header>
 
   <div class="sidebar-backdrop d-lg-none" *ngIf="sidebarOpen" (click)="closeSidebar()"></div>
@@ -19,6 +29,14 @@
           <div class="text-secondary small">Client Workspace</div>
         </div>
         <div class="d-flex gap-2">
+          <button
+            class="btn btn-outline-secondary btn-sm d-none d-lg-inline-flex"
+            type="button"
+            (click)="toggleTheme()"
+            [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+          >
+            <i class="bi" [class.bi-moon-stars]="!theme.isDark()" [class.bi-sun]="theme.isDark()"></i>
+          </button>
           <button
             class="btn btn-outline-secondary btn-sm d-none d-lg-inline-flex"
             type="button"
@@ -35,7 +53,7 @@
 
       <nav class="nav flex-column gap-2 mb-4">
         <a
-          *ngFor="let item of navItems"
+          *ngFor="let item of visibleNavItems"
           class="nav-link rounded-3 px-3 py-2 d-flex align-items-center gap-2"
           [routerLink]="item.path"
           routerLinkActive="active"
@@ -47,6 +65,19 @@
       </nav>
 
       <div class="user-block">
+        <div class="mb-3" *ngIf="canSwitchOrganization">
+          <label class="form-label small fw-semibold mb-1">Organization Context</label>
+          <select
+            class="form-select form-select-sm"
+            [ngModel]="selectedOrganizationId"
+            (ngModelChange)="switchOrganization($event)"
+            [disabled]="switchingOrganization"
+          >
+            <option *ngFor="let org of organizationOptions" [value]="org.id">
+              {{ org.name || org.legalName || org.id }}
+            </option>
+          </select>
+        </div>
         <div class="small text-secondary mb-2">Signed in as</div>
         <div class="fw-semibold mb-3">{{ userLabel }}</div>
         <button class="btn btn-outline-danger btn-sm" (click)="logout()">Sign Out</button>
@@ -56,5 +87,34 @@
     <main class="app-main p-3 p-md-4 p-xl-5">
       <router-outlet></router-outlet>
     </main>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="auth.unauthorizedAccess().visible"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="auth.unauthorizedAccess().visible ? 'block' : 'none'"
+  [attr.aria-hidden]="!auth.unauthorizedAccess().visible"
+  *ngIf="auth.unauthorizedAccess().visible"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title text-danger">
+          <i class="bi me-2" [ngClass]="auth.unauthorizedAccess().icon"></i>
+          {{ auth.unauthorizedAccess().title }}
+        </h5>
+        <button type="button" class="btn-close" (click)="closeUnauthorizedModal()"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-0">{{ auth.unauthorizedAccess().message }}</p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-primary" type="button" (click)="closeUnauthorizedModal()">
+          OK
+        </button>
+      </div>
+    </div>
   </div>
 </div>
