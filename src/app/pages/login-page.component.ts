@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { ThemeService } from '../core/theme.service';
 import { ApiResponse } from '../core/types';
@@ -25,7 +25,7 @@ interface LoginPayload {
 @Component({
   selector: 'app-login-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './login-page.component.html',
 })
 export class LoginPageComponent {
@@ -38,6 +38,13 @@ export class LoginPageComponent {
   password = '';
   loading = false;
   error = '';
+  forgotEmail = '';
+  forgotLoading = false;
+  forgotMessage = '';
+  forgotError = '';
+  forgotModalVisible = false;
+  verificationLoading = false;
+  verificationMessage = '';
 
   toggleTheme(): void {
     this.theme.toggle();
@@ -46,6 +53,7 @@ export class LoginPageComponent {
   submit(): void {
     this.loading = true;
     this.error = '';
+    this.verificationMessage = '';
 
     this.http
       .post<ApiResponse<LoginPayload>>('/api/v1/auth/login', {
@@ -68,6 +76,78 @@ export class LoginPageComponent {
         error: (errorResponse) => {
           this.loading = false;
           this.error = errorResponse?.error?.message || 'Unable to log in.';
+        },
+      });
+  }
+
+  openForgotModal(): void {
+    this.forgotModalVisible = true;
+    this.forgotEmail = this.email || '';
+    this.forgotLoading = false;
+    this.forgotMessage = '';
+    this.forgotError = '';
+  }
+
+  closeForgotModal(): void {
+    this.forgotModalVisible = false;
+  }
+
+  submitForgotPassword(): void {
+    const normalizedEmail = String(this.forgotEmail || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+      this.forgotError = 'Email is required.';
+      this.forgotMessage = '';
+      return;
+    }
+
+    this.forgotLoading = true;
+    this.forgotError = '';
+    this.forgotMessage = '';
+
+    this.http
+      .post<ApiResponse<unknown>>('/api/v1/auth/forgot-password', {
+        email: normalizedEmail,
+      })
+      .subscribe({
+        next: (response) => {
+          this.forgotLoading = false;
+          this.forgotMessage =
+            response.message ||
+            'If an account exists for that email, a password reset link has been sent.';
+        },
+        error: (errorResponse) => {
+          this.forgotLoading = false;
+          this.forgotError =
+            errorResponse?.error?.message || 'Unable to process password reset request.';
+        },
+      });
+  }
+
+  resendVerificationEmail(): void {
+    const normalizedEmail = String(this.email || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+      this.error = 'Enter your email first to request a verification link.';
+      return;
+    }
+
+    this.verificationLoading = true;
+    this.verificationMessage = '';
+
+    this.http
+      .post<ApiResponse<unknown>>('/api/v1/auth/request-email-verification', {
+        email: normalizedEmail,
+      })
+      .subscribe({
+        next: (response) => {
+          this.verificationLoading = false;
+          this.verificationMessage =
+            response.message ||
+            'If an account exists for that email, a verification link has been sent.';
+        },
+        error: (errorResponse) => {
+          this.verificationLoading = false;
+          this.verificationMessage =
+            errorResponse?.error?.message || 'Unable to send verification email.';
         },
       });
   }

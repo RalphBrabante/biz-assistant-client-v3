@@ -47,6 +47,11 @@
                   required
                   autocomplete="current-password"
                 />
+                <div class="d-flex justify-content-end mt-2">
+                  <button class="btn btn-link btn-sm text-decoration-none px-0" type="button" (click)="openForgotModal()">
+                    Forgot password?
+                  </button>
+                </div>
               </div>
 
               <div class="d-grid">
@@ -57,7 +62,19 @@
             </form>
 
             <div *ngIf="error" class="alert alert-danger mt-4 mb-0" role="alert">
-              {{ error }}
+              <div>{{ error }}</div>
+              <div class="mt-2" *ngIf="error.toLowerCase().includes('not verified')">
+                <button class="btn btn-outline-danger btn-sm" type="button" (click)="resendVerificationEmail()" [disabled]="verificationLoading">
+                  {{ verificationLoading ? 'Sending verification...' : 'Send verification email' }}
+                </button>
+              </div>
+            </div>
+            <div *ngIf="verificationMessage" class="alert alert-info mt-3 mb-0" role="alert">
+              {{ verificationMessage }}
+            </div>
+
+            <div class="text-center mt-3">
+              <a class="small text-decoration-none" routerLink="/reset-password">Have a reset token already?</a>
             </div>
           </div>
         </section>
@@ -65,3 +82,52 @@
     </div>
   </div>
 </main>
+
+<div class="modal-backdrop fade show" *ngIf="forgotModalVisible"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="forgotModalVisible ? 'block' : 'none'"
+  [attr.aria-hidden]="!forgotModalVisible"
+  *ngIf="forgotModalVisible"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">
+          <i class="bi bi-envelope-paper-heart me-2 text-primary"></i>
+          Reset Password
+        </h5>
+        <button type="button" class="btn-close" (click)="closeForgotModal()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary mb-3">
+          Enter your account email and we will send a secure reset link.
+        </p>
+        <label class="form-label fw-semibold" for="forgotEmail">Email</label>
+        <input
+          id="forgotEmail"
+          type="email"
+          class="form-control"
+          [(ngModel)]="forgotEmail"
+          [disabled]="forgotLoading"
+          autocomplete="email"
+        />
+        <div *ngIf="forgotMessage" class="alert alert-success mt-3 mb-0">
+          {{ forgotMessage }}
+        </div>
+        <div *ngIf="forgotError" class="alert alert-danger mt-3 mb-0">
+          {{ forgotError }}
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" type="button" (click)="closeForgotModal()" [disabled]="forgotLoading">
+          Close
+        </button>
+        <button class="btn btn-primary" type="button" (click)="submitForgotPassword()" [disabled]="forgotLoading">
+          {{ forgotLoading ? 'Sending...' : 'Send Reset Link' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
