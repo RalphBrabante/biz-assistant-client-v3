@@ -7,7 +7,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --no-audit --fund=false
+RUN npm install --no-audit --fund=false --include=optional
 
 COPY . .
 
