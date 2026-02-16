@@ -254,6 +254,41 @@ export class AppShellComponent {
       return;
     }
 
+    // Non-superusers may not have organizations.read permission; avoid global 403 modal
+    // from shell bootstrap calls by using user session fallback labels.
+    if (!this.canSwitchOrganization) {
+      const user = this.auth.currentUser();
+      const fallbackName = String(user?.organizationName || user?.organizationLegalName || '').trim();
+      if (fallbackName) {
+        this.organizationDisplayName = fallbackName;
+        return;
+      }
+
+      this.organizationDisplayName = 'Organization';
+      this.api.get<{ user?: { organizationName?: string; organizationLegalName?: string; currency?: string } }>(
+        '/api/v1/auth/session'
+      ).subscribe({
+        next: (response) => {
+          const sessionUser = response.data?.user;
+          const resolvedName = String(
+            sessionUser?.organizationName || sessionUser?.organizationLegalName || 'Organization'
+          ).trim();
+          this.organizationDisplayName = resolvedName || 'Organization';
+          if (sessionUser) {
+            this.auth.updateCurrentUser({
+              organizationName: sessionUser.organizationName,
+              organizationLegalName: sessionUser.organizationLegalName,
+              currency: sessionUser.currency,
+            });
+          }
+        },
+        error: () => {
+          this.organizationDisplayName = 'Organization';
+        },
+      });
+      return;
+    }
+
     this.api.get<{ id: string; name?: string; legalName?: string }>(`/api/v1/organizations/${organizationId}`).subscribe({
       next: (response) => {
         const org = response.data;

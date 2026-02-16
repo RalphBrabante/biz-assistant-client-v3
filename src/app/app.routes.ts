@@ -32,6 +32,7 @@ import { UserDetailPageComponent } from './pages/user-detail-page.component';
 import { TaxTypesPageComponent } from './pages/tax-types-page.component';
 import { ProfileSettingsPageComponent } from './pages/profile-settings-page.component';
 import { VerifyEmailPageComponent } from './pages/verify-email-page.component';
+import { HomeRedirectPageComponent } from './pages/home-redirect-page.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPageComponent },
@@ -69,7 +70,7 @@ export const routes: Routes = [
       { path: 'license/:id', component: LicenseEditPageComponent, canActivate: [permissionGuard], data: { permissions: ['licenses.read'] } },
       { path: 'sales-invoices', component: SalesInvoicesPageComponent, canActivate: [permissionGuard], data: { permissions: ['sales_invoices.read'] } },
       { path: 'sales-invoices/:id', component: SalesInvoiceDetailPageComponent, canActivate: [permissionGuard], data: { permissions: ['sales_invoices.read'] } },
-      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: '', pathMatch: 'full', component: HomeRedirectPageComponent },
     ],
   },
   { path: '**', redirectTo: '' },

@@ -16,6 +16,8 @@ interface LoginPayload {
     lastName?: string;
     status?: string;
     organizationId?: string;
+    organizationName?: string;
+    organizationLegalName?: string;
     currency?: string;
     roleCodes?: string[];
     permissionCodes?: string[];
@@ -75,7 +77,7 @@ export class LoginPageComponent {
           }
 
           this.auth.setSession(token, response.data?.user);
-          void this.router.navigate(['/dashboard']);
+          void this.router.navigate(['/']);
         },
         error: (errorResponse) => {
           this.loading = false;

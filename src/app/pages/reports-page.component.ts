@@ -117,6 +117,14 @@ export class ReportsPageComponent {
     return roleCodes.includes('superuser');
   }
 
+  get canGenerateReports(): boolean {
+    return this.auth.hasPermission('reports.generate');
+  }
+
+  get canDeleteReports(): boolean {
+    return this.auth.hasPermission('reports.delete');
+  }
+
   private get orgParamValue(): string {
     const organizationId = this.organizationContext.getActiveOrganizationId();
     if (!organizationId) {

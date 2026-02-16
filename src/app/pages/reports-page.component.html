@@ -38,7 +38,7 @@
       <h2 class="h5 mb-1">Quarterly Sales Reports</h2>
       <div class="text-secondary small">All saved quarterly sales reports.</div>
     </div>
-    <button class="btn btn-primary" [disabled]="generatingSales()" (click)="generateQuarterlySalesReport()">
+    <button class="btn btn-primary" *ngIf="canGenerateReports" [disabled]="generatingSales()" (click)="generateQuarterlySalesReport()">
       <i class="bi bi-calculator me-1"></i>{{ generatingSales() ? 'Generating...' : 'Generate Sales Report' }}
     </button>
   </div>
@@ -116,6 +116,7 @@
                 <i class="bi bi-eye"></i>
               </a>
               <button
+                *ngIf="canDeleteReports"
                 class="btn btn-sm btn-outline-danger"
                 type="button"
                 [disabled]="deletingSalesReportId() === row.id"
@@ -147,7 +148,7 @@
       <h2 class="h5 mb-1">Quarterly Expense Reports</h2>
       <div class="text-secondary small">All saved quarterly expense reports (excluding cancelled entries).</div>
     </div>
-    <button class="btn btn-outline-primary" [disabled]="generatingExpenses()" (click)="generateQuarterlyExpenseReport()">
+    <button class="btn btn-outline-primary" *ngIf="canGenerateReports" [disabled]="generatingExpenses()" (click)="generateQuarterlyExpenseReport()">
       <i class="bi bi-calculator me-1"></i>{{ generatingExpenses() ? 'Generating...' : 'Generate Expense Report' }}
     </button>
   </div>
@@ -225,6 +226,7 @@
                 <i class="bi bi-eye"></i>
               </a>
               <button
+                *ngIf="canDeleteReports"
                 class="btn btn-sm btn-outline-danger"
                 type="button"
                 [disabled]="deletingExpenseReportId() === row.id"

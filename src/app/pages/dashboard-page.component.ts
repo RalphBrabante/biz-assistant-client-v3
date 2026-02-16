@@ -99,6 +99,17 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     return this.auth.hasPermission('reports.read');
   }
 
+  get canViewFinancialCharts(): boolean {
+    const roleCodes = (this.auth.currentUser()?.roleCodes || []).map((code) =>
+      String(code || '').toLowerCase()
+    );
+    return (
+      roleCodes.includes('superuser') ||
+      roleCodes.includes('administrator') ||
+      roleCodes.includes('accountant')
+    );
+  }
+
   get isSuperuser(): boolean {
     const roleCodes = (this.auth.currentUser()?.roleCodes || []).map((code) =>
       String(code || '').toLowerCase()
@@ -123,7 +134,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    if (this.canViewReports) {
+    if (this.canViewReports && this.canViewFinancialCharts) {
       this.loadYearlyReportsChart();
     }
   }
@@ -194,7 +205,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
             ]
           : [];
         this.orderStatusMax = Math.max(1, ...this.orderStatusCounts.map((row) => row.value));
-        if (this.canViewReports) {
+        if (this.canViewReports && this.canViewFinancialCharts) {
           this.loadYearlyReportsChart();
         }
       },

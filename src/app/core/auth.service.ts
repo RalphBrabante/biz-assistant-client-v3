@@ -15,6 +15,8 @@ interface CurrentUser {
   country?: string;
   status?: string;
   organizationId?: string;
+  organizationName?: string;
+  organizationLegalName?: string;
   currency?: string;
   roleCodes?: string[];
   permissionCodes?: string[];
