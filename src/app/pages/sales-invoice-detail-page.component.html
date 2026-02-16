@@ -108,7 +108,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let line of orderedItems">
+                <tr *ngFor="let line of orderedItems; trackBy: trackBySnapshotId">
                   <td>{{ line.name || '-' }}</td>
                   <td>{{ line.sku || '-' }}</td>
                   <td class="text-end">{{ line.quantity || 0 }}</td>

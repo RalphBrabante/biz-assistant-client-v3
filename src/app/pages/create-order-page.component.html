@@ -46,7 +46,7 @@
         <label class="form-label">Select Customer</label>
         <select class="form-select" [(ngModel)]="selectedCustomerId" name="selectedCustomerId">
           <option value="">Select customer</option>
-          <option *ngFor="let customer of customerResults" [value]="customer.id">
+          <option *ngFor="let customer of customerResults; trackBy: trackByCustomerId" [value]="customer.id">
             {{ customerLabel(customer) }}
           </option>
         </select>
@@ -111,7 +111,7 @@
         <label class="form-label">Withholding Tax Type</label>
         <select class="form-select" [(ngModel)]="withholdingTaxTypeId" name="withholdingTaxTypeId">
           <option value="">Select withholding tax type</option>
-          <option *ngFor="let row of withholdingTaxTypes" [value]="row.id">
+          <option *ngFor="let row of withholdingTaxTypes; trackBy: trackByWithholdingTaxTypeId" [value]="row.id">
             {{ row.code || 'N/A' }} - {{ row.name || 'Unnamed' }} ({{ row.percentage || 0 }}%)
           </option>
         </select>
@@ -146,7 +146,7 @@
         </div>
 
         <div class="row g-3">
-          <div class="col-12 col-md-6" *ngFor="let item of catalogItems">
+          <div class="col-12 col-md-6" *ngFor="let item of catalogItems; trackBy: trackByItemId">
             <article class="border rounded-3 p-3 h-100 d-flex flex-column">
               <div class="d-flex justify-content-between align-items-start gap-2">
                 <div>
@@ -193,7 +193,7 @@
         <div *ngIf="cart.length === 0" class="text-secondary small">No items yet. Add items from search.</div>
 
         <div class="d-flex flex-column gap-3" *ngIf="cart.length > 0">
-          <div class="border rounded-3 p-3" *ngFor="let row of cart">
+          <div class="border rounded-3 p-3" *ngFor="let row of cart; trackBy: trackByCartItemId">
             <div class="d-flex justify-content-between align-items-start gap-2">
               <div>
                 <div class="fw-semibold">{{ row.item.name }}</div>

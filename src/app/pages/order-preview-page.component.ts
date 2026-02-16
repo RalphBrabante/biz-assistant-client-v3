@@ -160,6 +160,7 @@ export class OrderPreviewPageComponent {
   withholdingTaxTypes: WithholdingTaxTypeOption[] = [];
   loadingWithholdingTaxTypes = false;
   activityVisibleCount = 3;
+  private readonly currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
   ngOnInit(): void {
     this.orderId = String(this.route.snapshot.paramMap.get('id') || '');
@@ -197,15 +198,23 @@ export class OrderPreviewPageComponent {
   formatMoney(value: unknown, currency?: string): string {
     const amount = Number(value ?? 0);
     const code = String(currency || this.orderCurrency || 'USD').toUpperCase();
+    const normalizedAmount = Number.isFinite(amount) ? amount : 0;
+    const formatter = this.currencyFormatterCache.get(code);
+    if (formatter) {
+      return formatter.format(normalizedAmount);
+    }
+
     try {
-      return new Intl.NumberFormat('en-US', {
+      const created = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: code,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(Number.isFinite(amount) ? amount : 0);
+      });
+      this.currencyFormatterCache.set(code, created);
+      return created.format(normalizedAmount);
     } catch (_err) {
-      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+      return `${code} ${normalizedAmount.toFixed(2)}`;
     }
   }
 
@@ -864,6 +873,34 @@ export class OrderPreviewPageComponent {
 
   showMoreActivities(): void {
     this.activityVisibleCount += 3;
+  }
+
+  trackByWithholdingTaxTypeId(index: number, row: WithholdingTaxTypeOption): string {
+    return row.id || String(index);
+  }
+
+  trackByCustomerId(index: number, row: CustomerRow): string {
+    return row.id || String(index);
+  }
+
+  trackByActivityId(index: number, row: OrderActivityRow): string {
+    return row.id || String(index);
+  }
+
+  trackByChangedField(index: number, field: string): string {
+    return field || String(index);
+  }
+
+  trackByItemId(index: number, row: ItemRow): string {
+    return row.id || String(index);
+  }
+
+  trackByCartItemId(index: number, row: CartItem): string {
+    return row.item.id || String(index);
+  }
+
+  trackBySnapshotId(index: number, row: OrderSnapshotRow): string {
+    return row.id || row.itemId || String(index);
   }
 
   private showError(message: string): void {

@@ -96,6 +96,7 @@ export class CreateOrderPageComponent {
   applyWithholdingTax = false;
   withholdingTaxTypeId = '';
   withholdingTaxTypes: WithholdingTaxTypeOption[] = [];
+  private readonly currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
   catalogLoading = false;
   withholdingTaxLoading = false;
@@ -114,15 +115,23 @@ export class CreateOrderPageComponent {
   formatMoney(value: unknown, currency?: string): string {
     const amount = Number(value ?? 0);
     const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
+    const normalizedAmount = Number.isFinite(amount) ? amount : 0;
+    const formatter = this.currencyFormatterCache.get(code);
+    if (formatter) {
+      return formatter.format(normalizedAmount);
+    }
+
     try {
-      return new Intl.NumberFormat('en-US', {
+      const created = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: code,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(Number.isFinite(amount) ? amount : 0);
+      });
+      this.currencyFormatterCache.set(code, created);
+      return created.format(normalizedAmount);
     } catch (_err) {
-      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+      return `${code} ${normalizedAmount.toFixed(2)}`;
     }
   }
 
@@ -515,6 +524,22 @@ export class CreateOrderPageComponent {
 
   exceedsStock(row: CartItem): boolean {
     return row.item.type === 'product' && row.quantity > this.maxStock(row.item);
+  }
+
+  trackByCustomerId(index: number, row: CustomerRow): string {
+    return row.id || String(index);
+  }
+
+  trackByWithholdingTaxTypeId(index: number, row: WithholdingTaxTypeOption): string {
+    return row.id || String(index);
+  }
+
+  trackByItemId(index: number, row: ItemRow): string {
+    return row.id || String(index);
+  }
+
+  trackByCartItemId(index: number, row: CartItem): string {
+    return row.item.id || String(index);
   }
 
   private fetchCatalogPage(page: number, limit: number) {

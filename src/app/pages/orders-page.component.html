@@ -78,7 +78,7 @@
           <tr *ngIf="!loading && rows.length === 0">
             <td [attr.colspan]="isSuperuser ? 6 : 5" class="text-center text-secondary py-4">No orders found.</td>
           </tr>
-          <tr *ngFor="let row of rows">
+          <tr *ngFor="let row of rows; trackBy: trackById">
             <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
             <td>{{ row['orderNumber'] }}</td>
             <td>

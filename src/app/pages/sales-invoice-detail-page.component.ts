@@ -66,6 +66,7 @@ export class SalesInvoiceDetailPageComponent {
 
   invoiceId = '';
   status = 'draft';
+  private readonly currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
   readonly statusOptions = [
     'draft',
@@ -167,16 +168,28 @@ export class SalesInvoiceDetailPageComponent {
   formatMoney(value: unknown, currency?: string): string {
     const amount = Number(value ?? 0);
     const code = String(currency || this.invoiceCurrency || 'USD').toUpperCase();
+    const normalizedAmount = Number.isFinite(amount) ? amount : 0;
+    const formatter = this.currencyFormatterCache.get(code);
+    if (formatter) {
+      return formatter.format(normalizedAmount);
+    }
+
     try {
-      return new Intl.NumberFormat('en-US', {
+      const created = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: code,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(Number.isFinite(amount) ? amount : 0);
+      });
+      this.currencyFormatterCache.set(code, created);
+      return created.format(normalizedAmount);
     } catch (_err) {
-      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+      return `${code} ${normalizedAmount.toFixed(2)}`;
     }
+  }
+
+  trackBySnapshotId(index: number, row: SnapshotRow): string {
+    return row.id || String(index);
   }
 
   async saveStatus(): Promise<void> {

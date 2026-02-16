@@ -237,4 +237,16 @@ export class OrganizationDetailPageComponent {
   roleLabel(role: RoleOption): string {
     return role.name ? `${role.name} (${role.code})` : role.code;
   }
+
+  trackByUserOptionId(index: number, row: UserOption): string {
+    return row.id || String(index);
+  }
+
+  trackByRoleOptionId(index: number, row: RoleOption): string {
+    return row.id || String(index);
+  }
+
+  trackByMemberId(index: number, row: UserMembership): string {
+    return row.id || String(index);
+  }
 }

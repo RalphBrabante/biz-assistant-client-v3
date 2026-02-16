@@ -36,13 +36,13 @@
       </div>
 
       <nav class="mb-4">
-        <div *ngFor="let section of visibleNavSections()" class="mb-3">
+        <div *ngFor="let section of visibleNavSections(); trackBy: trackByNavSection" class="mb-3">
           <div class="small text-uppercase text-secondary fw-semibold px-3 mb-2 nav-label">
             {{ section.title }}
           </div>
           <div class="nav flex-column gap-2">
             <a
-              *ngFor="let item of section.items"
+              *ngFor="let item of section.items; trackBy: trackByNavItem"
               class="nav-link rounded-3 px-3 py-2 d-flex align-items-center gap-2"
               [routerLink]="item.path"
               routerLinkActive="active"
@@ -65,7 +65,7 @@
             [disabled]="switchingOrganization"
           >
             <option [value]="organizationContext.ALL_ORGANIZATIONS">All Organizations</option>
-            <option *ngFor="let org of organizationOptions" [value]="org.id">
+            <option *ngFor="let org of organizationOptions; trackBy: trackByOrganization" [value]="org.id">
               {{ org.name || org.legalName || org.id }}
             </option>
           </select>

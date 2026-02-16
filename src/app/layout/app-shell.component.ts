@@ -294,4 +294,16 @@ export class AppShellComponent {
     this.deferredInstallPrompt = null;
     this.canInstallApp = false;
   };
+
+  trackByNavSection(_index: number, section: NavSection): string {
+    return section.title;
+  }
+
+  trackByNavItem(_index: number, item: NavItem): string {
+    return item.path;
+  }
+
+  trackByOrganization(_index: number, org: { id: string }): string {
+    return org.id;
+  }
 }

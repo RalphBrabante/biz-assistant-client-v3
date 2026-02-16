@@ -31,6 +31,7 @@ export class OrdersPageComponent {
   total = 0;
   totalPages = 1;
   readonly pageSizeOptions = [10, 20, 50, 100];
+  private readonly currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
   get isSuperuser(): boolean {
     return this.organizationContext.isSuperuser();
@@ -159,16 +160,28 @@ export class OrdersPageComponent {
   formatMoney(value: unknown, row?: Record<string, unknown>): string {
     const amount = Number(value ?? 0);
     const code = String(row?.['currency'] || 'USD').toUpperCase();
+    const normalizedAmount = Number.isFinite(amount) ? amount : 0;
+    const formatter = this.currencyFormatterCache.get(code);
+    if (formatter) {
+      return formatter.format(normalizedAmount);
+    }
+
     try {
-      return new Intl.NumberFormat('en-US', {
+      const created = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: code,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(Number.isFinite(amount) ? amount : 0);
+      });
+      this.currencyFormatterCache.set(code, created);
+      return created.format(normalizedAmount);
     } catch (_err) {
-      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+      return `${code} ${normalizedAmount.toFixed(2)}`;
     }
+  }
+
+  trackById(_index: number, row: Record<string, unknown>): string {
+    return String(row['id'] || _index);
   }
 
   onSearchChange(value: string): void {

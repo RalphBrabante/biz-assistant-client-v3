@@ -58,12 +58,14 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
   health: Record<string, unknown> | null = null;
   metrics: DashboardMetrics | null = null;
   orderStatusCounts: Array<{ label: string; value: number; className: string }> = [];
+  orderStatusMax = 1;
   selectedYear = new Date().getFullYear();
   chartLoading = false;
   chartError = '';
   yearlySalesTotal = 0;
   yearlyExpenseTotal = 0;
   yearlyCurrency = 'USD';
+  readonly availableYears = Array.from({ length: 8 }, (_v, index) => new Date().getFullYear() - index);
 
   get canViewItems(): boolean {
     return this.auth.hasPermission('items.read');
@@ -95,11 +97,6 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
 
   get canViewReports(): boolean {
     return this.auth.hasPermission('reports.read');
-  }
-
-  get availableYears(): number[] {
-    const current = new Date().getFullYear();
-    return Array.from({ length: 8 }, (_v, index) => current - index);
   }
 
   get isSuperuser(): boolean {
@@ -196,6 +193,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
               { label: 'Cancelled', value: result.cancelledOrders, className: 'bg-danger' },
             ]
           : [];
+        this.orderStatusMax = Math.max(1, ...this.orderStatusCounts.map((row) => row.value));
         if (this.canViewReports) {
           this.loadYearlyReportsChart();
         }
@@ -208,11 +206,15 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
   }
 
   maxOrderStatusCount(): number {
-    return Math.max(1, ...this.orderStatusCounts.map((row) => row.value));
+    return this.orderStatusMax;
   }
 
   orderStatusWidth(value: number): number {
-    return Math.round((value / this.maxOrderStatusCount()) * 100);
+    return Math.round((value / this.orderStatusMax) * 100);
+  }
+
+  trackByOrderStatus(_index: number, row: { label: string }): string {
+    return row.label;
   }
 
   private fetchTotal(endpoint: string) {

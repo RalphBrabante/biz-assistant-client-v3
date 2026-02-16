@@ -58,7 +58,7 @@
         <label class="form-label">Select User</label>
         <select class="form-select" [(ngModel)]="selectedUserId" name="selectedUserId">
           <option value="">Select from results</option>
-          <option *ngFor="let user of userOptions" [value]="user.id">{{ userLabel(user) }}</option>
+          <option *ngFor="let user of userOptions; trackBy: trackByUserOptionId" [value]="user.id">{{ userLabel(user) }}</option>
         </select>
       </div>
 
@@ -66,7 +66,7 @@
         <label class="form-label">Role</label>
         <select class="form-select" [(ngModel)]="selectedRoleId" name="selectedRoleId">
           <option value="" *ngIf="roleOptions.length === 0">No roles available</option>
-          <option *ngFor="let role of roleOptions" [value]="role.id">{{ roleLabel(role) }}</option>
+          <option *ngFor="let role of roleOptions; trackBy: trackByRoleOptionId" [value]="role.id">{{ roleLabel(role) }}</option>
         </select>
       </div>
 
@@ -96,7 +96,7 @@
           <tr *ngIf="!memberLoading && members.length === 0">
             <td colspan="5" class="text-center text-secondary py-4">No users in this organization yet.</td>
           </tr>
-          <tr *ngFor="let member of members">
+          <tr *ngFor="let member of members; trackBy: trackByMemberId">
             <td>{{ member.firstName || '' }} {{ member.lastName || '' }}</td>
             <td>{{ member.email || '-' }}</td>
             <td>{{ memberRole(member) }}</td>

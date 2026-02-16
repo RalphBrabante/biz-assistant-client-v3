@@ -126,7 +126,7 @@
       <div class="card-body p-4">
         <h2 class="h5 mb-3">Orders by Status</h2>
         <div class="d-flex flex-column gap-3">
-          <div *ngFor="let row of orderStatusCounts">
+          <div *ngFor="let row of orderStatusCounts; trackBy: trackByOrderStatus">
             <div class="d-flex justify-content-between small mb-1">
               <span>{{ row.label }}</span>
               <strong>{{ row.value }}</strong>
