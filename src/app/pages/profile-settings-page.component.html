@@ -1,0 +1,113 @@
+<section class="card border-0 shadow-sm rounded-4">
+  <div class="card-body p-4 p-md-5">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-4">
+      <div>
+        <h2 class="h4 mb-1">Profile Settings</h2>
+        <p class="text-secondary mb-0">Update your profile, password, and profile picture.</p>
+      </div>
+    </div>
+
+    <div *ngIf="loading()" class="alert alert-info">Loading profile...</div>
+    <div *ngIf="error()" class="alert alert-danger">{{ error() }}</div>
+    <div *ngIf="message()" class="alert alert-success">{{ message() }}</div>
+
+    <form *ngIf="!loading()" (ngSubmit)="saveProfile()" #f="ngForm" class="row g-3">
+      <div class="col-12 d-flex align-items-center gap-3 mb-1">
+        <div
+          *ngIf="!displayImageUrl"
+          class="rounded-circle bg-primary-subtle text-primary fw-bold d-inline-flex align-items-center justify-content-center"
+          style="width: 64px; height: 64px; font-size: 1.2rem;"
+        >
+          {{ initials }}
+        </div>
+        <img
+          *ngIf="displayImageUrl"
+          [src]="displayImageUrl"
+          alt="Profile picture"
+          class="rounded-circle border"
+          style="width: 64px; height: 64px; object-fit: cover;"
+        />
+
+        <div class="flex-grow-1">
+          <label class="form-label fw-semibold mb-1">Profile Picture</label>
+          <input type="file" class="form-control" accept="image/*" (change)="onFileSelected($event)" />
+          <div class="form-text">JPG/PNG up to 5MB.</div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">First Name</label>
+        <input class="form-control" [(ngModel)]="form['firstName']" name="firstName" required />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Last Name</label>
+        <input class="form-control" [(ngModel)]="form['lastName']" name="lastName" required />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Email</label>
+        <input class="form-control" type="email" [(ngModel)]="form['email']" name="email" required />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Phone</label>
+        <input class="form-control" [(ngModel)]="form['phone']" name="phone" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Address Line 1</label>
+        <input class="form-control" [(ngModel)]="form['addressLine1']" name="addressLine1" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Address Line 2</label>
+        <input class="form-control" [(ngModel)]="form['addressLine2']" name="addressLine2" />
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">City</label>
+        <input class="form-control" [(ngModel)]="form['city']" name="city" />
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">State</label>
+        <input class="form-control" [(ngModel)]="form['state']" name="state" />
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Postal Code</label>
+        <input class="form-control" [(ngModel)]="form['postalCode']" name="postalCode" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Country</label>
+        <input class="form-control" [(ngModel)]="form['country']" name="country" />
+      </div>
+
+      <div class="col-md-6"></div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">New Password</label>
+        <input class="form-control" type="password" [(ngModel)]="form['password']" name="password" autocomplete="new-password" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Confirm Password</label>
+        <input
+          class="form-control"
+          type="password"
+          [(ngModel)]="form['confirmPassword']"
+          name="confirmPassword"
+          autocomplete="new-password"
+        />
+      </div>
+
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-primary" type="submit" [disabled]="submitting() || !f.form.valid">
+          <i class="bi bi-save me-1"></i>{{ submitting() ? 'Saving...' : 'Save Changes' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</section>

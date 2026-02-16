@@ -34,8 +34,8 @@ export class LoginPageComponent {
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
 
-  email = 'ralphjohnbrabante@gmail.com';
-  password = 'Default123!';
+  email = '';
+  password = '';
   loading = false;
   error = '';
 

@@ -35,6 +35,10 @@ export class ApiService {
     return this.http.put<ApiResponse<T>>(endpoint, payload);
   }
 
+  putFormData<T>(endpoint: string, payload: FormData): Observable<ApiResponse<T>> {
+    return this.http.put<ApiResponse<T>>(endpoint, payload);
+  }
+
   download(endpoint: string): Observable<Blob> {
     return this.http.get(endpoint, { responseType: 'blob' });
   }

@@ -251,10 +251,22 @@
           <strong>{{ totalAmount | number: '1.2-2' }}</strong>
         </div>
 
-        <button class="btn btn-primary btn-lg mt-auto" type="button" [disabled]="submitting" (click)="placeOrder()">
-          <i class="bi bi-bag-check me-1"></i>{{ submitting ? 'Placing Order...' : 'Place Order' }}
-        </button>
+        <div class="small text-secondary mt-auto">
+          Use the floating action button to place the order anytime.
+        </div>
       </div>
     </section>
   </div>
+</div>
+
+<div class="position-fixed bottom-0 end-0 p-3 p-md-4 no-print" style="z-index: 1045;">
+  <button
+    class="btn btn-primary btn-lg rounded-pill shadow d-inline-flex align-items-center gap-2"
+    type="button"
+    [disabled]="submitting"
+    (click)="placeOrder()"
+  >
+    <i class="bi" [ngClass]="submitting ? 'bi-arrow-repeat' : 'bi-bag-check'"></i>
+    <span>{{ submitting ? 'Placing Order...' : 'Place Order' }}</span>
+  </button>
 </div>

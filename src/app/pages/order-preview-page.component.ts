@@ -47,6 +47,22 @@ interface OrderSnapshotRow {
   lineTotal?: number;
 }
 
+interface OrderActivityRow {
+  id: string;
+  actionType?: string;
+  title?: string;
+  description?: string;
+  changedFields?: string[];
+  metadata?: Record<string, unknown> | null;
+  createdAt?: string;
+  actor?: {
+    id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  };
+}
+
 interface OrderRow {
   id: string;
   organizationId: string;
@@ -70,6 +86,7 @@ interface OrderRow {
   shippingAmount?: number;
   notes?: string;
   orderedItemSnapshots?: OrderSnapshotRow[];
+  activities?: OrderActivityRow[];
   withholdingTaxType?: {
     id: string;
     code?: string;
@@ -141,11 +158,12 @@ export class OrderPreviewPageComponent {
   withholdingTaxTypeId = '';
   withholdingTaxTypes: WithholdingTaxTypeOption[] = [];
   loadingWithholdingTaxTypes = false;
+  activityVisibleCount = 3;
 
   ngOnInit(): void {
     this.orderId = String(this.route.snapshot.paramMap.get('id') || '');
     if (!this.orderId) {
-      this.error = 'Order ID is missing.';
+      this.showError('Order ID is missing.');
       return;
     }
     this.loadOrder();
@@ -167,6 +185,7 @@ export class OrderPreviewPageComponent {
     this.loading = true;
     this.error = '';
     this.message = '';
+    this.activityVisibleCount = 3;
     // Keep item search pane intentionally empty until user searches (prevents noisy initial list).
     this.catalogItems = [];
     this.catalogHasMore = false;
@@ -179,7 +198,7 @@ export class OrderPreviewPageComponent {
         const order = response.data || null;
         this.order = order;
         if (!order) {
-          this.error = 'Order not found.';
+          this.showError('Order not found.');
           return;
         }
 
@@ -199,7 +218,7 @@ export class OrderPreviewPageComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.error = err?.error?.message || 'Unable to load order.';
+        this.showError(err?.error?.message || 'Unable to load order.');
       },
     });
   }
@@ -241,7 +260,7 @@ export class OrderPreviewPageComponent {
       },
       error: (err) => {
         this.catalogLoading = false;
-        this.error = err?.error?.message || 'Unable to load items catalog.';
+        this.showError(err?.error?.message || 'Unable to load items catalog.');
       },
     });
   }
@@ -279,7 +298,7 @@ export class OrderPreviewPageComponent {
   searchItems(): void {
     if (this.isLocked) return;
     if (!this.organizationId) {
-      this.error = 'Order organization is missing.';
+      this.showError('Order organization is missing.');
       return;
     }
 
@@ -304,7 +323,7 @@ export class OrderPreviewPageComponent {
           this.catalogLoading = false;
           this.catalogHasMore = false;
           this.catalogItems = [];
-          this.error = err?.error?.message || 'Unable to search items.';
+          this.showError(err?.error?.message || 'Unable to search items.');
         },
       });
   }
@@ -333,7 +352,7 @@ export class OrderPreviewPageComponent {
         },
         error: (err) => {
           this.catalogLoadingMore = false;
-          this.error = err?.error?.message || 'Unable to load more items.';
+          this.showError(err?.error?.message || 'Unable to load more items.');
         },
       });
   }
@@ -341,7 +360,7 @@ export class OrderPreviewPageComponent {
   searchCustomers(): void {
     if (this.isLocked) return;
     if (!this.organizationId) {
-      this.error = 'Order organization is missing.';
+      this.showError('Order organization is missing.');
       return;
     }
 
@@ -358,7 +377,7 @@ export class OrderPreviewPageComponent {
       },
       error: (err) => {
         this.searchingCustomers = false;
-        this.error = err?.error?.message || 'Unable to search customers.';
+        this.showError(err?.error?.message || 'Unable to search customers.');
       },
     });
   }
@@ -517,6 +536,18 @@ export class OrderPreviewPageComponent {
     return this.order?.orderedItemSnapshots || [];
   }
 
+  get activityHistory(): OrderActivityRow[] {
+    return this.order?.activities || [];
+  }
+
+  get visibleActivityHistory(): OrderActivityRow[] {
+    return this.activityHistory.slice(0, this.activityVisibleCount);
+  }
+
+  get hasMoreActivities(): boolean {
+    return this.activityVisibleCount < this.activityHistory.length;
+  }
+
   get printProductLines(): OrderSnapshotRow[] {
     return this.deliveryLines.filter((line) => {
       const snapshotType = String(line.type || '').toLowerCase();
@@ -586,23 +617,23 @@ export class OrderPreviewPageComponent {
 
   async saveOrder(): Promise<void> {
     if (this.isCompleted) {
-      this.error = 'Completed orders are locked and can no longer be edited.';
+      this.showError('Completed orders are locked and can no longer be edited.');
       return;
     }
     if (!this.orderId) return;
     if (!this.selectedCustomerId) {
-      this.error = 'Please select a customer.';
+      this.showError('Please select a customer.');
       return;
     }
     if (this.cart.length === 0) {
-      this.error = 'Order must have at least one item.';
+      this.showError('Order must have at least one item.');
       return;
     }
     const invalidStockEntry = this.cart.find(
       (row) => row.item.type === 'product' && row.quantity > this.maxStock(row.item)
     );
     if (invalidStockEntry) {
-      this.error = `Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`;
+      this.showError(`Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`);
       return;
     }
 
@@ -712,7 +743,7 @@ export class OrderPreviewPageComponent {
           this.completionModalError = message;
           return;
         }
-        this.error = message;
+        this.showError(message);
       },
     });
   }
@@ -775,5 +806,45 @@ export class OrderPreviewPageComponent {
           this.withholdingTaxTypes = [];
         },
       });
+  }
+
+  activityBadgeClass(actionType: string | undefined): string {
+    const normalized = String(actionType || '').toLowerCase();
+    if (normalized === 'status_changed' || normalized === 'order_completed') {
+      return 'text-bg-success';
+    }
+    if (normalized === 'inventory_deducted') {
+      return 'text-bg-warning';
+    }
+    if (normalized === 'sales_invoice_created') {
+      return 'text-bg-primary';
+    }
+    return 'text-bg-secondary';
+  }
+
+  activityIcon(actionType: string | undefined): string {
+    const normalized = String(actionType || '').toLowerCase();
+    if (normalized === 'order_created') return 'bi-plus-circle';
+    if (normalized === 'order_updated') return 'bi-pencil-square';
+    if (normalized === 'status_changed') return 'bi-arrow-left-right';
+    if (normalized === 'inventory_deducted') return 'bi-box-seam';
+    if (normalized === 'sales_invoice_created') return 'bi-file-earmark-check';
+    return 'bi-clock-history';
+  }
+
+  actorLabel(activity: OrderActivityRow): string {
+    const actor = activity.actor;
+    if (!actor) return 'System';
+    const fullName = [actor.firstName, actor.lastName].filter(Boolean).join(' ').trim();
+    return fullName || actor.email || 'System';
+  }
+
+  showMoreActivities(): void {
+    this.activityVisibleCount += 3;
+  }
+
+  private showError(message: string): void {
+    this.error = message;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }

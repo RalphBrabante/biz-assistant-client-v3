@@ -126,9 +126,9 @@ export class CreateOrderPageComponent {
 
   searchItems(): void {
     if (!this.currentOrganizationId.trim()) {
-      this.error = this.organizationContext.isAllOrganizationsSelected()
+      this.showError(this.organizationContext.isAllOrganizationsSelected()
         ? 'Select a specific organization first.'
-        : 'Logged in user has no organization assigned.';
+        : 'Logged in user has no organization assigned.');
       this.catalogItems = [];
       this.catalogHasMore = false;
       return;
@@ -150,7 +150,7 @@ export class CreateOrderPageComponent {
         this.catalogLoading = false;
         this.catalogHasMore = false;
         this.catalogItems = [];
-        this.error = err?.error?.message || 'Unable to search items.';
+        this.showError(err?.error?.message || 'Unable to search items.');
       },
     });
   }
@@ -175,16 +175,16 @@ export class CreateOrderPageComponent {
       },
       error: (err) => {
         this.catalogLoadingMore = false;
-        this.error = err?.error?.message || 'Unable to load more items.';
+        this.showError(err?.error?.message || 'Unable to load more items.');
       },
     });
   }
 
   searchCustomers(): void {
     if (!this.currentOrganizationId.trim()) {
-      this.error = this.organizationContext.isAllOrganizationsSelected()
+      this.showError(this.organizationContext.isAllOrganizationsSelected()
         ? 'Select a specific organization first.'
-        : 'Logged in user has no organization assigned.';
+        : 'Logged in user has no organization assigned.');
       this.customerResults = [];
       this.customerSearchStatus = '';
       return;
@@ -213,7 +213,7 @@ export class CreateOrderPageComponent {
         this.searchingCustomers = false;
         this.customerResults = [];
         this.customerSearchStatus = 'Customer search failed.';
-        this.error = err?.error?.message || 'Unable to search customers.';
+        this.showError(err?.error?.message || 'Unable to search customers.');
       },
     });
   }
@@ -370,28 +370,28 @@ export class CreateOrderPageComponent {
 
   placeOrder(): void {
     if (!this.currentOrganizationId.trim()) {
-      this.error = this.organizationContext.isAllOrganizationsSelected()
+      this.showError(this.organizationContext.isAllOrganizationsSelected()
         ? 'Select a specific organization first.'
-        : 'Logged in user has no organization assigned.';
+        : 'Logged in user has no organization assigned.');
       return;
     }
     if (!this.orderNumber.trim()) {
-      this.error = 'Order number is required.';
+      this.showError('Order number is required.');
       return;
     }
     if (!this.selectedCustomerId.trim()) {
-      this.error = 'Please select a customer for this order.';
+      this.showError('Please select a customer for this order.');
       return;
     }
     if (this.cart.length === 0) {
-      this.error = 'Add at least one item to place an order.';
+      this.showError('Add at least one item to place an order.');
       return;
     }
     const invalidStockEntry = this.cart.find(
       (row) => row.item.type === 'product' && row.quantity > this.maxStock(row.item)
     );
     if (invalidStockEntry) {
-      this.error = `Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`;
+      this.showError(`Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`);
       return;
     }
 
@@ -434,9 +434,14 @@ export class CreateOrderPageComponent {
       },
       error: (err) => {
         this.submitting = false;
-        this.error = err?.error?.message || 'Unable to place order.';
+        this.showError(err?.error?.message || 'Unable to place order.');
       },
     });
+  }
+
+  private showError(message: string): void {
+    this.error = message;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   private generateOrderNumber(): string {

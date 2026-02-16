@@ -64,10 +64,26 @@ export class AppShellComponent {
     return fullName || user.email || 'User';
   }
 
+  get userInitials(): string {
+    const user = this.auth.currentUser();
+    const first = String(user?.firstName || '').trim().charAt(0);
+    const last = String(user?.lastName || '').trim().charAt(0);
+    const email = String(user?.email || '').trim().charAt(0);
+    return `${first}${last}`.trim().toUpperCase() || email.toUpperCase() || 'U';
+  }
+
+  get userProfileImageUrl(): string {
+    return String(this.auth.currentUser()?.profileImageUrl || '').trim();
+  }
+
   logout(): void {
     this.organizationContext.clearSelectedOrganizationId();
     this.auth.clearSession();
     void this.router.navigate(['/login']);
+  }
+
+  goToProfile(): void {
+    void this.router.navigate(['/profile']);
   }
 
   openSidebar(): void {

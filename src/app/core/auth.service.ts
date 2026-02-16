@@ -5,6 +5,14 @@ interface CurrentUser {
   email?: string;
   firstName?: string;
   lastName?: string;
+  profileImageUrl?: string;
+  phone?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
   status?: string;
   organizationId?: string;
   currency?: string;
@@ -45,6 +53,13 @@ export class AuthService {
       localStorage.setItem(this.userKey, JSON.stringify(user));
       this.currentUser.set(user);
     }
+  }
+
+  updateCurrentUser(partial: CurrentUser): void {
+    const current = this.currentUser() || {};
+    const updated = { ...current, ...partial };
+    localStorage.setItem(this.userKey, JSON.stringify(updated));
+    this.currentUser.set(updated);
   }
 
   clearSession(): void {
