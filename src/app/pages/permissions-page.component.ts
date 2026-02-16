@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
@@ -24,6 +25,7 @@ interface PermissionRow {
 })
 export class PermissionsPageComponent {
   private readonly api: ApiService;
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   constructor(api: ApiService) {
     this.api = api;
@@ -217,7 +219,17 @@ export class PermissionsPageComponent {
     });
   }
 
-  removePermission(id: string): void {
+  async removePermission(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Permission',
+      message: 'Delete this permission? This action cannot be undone.',
+      confirmText: 'Delete Permission',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-key',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');

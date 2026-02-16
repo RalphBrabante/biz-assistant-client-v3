@@ -1,0 +1,81 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Finance</div>
+        <h1 class="h3 mb-2">Expense Details</h1>
+        <p class="text-secondary mb-0">Review full expense record and printable expense summary.</p>
+      </div>
+      <div class="d-flex gap-2 no-print">
+        <button class="btn btn-outline-primary" (click)="printPage()">
+          <i class="bi bi-printer me-1"></i>Print
+        </button>
+        <a class="btn btn-outline-secondary" routerLink="/expenses">
+          <i class="bi bi-arrow-left me-1"></i>Back to Expenses
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 print-card" *ngIf="expense() as row">
+  <div class="card-body p-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 border-bottom pb-3 mb-3">
+      <div>
+        <div class="h5 mb-1">Expense Summary</div>
+        <div class="small text-secondary">Reference: {{ row.expenseNumber || row.id }}</div>
+      </div>
+      <div class="text-md-end">
+        <div><strong>Status:</strong> {{ row.status || '-' }}</div>
+        <div><strong>Date:</strong> {{ row.expenseDate | date: 'mediumDate' }}</div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-12">
+        <div class="fw-semibold text-uppercase small text-secondary">General Details</div>
+      </div>
+      <div class="col-12 col-md-4"><strong>Organization:</strong> {{ organizationLabel() }}</div>
+      <div class="col-12 col-md-4"><strong>Vendor:</strong> {{ vendorLabel() }}</div>
+      <div class="col-12 col-md-4"><strong>Vendor TIN:</strong> {{ row.vendorTaxId || '-' }}</div>
+      <div class="col-12 col-md-4"><strong>Category:</strong> {{ row.category || '-' }}</div>
+      <div class="col-12 col-md-4"><strong>Payment Method:</strong> {{ row.paymentMethod || '-' }}</div>
+      <div class="col-12 col-md-4"><strong>Due Date:</strong> {{ row.dueDate ? (row.dueDate | date: 'mediumDate') : '-' }}</div>
+      <div class="col-12 col-md-6"><strong>Tax Type:</strong> {{ taxTypeLabel() }}</div>
+      <div class="col-12 col-md-6"><strong>Withholding Tax Type:</strong> {{ withholdingLabel() }}</div>
+      <div class="col-12"><strong>Description:</strong> {{ row.description || '-' }}</div>
+      <div class="col-12"><strong>Notes:</strong> {{ row.notes || '-' }}</div>
+      <div class="col-12"><strong>Expense ID:</strong> {{ row.id }}</div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="fw-semibold text-uppercase small text-secondary">Computed Breakdown</div>
+      </div>
+      <div class="col-12 col-md-3"><strong>Amount:</strong> {{ row.amount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>VAT Exempt Amount:</strong> {{ row.vatExemptAmount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>Taxable Amount:</strong> {{ row.taxableAmount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>Tax Amount:</strong> {{ row.taxAmount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>Withholding Tax Amount:</strong> {{ row.withHoldingTaxAmount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>Discount Amount:</strong> {{ row.discountAmount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>Total Amount:</strong> {{ row.totalAmount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>Currency:</strong> {{ row.currency || '-' }}</div>
+    </div>
+
+    <div class="mt-3 no-print" *ngIf="row.file">
+      <a [href]="row.file" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-file-earmark-image me-1"></i>View Attachment
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4" *ngIf="loading()">
+  <div class="card-body p-4 text-secondary">Loading expense details...</div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4" *ngIf="error()">
+  <div class="card-body p-4">
+    <div class="alert alert-danger mb-0">{{ error() }}</div>
+  </div>
+</section>

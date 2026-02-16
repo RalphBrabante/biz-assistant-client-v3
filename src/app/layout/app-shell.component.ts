@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ThemeService } from '../core/theme.service';
 
@@ -24,6 +25,7 @@ interface NavItem {
 export class AppShellComponent {
   private readonly api = inject(ApiService);
   readonly auth = inject(AuthService);
+  readonly confirmDialog = inject(ConfirmDialogService);
   readonly organizationContext = inject(OrganizationContextService);
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
@@ -40,6 +42,7 @@ export class AppShellComponent {
     { label: 'Customers', path: '/customers', icon: 'bi-person-vcard', permissions: ['organizations.read'] },
     { label: 'Vendors', path: '/vendors', icon: 'bi-truck', permissions: ['vendors.read'] },
     { label: 'Expenses', path: '/expenses', icon: 'bi-cash-stack', permissions: ['expenses.read'] },
+    { label: 'Taxes', path: '/taxes', icon: 'bi-percent', permissions: ['expenses.read'] },
     { label: 'Orders', path: '/orders', icon: 'bi-receipt', permissions: ['orders.read'] },
     { label: 'Licenses', path: '/licenses', icon: 'bi-patch-check', permissions: ['licenses.read'] },
     { label: 'Sales Invoices', path: '/sales-invoices', icon: 'bi-file-earmark-text', permissions: ['sales_invoices.read'] },
@@ -49,6 +52,7 @@ export class AppShellComponent {
   sidebarCollapsed = false;
   organizationOptions: Array<{ id: string; name?: string; legalName?: string }> = [];
   switchingOrganization = false;
+  organizationDisplayName = 'Organization';
 
   get userLabel(): string {
     const user = this.auth.currentUser();
@@ -96,10 +100,19 @@ export class AppShellComponent {
   }
 
   get selectedOrganizationId(): string {
-    return this.organizationContext.getActiveOrganizationId();
+    if (!this.canSwitchOrganization) {
+      return this.organizationContext.getActiveOrganizationId();
+    }
+    const selected = String(this.organizationContext.selectedOrganizationId() || '').trim();
+    if (selected) {
+      return selected;
+    }
+    return String(this.auth.currentUser()?.organizationId || '').trim();
   }
 
   ngOnInit(): void {
+    this.resolveOrganizationDisplayName();
+
     if (!this.canSwitchOrganization) {
       return;
     }
@@ -107,6 +120,7 @@ export class AppShellComponent {
     this.api.list<{ id: string; name?: string; legalName?: string }>('/api/v1/organizations?limit=500').subscribe({
       next: (response) => {
         this.organizationOptions = response.data || [];
+        this.updateDisplayNameFromOptions();
       },
       error: () => {
         this.organizationOptions = [];
@@ -118,6 +132,14 @@ export class AppShellComponent {
     this.auth.clearUnauthorizedAccess();
   }
 
+  closeConfirmModal(): void {
+    this.confirmDialog.cancel();
+  }
+
+  approveConfirmModal(): void {
+    this.confirmDialog.approve();
+  }
+
   toggleTheme(): void {
     this.theme.toggle();
   }
@@ -127,9 +149,51 @@ export class AppShellComponent {
       return;
     }
     this.organizationContext.setSelectedOrganizationId(organizationId);
+    this.updateDisplayNameFromOptions();
     this.switchingOrganization = true;
     setTimeout(() => {
       window.location.reload();
     }, 50);
+  }
+
+  private resolveOrganizationDisplayName(): void {
+    const organizationId = String(this.selectedOrganizationId || '').trim();
+    if (!organizationId) {
+      this.organizationDisplayName = 'Organization';
+      return;
+    }
+    if (organizationId === this.organizationContext.ALL_ORGANIZATIONS) {
+      this.organizationDisplayName = 'All Organizations';
+      return;
+    }
+
+    this.api.get<{ id: string; name?: string; legalName?: string }>(`/api/v1/organizations/${organizationId}`).subscribe({
+      next: (response) => {
+        const org = response.data;
+        this.organizationDisplayName =
+          String(org?.name || org?.legalName || organizationId).trim() || 'Organization';
+      },
+      error: () => {
+        this.organizationDisplayName = organizationId;
+      },
+    });
+  }
+
+  private updateDisplayNameFromOptions(): void {
+    const organizationId = String(this.selectedOrganizationId || '').trim();
+    if (!organizationId) {
+      this.organizationDisplayName = 'Organization';
+      return;
+    }
+    if (organizationId === this.organizationContext.ALL_ORGANIZATIONS) {
+      this.organizationDisplayName = 'All Organizations';
+      return;
+    }
+    const match = this.organizationOptions.find((org) => org.id === organizationId);
+    if (!match) {
+      return;
+    }
+    this.organizationDisplayName =
+      String(match.name || match.legalName || organizationId).trim() || 'Organization';
   }
 }

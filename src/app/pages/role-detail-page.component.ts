@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
 interface PermissionRow {
@@ -40,6 +41,7 @@ interface RoleDetail {
 export class RoleDetailPageComponent {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly loading = signal(false);
   readonly submitting = signal(false);
@@ -160,7 +162,17 @@ export class RoleDetailPageComponent {
       });
   }
 
-  removePermission(permissionId: string): void {
+  async removePermission(permissionId: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Remove Permission',
+      message: 'Remove this permission from the role?',
+      confirmText: 'Remove Permission',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-key',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.removingPermissionId.set(permissionId);
     this.error.set('');
     this.message.set('');

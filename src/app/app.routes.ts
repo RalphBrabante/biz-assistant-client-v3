@@ -5,6 +5,7 @@ import { AppShellComponent } from './layout/app-shell.component';
 import { DashboardPageComponent } from './pages/dashboard-page.component';
 import { CreateOrderPageComponent } from './pages/create-order-page.component';
 import { CustomersPageComponent } from './pages/customers-page.component';
+import { ExpenseDetailPageComponent } from './pages/expense-detail-page.component';
 import { ExpensesPageComponent } from './pages/expenses-page.component';
 import { DevUserPageComponent } from './pages/dev-user-page.component';
 import { ItemsPageComponent } from './pages/items-page.component';
@@ -26,6 +27,7 @@ import { SettingsPageComponent } from './pages/settings-page.component';
 import { UsersPageComponent } from './pages/users-page.component';
 import { VendorsPageComponent } from './pages/vendors-page.component';
 import { UserDetailPageComponent } from './pages/user-detail-page.component';
+import { TaxTypesPageComponent } from './pages/tax-types-page.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPageComponent },
@@ -49,7 +51,10 @@ export const routes: Routes = [
       { path: 'orders/create', component: CreateOrderPageComponent, canActivate: [permissionGuard], data: { permissions: ['orders.create'] } },
       { path: 'orders/:id', component: OrderPreviewPageComponent, canActivate: [permissionGuard], data: { permissions: ['orders.read'] } },
       { path: 'customers', component: CustomersPageComponent, canActivate: [permissionGuard], data: { permissions: ['organizations.read'] } },
+      { path: 'expenses/:id', component: ExpenseDetailPageComponent, canActivate: [permissionGuard], data: { permissions: ['expenses.read'] } },
       { path: 'expenses', component: ExpensesPageComponent, canActivate: [permissionGuard], data: { permissions: ['expenses.read'] } },
+      { path: 'taxes', component: TaxTypesPageComponent, canActivate: [permissionGuard], data: { permissions: ['expenses.read'] } },
+      { path: 'tax-types', pathMatch: 'full', redirectTo: 'taxes' },
       { path: 'vendors', component: VendorsPageComponent, canActivate: [permissionGuard], data: { permissions: ['vendors.read'] } },
       { path: 'licenses', component: LicensesPageComponent, canActivate: [permissionGuard], data: { permissions: ['licenses.read'] } },
       { path: 'license/:id', component: LicenseEditPageComponent, canActivate: [permissionGuard], data: { permissions: ['licenses.read'] } },

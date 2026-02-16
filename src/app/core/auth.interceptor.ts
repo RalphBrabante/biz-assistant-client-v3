@@ -29,6 +29,19 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     }
   }
 
+  if (
+    token &&
+    req.method === 'POST' &&
+    req.url.includes('/api/v1/') &&
+    !req.url.includes('/api/v1/auth/') &&
+    !req.url.includes('/api/v1/dev/') &&
+    organizationContext.isAllOrganizationsSelected()
+  ) {
+    const message = 'Select a specific organization first. Imports and data creation are disabled in All Organizations mode.';
+    auth.showUnauthorizedAccess(message);
+    return throwError(() => ({ status: 403, error: { message } }));
+  }
+
   if (!token || request.url.includes('/api/v1/auth/login') || request.url.includes('/api/v1/dev/')) {
     return next(request).pipe(
       catchError((err) => {

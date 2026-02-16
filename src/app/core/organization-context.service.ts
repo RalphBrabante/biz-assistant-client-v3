@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class OrganizationContextService {
+  readonly ALL_ORGANIZATIONS = '__all__';
   private readonly storageKey = 'selectedOrganizationId';
   private readonly auth = inject(AuthService);
 
@@ -22,11 +23,25 @@ export class OrganizationContextService {
     }
 
     const selected = String(this.selectedOrganizationId() || '').trim();
+    if (selected === this.ALL_ORGANIZATIONS) {
+      return '';
+    }
     return selected || userOrgId;
   }
 
   shouldApplySuperuserScope(): boolean {
-    return this.isSuperuser() && Boolean(String(this.selectedOrganizationId() || '').trim());
+    if (!this.isSuperuser()) {
+      return false;
+    }
+    const selected = String(this.selectedOrganizationId() || '').trim();
+    return Boolean(selected) && selected !== this.ALL_ORGANIZATIONS;
+  }
+
+  isAllOrganizationsSelected(): boolean {
+    if (!this.isSuperuser()) {
+      return false;
+    }
+    return String(this.selectedOrganizationId() || '').trim() === this.ALL_ORGANIZATIONS;
   }
 
   setSelectedOrganizationId(organizationId: string): void {

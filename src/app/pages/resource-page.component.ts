@@ -3,6 +3,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse, CrudResourceConfig, FieldConfig } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 import { RESOURCE_CONFIGS } from '../shared/resource-configs';
@@ -16,6 +17,7 @@ import { RESOURCE_CONFIGS } from '../shared/resource-configs';
 export class ResourcePageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(ApiService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly config = this.resolveConfig();
 
@@ -122,9 +124,19 @@ export class ResourcePageComponent {
     });
   }
 
-  remove(id: unknown): void {
+  async remove(id: unknown): Promise<void> {
     const normalizedId = String(id || '');
     if (!normalizedId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: `Delete ${this.config.title}`,
+      message: `Delete this ${this.config.title.toLowerCase()}? This action cannot be undone.`,
+      confirmText: 'Delete',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-trash3',
+    });
+    if (!confirmed) {
       return;
     }
 

@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
@@ -19,6 +21,8 @@ interface VendorRow {
   addressLine2?: string;
   city?: string;
   state?: string;
+  barangay?: string;
+  province?: string;
   postalCode?: string;
   country?: string;
   paymentTerms?: string;
@@ -40,6 +44,8 @@ interface VendorRow {
 export class VendorsPageComponent {
   private readonly api: ApiService;
   private readonly auth: AuthService;
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly organizationContext = inject(OrganizationContextService);
 
   constructor(api: ApiService, auth: AuthService) {
     this.api = api;
@@ -52,6 +58,9 @@ export class VendorsPageComponent {
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
   readonly isEditModalOpen = signal(false);
+  readonly isImportModalOpen = signal(false);
+  readonly exporting = signal(false);
+  readonly importModalError = signal('');
 
   readonly message = signal('');
   readonly error = signal('');
@@ -66,9 +75,18 @@ export class VendorsPageComponent {
   createForm: Record<string, unknown> = this.newVendorForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newVendorForm();
+  private importFile: File | null = null;
 
   get currentUserId(): string {
     return this.auth.currentUser()?.id || '';
+  }
+
+  get currentOrganizationId(): string {
+    return this.organizationContext.getActiveOrganizationId();
+  }
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
   }
 
   ngOnInit(): void {
@@ -121,7 +139,26 @@ export class VendorsPageComponent {
     this.isCreateModalOpen.set(false);
   }
 
+  openImportModal(): void {
+    this.importFile = null;
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+    this.isImportModalOpen.set(true);
+  }
+
+  closeImportModal(): void {
+    this.isImportModalOpen.set(false);
+    this.importFile = null;
+    this.importModalError.set('');
+  }
+
   createVendor(): void {
+    if (this.organizationContext.isAllOrganizationsSelected()) {
+      this.error.set('Select a specific organization before creating a vendor.');
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
@@ -160,6 +197,8 @@ export class VendorsPageComponent {
       addressLine2: row.addressLine2 || '',
       city: row.city || '',
       state: row.state || '',
+      barangay: row.barangay || '',
+      province: row.province || '',
       postalCode: row.postalCode || '',
       country: row.country || 'United States',
       paymentTerms: row.paymentTerms || '',
@@ -206,7 +245,17 @@ export class VendorsPageComponent {
     });
   }
 
-  removeVendor(id: string): void {
+  async removeVendor(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Vendor',
+      message: 'Delete this vendor? This action cannot be undone.',
+      confirmText: 'Delete Vendor',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-truck',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');
@@ -249,6 +298,81 @@ export class VendorsPageComponent {
     this.load();
   }
 
+  onImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.importFile = target?.files && target.files.length > 0 ? target.files[0] : null;
+  }
+
+  importVendorsCsv(): void {
+    if (!this.importFile) {
+      this.importModalError.set('Please select a CSV file to import.');
+      return;
+    }
+    if (this.organizationContext.isAllOrganizationsSelected()) {
+      this.importModalError.set('Select a specific organization before importing vendors.');
+      return;
+    }
+
+    this.submitting.set(true);
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+    if (this.currentOrganizationId.trim()) {
+      formData.append('organizationId', this.currentOrganizationId.trim());
+    }
+
+    this.api.createFormData<Record<string, unknown>>('/api/v1/vendors/import', formData).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.closeImportModal();
+        const data = (response.data || {}) as Record<string, unknown>;
+        const imported = Number(data['imported'] || 0);
+        const skipped = Number(data['skipped'] || 0);
+        this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
+        this.page = 1;
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.importModalError.set(err?.error?.message || 'Unable to import vendors.');
+      },
+    });
+  }
+
+  exportVendorsCsv(): void {
+    this.exporting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const params = new URLSearchParams();
+    const q = this.filter().trim();
+    if (q) {
+      params.set('q', q);
+    }
+
+    this.api.download(`/api/v1/vendors/export?${params.toString()}`).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `vendors-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        this.message.set('Vendors CSV exported successfully.');
+      },
+      error: (err) => {
+        this.exporting.set(false);
+        this.error.set(err?.error?.message || 'Unable to export vendors.');
+      },
+    });
+  }
+
   statusBadgeClass(status: string | undefined): string {
     switch (String(status || '').toLowerCase()) {
       case 'active':
@@ -260,6 +384,10 @@ export class VendorsPageComponent {
       default:
         return 'text-bg-light';
     }
+  }
+
+  organizationLabel(row: VendorRow): string {
+    return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
   }
 
   private newVendorForm(): Record<string, unknown> {
@@ -274,6 +402,8 @@ export class VendorsPageComponent {
       addressLine2: '',
       city: '',
       state: '',
+      barangay: '',
+      province: '',
       postalCode: '',
       country: 'United States',
       paymentTerms: '',
@@ -296,6 +426,8 @@ export class VendorsPageComponent {
       addressLine2: this.optionalString(form['addressLine2']),
       city: this.optionalString(form['city']),
       state: this.optionalString(form['state']),
+      barangay: this.optionalString(form['barangay']),
+      province: this.optionalString(form['province']),
       postalCode: this.optionalString(form['postalCode']),
       country: this.optionalString(form['country']),
       paymentTerms: this.optionalString(form['paymentTerms']),

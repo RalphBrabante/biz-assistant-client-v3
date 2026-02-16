@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 
 interface ItemRow {
@@ -36,6 +38,17 @@ interface CustomerRow {
   isActive?: boolean;
 }
 
+interface OrganizationTaxInfo {
+  id: string;
+  taxTypeId?: string;
+  taxType?: {
+    id: string;
+    code?: string;
+    name?: string;
+    percentage?: number;
+  };
+}
+
 @Component({
   selector: 'app-create-order-page',
   standalone: true,
@@ -45,6 +58,8 @@ interface CustomerRow {
 export class CreateOrderPageComponent {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly organizationContext = inject(OrganizationContextService);
   private readonly router = inject(Router);
 
   orderNumber = this.generateOrderNumber();
@@ -63,6 +78,7 @@ export class CreateOrderPageComponent {
   searchingCustomers = false;
   customerSearchPerformed = false;
   customerSearchStatus = '';
+  organizationVatRate = 0;
 
   catalogLoading = false;
   submitting = false;
@@ -70,16 +86,31 @@ export class CreateOrderPageComponent {
   message = '';
 
   get currentOrganizationId(): string {
-    return this.auth.currentUser()?.organizationId || '';
+    return this.organizationContext.getActiveOrganizationId();
   }
 
   get currentOrganizationCurrency(): string {
     return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
+  get taxableAmount(): number {
+    const rate = this.organizationVatRate / 100;
+    if (rate <= 0) {
+      return this.subtotalAmount;
+    }
+    return Number((this.subtotalAmount / (1 + rate)).toFixed(2));
+  }
+
+  ngOnInit(): void {
+    this.loadOrganizationTaxRate();
+  }
+
   searchItems(): void {
     if (!this.currentOrganizationId.trim()) {
-      this.error = 'Logged in user has no organization assigned.';
+      this.error = this.organizationContext.isAllOrganizationsSelected()
+        ? 'Select a specific organization first.'
+        : 'Logged in user has no organization assigned.';
+      this.catalogItems = [];
       return;
     }
 
@@ -104,7 +135,11 @@ export class CreateOrderPageComponent {
 
   searchCustomers(): void {
     if (!this.currentOrganizationId.trim()) {
-      this.error = 'Logged in user has no organization assigned.';
+      this.error = this.organizationContext.isAllOrganizationsSelected()
+        ? 'Select a specific organization first.'
+        : 'Logged in user has no organization assigned.';
+      this.customerResults = [];
+      this.customerSearchStatus = '';
       return;
     }
 
@@ -185,7 +220,17 @@ export class CreateOrderPageComponent {
     }
   }
 
-  removeFromCart(itemId: string): void {
+  async removeFromCart(itemId: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Remove Item',
+      message: 'Remove this item from the order cart?',
+      confirmText: 'Remove',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-cart-x',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.cart = this.cart.filter((row) => row.item.id !== itemId);
   }
 
@@ -199,10 +244,8 @@ export class CreateOrderPageComponent {
 
   itemLineTotal(row: CartItem): number {
     const price = this.itemUnitPrice(row.item);
-    const taxRate = Number(row.item.taxRate ?? 0);
     const subtotal = price * row.quantity;
-    const tax = subtotal * (taxRate / 100);
-    return Number((subtotal + tax).toFixed(2));
+    return Number(subtotal.toFixed(2));
   }
 
   get subtotalAmount(): number {
@@ -211,11 +254,10 @@ export class CreateOrderPageComponent {
   }
 
   get taxAmount(): number {
-    const tax = this.cart.reduce((acc, row) => {
-      const base = this.itemUnitPrice(row.item) * row.quantity;
-      const rate = Number(row.item.taxRate ?? 0) / 100;
-      return acc + base * rate;
-    }, 0);
+    if (this.organizationVatRate <= 0) {
+      return 0;
+    }
+    const tax = this.taxableAmount * (this.organizationVatRate / 100);
     return Number(tax.toFixed(2));
   }
 
@@ -230,13 +272,15 @@ export class CreateOrderPageComponent {
   }
 
   get totalAmount(): number {
-    const total = this.subtotalAmount + this.taxAmount + Number(this.shippingAmount || 0);
+    const total = this.subtotalAmount + Number(this.shippingAmount || 0);
     return Number(total.toFixed(2));
   }
 
   placeOrder(): void {
     if (!this.currentOrganizationId.trim()) {
-      this.error = 'Logged in user has no organization assigned.';
+      this.error = this.organizationContext.isAllOrganizationsSelected()
+        ? 'Select a specific organization first.'
+        : 'Logged in user has no organization assigned.';
       return;
     }
     if (!this.orderNumber.trim()) {
@@ -312,5 +356,23 @@ export class CreateOrderPageComponent {
 
   customerLabel(row: CustomerRow): string {
     return `${row.name} (${row.taxId})`;
+  }
+
+  private loadOrganizationTaxRate(): void {
+    const orgId = this.currentOrganizationId.trim();
+    if (!orgId) {
+      this.organizationVatRate = 0;
+      return;
+    }
+
+    this.api.get<OrganizationTaxInfo>(`/api/v1/organizations/${encodeURIComponent(orgId)}`).subscribe({
+      next: (response) => {
+        const taxPercentage = Number(response.data?.taxType?.percentage ?? 0);
+        this.organizationVatRate = Number.isFinite(taxPercentage) && taxPercentage > 0 ? taxPercentage : 0;
+      },
+      error: () => {
+        this.organizationVatRate = 0;
+      },
+    });
   }
 }

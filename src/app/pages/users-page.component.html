@@ -59,6 +59,7 @@
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
+          <th *ngIf="isSuperuser">Organization</th>
           <th>Name</th>
           <th>Email</th>
           <th>Role</th>
@@ -70,10 +71,11 @@
       </thead>
       <tbody>
         <tr *ngIf="!loading() && filteredRows().length === 0">
-          <td colspan="7" class="text-center text-secondary py-4">No users found.</td>
+          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center text-secondary py-4">No users found.</td>
         </tr>
 
         <tr *ngFor="let row of filteredRows(); trackBy: trackById">
+          <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
           <td class="fw-semibold">{{ row.firstName }} {{ row.lastName }}</td>
           <td>{{ row.email }}</td>
           <td>

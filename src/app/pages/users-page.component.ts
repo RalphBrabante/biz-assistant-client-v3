@@ -1,15 +1,22 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface UserRow {
   id: string;
   organizationId?: string;
+  primaryOrganization?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+  };
   firstName: string;
   lastName: string;
   email: string;
@@ -37,6 +44,8 @@ interface UserRow {
 export class UsersPageComponent {
   private readonly api: ApiService;
   private readonly auth: AuthService;
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly organizationContext = inject(OrganizationContextService);
 
   constructor(api: ApiService, auth: AuthService) {
     this.api = api;
@@ -82,6 +91,10 @@ export class UsersPageComponent {
 
   get currentOrganizationId(): string {
     return this.auth.currentUser()?.organizationId || '';
+  }
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
   }
 
   ngOnInit(): void {
@@ -216,7 +229,17 @@ export class UsersPageComponent {
     });
   }
 
-  removeUser(id: string): void {
+  async removeUser(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete User',
+      message: 'Delete this user? This action cannot be undone.',
+      confirmText: 'Delete User',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-person-x',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');
@@ -296,6 +319,10 @@ export class UsersPageComponent {
 
   activeBadgeClass(isActive: boolean | undefined): string {
     return isActive ? 'text-bg-success' : 'text-bg-secondary';
+  }
+
+  organizationLabel(row: UserRow): string {
+    return row.primaryOrganization?.name || row.primaryOrganization?.legalName || row.organizationId || '-';
   }
 
   private newUserForm(includePassword: boolean): Record<string, unknown> {

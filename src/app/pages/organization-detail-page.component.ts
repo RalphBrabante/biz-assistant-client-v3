@@ -3,6 +3,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
 interface Organization {
@@ -57,6 +58,7 @@ interface RoleOption {
 export class OrganizationDetailPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(ApiService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   organizationId = '';
   organization: Organization | null = null;
@@ -188,7 +190,17 @@ export class OrganizationDetailPageComponent {
       });
   }
 
-  removeMember(userId: string): void {
+  async removeMember(userId: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Remove Member',
+      message: 'Remove this user from the organization?',
+      confirmText: 'Remove User',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-person-dash',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.removingUserId = userId;
     this.error = '';
     this.message = '';

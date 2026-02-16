@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
@@ -38,6 +40,8 @@ interface OrganizationOption {
 })
 export class LicensesPageComponent {
   private readonly api: ApiService;
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly organizationContext = inject(OrganizationContextService);
 
   constructor(api: ApiService) {
     this.api = api;
@@ -77,6 +81,10 @@ export class LicensesPageComponent {
       );
     });
   });
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
+  }
 
   ngOnInit(): void {
     this.load();
@@ -159,7 +167,17 @@ export class LicensesPageComponent {
     });
   }
 
-  removeLicense(id: string): void {
+  async removeLicense(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete License',
+      message: 'Delete this license? This action cannot be undone.',
+      confirmText: 'Delete License',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-patch-minus',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');

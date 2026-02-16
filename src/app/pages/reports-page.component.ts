@@ -9,6 +9,11 @@ import { ApiResponse } from '../core/types';
 interface QuarterlySalesReportRow {
   id: string;
   organizationId: string;
+  organization?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+  };
   year: number;
   quarter: number;
   periodStart: string;
@@ -25,6 +30,11 @@ interface QuarterlySalesReportRow {
 interface QuarterlyExpenseReportRow {
   id: string;
   organizationId: string;
+  organization?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+  };
   year: number;
   quarter: number;
   periodStart: string;
@@ -83,6 +93,7 @@ export class ReportsPageComponent {
   expenseTotalPages = 1;
 
   readonly pageSizeOptions = [10, 20, 50, 100];
+  private readonly organizationNameMap = signal<Record<string, string>>({});
 
   readonly availableYears = computed(() => {
     const currentYear = new Date().getFullYear();
@@ -112,8 +123,36 @@ export class ReportsPageComponent {
   }
 
   ngOnInit(): void {
+    if (this.isSuperuser) {
+      this.loadOrganizations();
+    }
     this.loadSalesReports();
     this.loadExpenseReports();
+  }
+
+  private loadOrganizations(): void {
+    this.api.list<{ id: string; name?: string; legalName?: string }>('/api/v1/organizations?limit=500').subscribe({
+      next: (response) => {
+        const map: Record<string, string> = {};
+        for (const org of response.data || []) {
+          const id = String(org.id || '').trim();
+          if (!id) continue;
+          map[id] = String(org.name || org.legalName || id).trim() || id;
+        }
+        this.organizationNameMap.set(map);
+      },
+      error: () => {
+        this.organizationNameMap.set({});
+      },
+    });
+  }
+
+  organizationLabelById(organizationId: string): string {
+    const id = String(organizationId || '').trim();
+    if (!id) {
+      return '-';
+    }
+    return this.organizationNameMap()[id] || id;
   }
 
   loadSalesReports(): void {

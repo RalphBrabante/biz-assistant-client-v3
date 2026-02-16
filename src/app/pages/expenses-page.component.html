@@ -10,6 +10,12 @@
         <button class="btn btn-outline-dark" (click)="load()" [disabled]="loading()">
           {{ loading() ? 'Refreshing...' : 'Refresh' }}
         </button>
+        <button class="btn btn-outline-success" (click)="exportExpensesCsv()" [disabled]="exporting()">
+          <i class="bi bi-download me-1"></i>{{ exporting() ? 'Exporting...' : 'Export CSV' }}
+        </button>
+        <button class="btn btn-outline-primary" (click)="openImportModal()">
+          <i class="bi bi-upload me-1"></i>Import CSV
+        </button>
         <button class="btn btn-primary" (click)="openCreateModal()"><i class="bi bi-plus-lg me-1"></i>Create Expense</button>
       </div>
     </div>
@@ -46,9 +52,14 @@
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
+          <th *ngIf="isSuperuser">Organization</th>
           <th>Category</th>
           <th>Vendor</th>
+          <th>Tax Type</th>
+          <th>Withholding Type</th>
+          <th>File</th>
           <th>VAT Exempt Amount</th>
+          <th>Taxable Amount</th>
           <th>Status</th>
           <th>Date</th>
           <th>Total</th>
@@ -57,18 +68,31 @@
       </thead>
       <tbody>
         <tr *ngIf="!loading() && filteredRows().length === 0">
-          <td colspan="7" class="text-center text-secondary py-4">No expenses found.</td>
+          <td [attr.colspan]="isSuperuser ? 12 : 11" class="text-center text-secondary py-4">No expenses found.</td>
         </tr>
 
         <tr *ngFor="let row of filteredRows(); trackBy: trackById">
+          <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
           <td>{{ row.category }}</td>
           <td>{{ vendorLabel(row) }}</td>
+          <td>{{ taxTypeLabel(row) }}</td>
+          <td>{{ withholdingTaxTypeLabel(row) }}</td>
+          <td>
+            <a *ngIf="row.file" [href]="row.file" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-file-earmark-image me-1"></i>View
+            </a>
+            <span *ngIf="!row.file" class="text-secondary">-</span>
+          </td>
           <td>{{ row.vatExemptAmount ?? 0 }}</td>
+          <td>{{ row.taxableAmount ?? 0 }}</td>
           <td>{{ row.status || '-' }}</td>
           <td>{{ row.expenseDate ? (row.expenseDate | date: 'mediumDate') : '-' }}</td>
           <td>{{ row.totalAmount ?? 0 }}</td>
           <td class="text-end">
             <div class="d-inline-flex gap-2">
+              <a class="btn btn-sm btn-outline-primary" [routerLink]="['/expenses', row.id]" appTooltip title="Details">
+                <i class="bi bi-eye"></i>
+              </a>
               <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
                 <i class="bi bi-pencil-square"></i>
               </button>
@@ -90,64 +114,83 @@
   </div>
 </section>
 
-<section class="card border-0 shadow-sm rounded-4 mb-4" *ngIf="editingId">
-  <div class="card-body p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2 class="h5 mb-0">Edit Expense</h2>
-      <button class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
-    </div>
-
-    <div class="row g-3">
-      <div class="col-12 col-md-3">
-        <label class="form-label">Vendor ID</label>
-        <input class="form-control" [(ngModel)]="editForm['vendorId']" />
+<div class="modal-backdrop fade show" *ngIf="isEditModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isEditModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isEditModalOpen()"
+  *ngIf="isEditModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Edit Expense</h5>
+        <button type="button" class="btn-close" (click)="cancelEdit()"></button>
       </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Category</label>
-        <input class="form-control" [(ngModel)]="editForm['category']" />
+      <div class="modal-body pt-3">
+        <div *ngIf="editModalError()" class="alert alert-danger py-2">
+          {{ editModalError() }}
+        </div>
+        <div class="row g-3">
+          <div class="col-12 col-md-3">
+            <label class="form-label">Vendor ID</label>
+            <input class="form-control" [(ngModel)]="editForm['vendorId']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Category</label>
+            <input class="form-control" [(ngModel)]="editForm['category']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Status</label>
+            <select class="form-select" [(ngModel)]="editForm['status']">
+              <option value="draft">draft</option>
+              <option value="submitted">submitted</option>
+              <option value="approved">approved</option>
+              <option value="paid">paid</option>
+              <option value="cancelled">cancelled</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Withholding Tax Type</label>
+            <select class="form-select" [(ngModel)]="editForm['withholdingTaxTypeId']">
+              <option value="">None</option>
+              <option *ngFor="let withholdingTaxType of withholdingTaxTypes()" [value]="withholdingTaxType.id">
+                {{ withholdingTaxType.name }} ({{ withholdingTaxType.percentage }}%)
+              </option>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Expense Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editForm['expenseDate']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Due Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editForm['dueDate']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Amount</label>
+            <input type="number" class="form-control" [(ngModel)]="editForm['amount']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">VAT Exempt Amount</label>
+            <input type="number" class="form-control" [(ngModel)]="editForm['vatExemptAmount']" />
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea rows="2" class="form-control" [(ngModel)]="editForm['notes']"></textarea>
+          </div>
+        </div>
       </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Status</label>
-        <select class="form-select" [(ngModel)]="editForm['status']">
-          <option value="draft">draft</option>
-          <option value="submitted">submitted</option>
-          <option value="approved">approved</option>
-          <option value="paid">paid</option>
-          <option value="cancelled">cancelled</option>
-        </select>
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Expense Date</label>
-        <input type="date" class="form-control" [(ngModel)]="editForm['expenseDate']" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Due Date</label>
-        <input type="date" class="form-control" [(ngModel)]="editForm['dueDate']" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Amount</label>
-        <input type="number" class="form-control" [(ngModel)]="editForm['amount']" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Total Amount</label>
-        <input type="number" class="form-control" [(ngModel)]="editForm['totalAmount']" />
-      </div>
-      <div class="col-12">
-        <label class="form-label">Notes</label>
-        <textarea rows="2" class="form-control" [(ngModel)]="editForm['notes']"></textarea>
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">VAT Exempt Amount</label>
-        <input type="number" class="form-control" [(ngModel)]="editForm['vatExemptAmount']" />
-      </div>
-      <div class="col-12">
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="cancelEdit()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
         <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
           {{ submitting() ? 'Saving...' : 'Save Expense' }}
         </button>
       </div>
     </div>
   </div>
-</section>
+</div>
 
 <div class="modal-backdrop fade show" *ngIf="isCreateModalOpen()"></div>
 <div
@@ -164,35 +207,41 @@
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
       <div class="modal-body pt-3">
+        <div *ngIf="createModalError()" class="alert alert-danger py-2">
+          {{ createModalError() }}
+        </div>
         <div class="row g-3">
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Vendor Search</label>
-            <input
-              class="form-control"
-              [ngModel]="vendorSearch()"
-              (ngModelChange)="onVendorSearchChange($event)"
-              placeholder="Search vendor name or TIN"
-            />
             <input type="hidden" [(ngModel)]="createForm['vendorId']" />
-            <div class="list-group mt-2 shadow-sm" *ngIf="vendorSearch().trim() && vendors().length > 0">
-              <button
-                *ngFor="let vendor of vendors()"
-                type="button"
-                class="list-group-item list-group-item-action"
-                (click)="selectVendor(vendor)"
-              >
-                <div class="fw-semibold">{{ vendor.name || vendor.legalName || 'Unnamed Vendor' }}</div>
-                <div class="small text-secondary">TIN: {{ vendor.taxId || '-' }}</div>
-              </button>
-            </div>
-            <div class="form-text" *ngIf="loadingVendors()">Loading vendors...</div>
-            <div class="form-text text-danger" *ngIf="vendorSearch().trim() && !loadingVendors() && vendors().length === 0">
-              No vendors found.
-            </div>
-            <div class="mt-2" *ngIf="vendorSearch().trim() && !loadingVendors() && vendors().length === 0 && !showInlineVendorCreate()">
-              <button type="button" class="btn btn-sm btn-outline-primary" (click)="openInlineVendorCreate()">
-                <i class="bi bi-plus-lg me-1"></i>Create New Vendor
-              </button>
+            <div *ngIf="!selectedCreateVendor(); else selectedVendorBlock">
+              <input
+                class="form-control"
+                [ngModel]="vendorSearch()"
+                (ngModelChange)="onVendorSearchChange($event)"
+                placeholder="Search vendor name or TIN"
+              />
+              <div class="form-text">Type at least 2 characters to search vendors.</div>
+              <div class="list-group mt-2 shadow-sm" *ngIf="vendorSearch().trim() && vendors().length > 0">
+                <button
+                  *ngFor="let vendor of vendors()"
+                  type="button"
+                  class="list-group-item list-group-item-action"
+                  (click)="selectVendor(vendor)"
+                >
+                  <div class="fw-semibold">{{ vendor.name || vendor.legalName || 'Unnamed Vendor' }}</div>
+                  <div class="small text-secondary">TIN: {{ vendor.taxId || '-' }}</div>
+                </button>
+              </div>
+              <div class="form-text" *ngIf="loadingVendors()">Loading vendors...</div>
+              <div class="form-text text-danger" *ngIf="vendorSearch().trim() && !loadingVendors() && vendors().length === 0">
+                No vendors found.
+              </div>
+              <div class="mt-2" *ngIf="vendorSearch().trim() && !loadingVendors() && vendors().length === 0 && !showInlineVendorCreate()">
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openInlineVendorCreate()">
+                  <i class="bi bi-plus-lg me-1"></i>Create New Vendor
+                </button>
+              </div>
             </div>
             <div class="card border mt-2" *ngIf="showInlineVendorCreate()">
               <div class="card-body p-3">
@@ -243,6 +292,14 @@
                     <label class="form-label small mb-1">Postal Code</label>
                     <input class="form-control form-control-sm" [(ngModel)]="vendorCreateForm['postalCode']" />
                   </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small mb-1">Barangay (Brgy)</label>
+                    <input class="form-control form-control-sm" [(ngModel)]="vendorCreateForm['barangay']" />
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small mb-1">Province</label>
+                    <input class="form-control form-control-sm" [(ngModel)]="vendorCreateForm['province']" />
+                  </div>
                   <div class="col-12">
                     <label class="form-label small mb-1">Country</label>
                     <input class="form-control form-control-sm" [(ngModel)]="vendorCreateForm['country']" />
@@ -250,6 +307,14 @@
                   <div class="col-12">
                     <label class="form-label small mb-1">Payment Terms</label>
                     <input class="form-control form-control-sm" [(ngModel)]="vendorCreateForm['paymentTerms']" />
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label small mb-1">Status</label>
+                    <select class="form-select form-select-sm" [(ngModel)]="vendorCreateForm['status']">
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                      <option value="blocked">blocked</option>
+                    </select>
                   </div>
                   <div class="col-12">
                     <label class="form-label small mb-1">Notes</label>
@@ -266,10 +331,23 @@
                 </div>
               </div>
             </div>
-            <div class="alert alert-light border mt-2 mb-0 py-2" *ngIf="selectedCreateVendor() as selectedVendor">
-              <div><strong>Selected:</strong> {{ selectedVendor.name || selectedVendor.legalName || '-' }}</div>
-              <div><strong>TIN:</strong> {{ selectedVendor.taxId || '-' }}</div>
-            </div>
+            <ng-template #selectedVendorBlock>
+              <div class="alert alert-light border mt-2 mb-0 py-2 d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div><strong>Selected:</strong> {{ selectedCreateVendor()?.name || selectedCreateVendor()?.legalName || '-' }}</div>
+                  <div><strong>TIN:</strong> {{ selectedCreateVendor()?.taxId || '-' }}</div>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary"
+                  (click)="clearSelectedVendor()"
+                  appTooltip
+                  title="Change vendor"
+                >
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </ng-template>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Category</label>
@@ -286,6 +364,15 @@
             </select>
           </div>
           <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Withholding Tax Type</label>
+            <select class="form-select" [(ngModel)]="createForm['withholdingTaxTypeId']">
+              <option value="">None</option>
+              <option *ngFor="let withholdingTaxType of withholdingTaxTypes()" [value]="withholdingTaxType.id">
+                {{ withholdingTaxType.name }} ({{ withholdingTaxType.percentage }}%)
+              </option>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Expense Date</label>
             <input type="date" class="form-control" [(ngModel)]="createForm['expenseDate']" />
           </div>
@@ -298,16 +385,8 @@
             <input type="number" class="form-control" [(ngModel)]="createForm['amount']" />
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Tax Amount</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['taxAmount']" />
-          </div>
-          <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Discount Amount</label>
             <input type="number" class="form-control" [(ngModel)]="createForm['discountAmount']" />
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Total Amount</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['totalAmount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Payment Method</label>
@@ -318,6 +397,16 @@
               <option value="check">check</option>
               <option value="other">other</option>
             </select>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Expense File (Image)</label>
+            <input
+              type="file"
+              class="form-control"
+              accept="image/*"
+              (change)="onCreateFileChange($event)"
+            />
+            <div class="form-text" *ngIf="createFileName()">Selected: {{ createFileName() }}</div>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold">Notes</label>
@@ -333,6 +422,40 @@
         <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
         <button class="btn btn-primary" [disabled]="submitting()" (click)="createExpense()">
           {{ submitting() ? 'Creating...' : 'Create Expense' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="isImportModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isImportModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isImportModalOpen()"
+  *ngIf="isImportModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Import Expenses CSV</h5>
+        <button type="button" class="btn-close" (click)="closeImportModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div class="small text-secondary mb-2">
+          Required columns: <code>vendorId</code>, <code>category</code>, <code>expenseDate</code>
+        </div>
+        <div class="small text-secondary mb-3">
+          Optional columns: vendorTaxId, dueDate, status, paymentMethod, amount, discountAmount, vatExemptAmount, withholdingTaxTypeId, withholdingTaxTypeCode, description, notes
+        </div>
+        <input type="file" class="form-control" accept=".csv,text/csv" (change)="onImportFileChange($event)" />
+        <div *ngIf="importModalError()" class="alert alert-danger py-2 mt-3 mb-0">{{ importModalError() }}</div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeImportModal()">Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="importExpensesCsv()">
+          {{ submitting() ? 'Importing...' : 'Import Expenses' }}
         </button>
       </div>
     </div>

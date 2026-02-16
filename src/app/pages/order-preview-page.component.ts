@@ -3,6 +3,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
 interface ItemRow {
@@ -78,6 +79,7 @@ interface CartItem {
 export class OrderPreviewPageComponent {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   orderId = '';
   order: OrderRow | null = null;
@@ -277,8 +279,18 @@ export class OrderPreviewPageComponent {
     }
   }
 
-  removeFromCart(itemId: string): void {
+  async removeFromCart(itemId: string): Promise<void> {
     if (this.isLocked) return;
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Remove Item',
+      message: 'Remove this item from the order cart?',
+      confirmText: 'Remove',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-cart-x',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.cart = this.cart.filter((row) => row.item.id !== itemId);
   }
 

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
@@ -19,6 +20,13 @@ interface OrganizationRow {
   postalCode?: string;
   country?: string;
   currency?: string;
+  taxTypeId?: string;
+  taxType?: {
+    id: string;
+    code?: string;
+    name?: string;
+    percentage?: number;
+  };
   contactName?: string;
   contactEmail?: string;
   phone?: string;
@@ -26,6 +34,14 @@ interface OrganizationRow {
   industry?: string;
   employeeCount?: number;
   notes?: string;
+  isActive?: boolean;
+}
+
+interface TaxTypeOption {
+  id: string;
+  code: string;
+  name: string;
+  percentage: number;
   isActive?: boolean;
 }
 
@@ -38,12 +54,14 @@ interface OrganizationRow {
 export class OrganizationsPageComponent {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly rows = signal<OrganizationRow[]>([]);
   readonly loading = signal(false);
   readonly submitting = signal(false);
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
+  readonly taxTypes = signal<TaxTypeOption[]>([]);
 
   readonly message = signal('');
   readonly error = signal('');
@@ -75,6 +93,7 @@ export class OrganizationsPageComponent {
   });
 
   ngOnInit(): void {
+    this.loadTaxTypes();
     this.load();
   }
 
@@ -117,6 +136,7 @@ export class OrganizationsPageComponent {
 
   openCreateModal(): void {
     this.createForm = this.newOrgForm();
+    this.loadTaxTypes();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -127,6 +147,12 @@ export class OrganizationsPageComponent {
   }
 
   createOrganization(): void {
+    const createValidationError = this.validateRequiredFields(this.createForm);
+    if (createValidationError) {
+      this.error.set(createValidationError);
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
@@ -148,6 +174,7 @@ export class OrganizationsPageComponent {
   }
 
   startEdit(row: OrganizationRow): void {
+    this.loadTaxTypes();
     this.editingId = row.id;
     this.editForm = {
       name: row.name || '',
@@ -160,6 +187,7 @@ export class OrganizationsPageComponent {
       postalCode: row.postalCode || '',
       country: row.country || 'United States',
       currency: row.currency || this.currentOrganizationCurrency,
+      taxTypeId: row.taxTypeId || row.taxType?.id || '',
       contactName: row.contactName || '',
       contactEmail: row.contactEmail || '',
       phone: row.phone || '',
@@ -178,6 +206,11 @@ export class OrganizationsPageComponent {
 
   saveEdit(): void {
     if (!this.editingId) {
+      return;
+    }
+    const editValidationError = this.validateRequiredFields(this.editForm);
+    if (editValidationError) {
+      this.error.set(editValidationError);
       return;
     }
 
@@ -201,7 +234,17 @@ export class OrganizationsPageComponent {
     });
   }
 
-  removeOrganization(id: string): void {
+  async removeOrganization(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Organization',
+      message: 'Delete this organization? This action cannot be undone.',
+      confirmText: 'Delete Organization',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-buildings',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');
@@ -244,6 +287,26 @@ export class OrganizationsPageComponent {
     this.load();
   }
 
+  taxTypeLabel(row: OrganizationRow): string {
+    const code = String(row.taxType?.code || '').trim();
+    const name = String(row.taxType?.name || '').trim();
+    if (code && name) {
+      return `${code} - ${name}`;
+    }
+    return code || name || row.taxTypeId || '-';
+  }
+
+  private loadTaxTypes(): void {
+    this.api.list<TaxTypeOption>('/api/v1/tax-types?activeOnly=true').subscribe({
+      next: (response) => {
+        this.taxTypes.set(response.data || []);
+      },
+      error: () => {
+        this.taxTypes.set([]);
+      },
+    });
+  }
+
   private newOrgForm(): Record<string, unknown> {
     return {
       name: '',
@@ -256,6 +319,7 @@ export class OrganizationsPageComponent {
       postalCode: '',
       country: 'United States',
       currency: this.currentOrganizationCurrency,
+      taxTypeId: '',
       contactName: '',
       contactEmail: '',
       phone: '',
@@ -279,6 +343,7 @@ export class OrganizationsPageComponent {
       postalCode: this.optionalString(form['postalCode']),
       country: this.optionalString(form['country']),
       currency: this.optionalString(form['currency']),
+      taxTypeId: this.asString(form['taxTypeId']),
       contactName: this.optionalString(form['contactName']),
       contactEmail: this.asString(form['contactEmail']),
       phone: this.asString(form['phone']),
@@ -305,5 +370,22 @@ export class OrganizationsPageComponent {
     }
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : undefined;
+  }
+
+  private validateRequiredFields(form: Record<string, unknown>): string {
+    const name = this.asString(form['name']);
+    const addressLine1 = this.asString(form['addressLine1']);
+    const city = this.asString(form['city']);
+    const contactEmail = this.asString(form['contactEmail']);
+    const phone = this.asString(form['phone']);
+    const taxTypeId = this.asString(form['taxTypeId']);
+
+    if (!name) return 'Name is required.';
+    if (!addressLine1) return 'Address Line 1 is required.';
+    if (!city) return 'City is required.';
+    if (!contactEmail) return 'Contact Email is required.';
+    if (!phone) return 'Phone is required.';
+    if (!taxTypeId) return 'Tax Type is required.';
+    return '';
   }
 }

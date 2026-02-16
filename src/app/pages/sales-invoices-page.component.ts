@@ -4,12 +4,19 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface SalesInvoiceRow {
   id: string;
   organizationId: string;
+  organization?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+  };
   orderId: string;
   invoiceNumber: string;
   issueDate: string;
@@ -36,15 +43,20 @@ interface SalesInvoiceRow {
 export class SalesInvoicesPageComponent {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly organizationContext = inject(OrganizationContextService);
 
   readonly rows = signal<SalesInvoiceRow[]>([]);
   readonly loading = signal(false);
   readonly submitting = signal(false);
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
+  readonly isImportModalOpen = signal(false);
+  readonly exporting = signal(false);
 
   readonly message = signal('');
   readonly error = signal('');
+  readonly importModalError = signal('');
   readonly filter = signal('');
   page = 1;
   pageSize = 20;
@@ -53,6 +65,7 @@ export class SalesInvoicesPageComponent {
   readonly pageSizeOptions = [10, 20, 50, 100];
 
   createForm: Record<string, unknown> = this.newInvoiceForm();
+  private importFile: File | null = null;
 
   readonly filteredRows = computed(() => {
     const q = this.filter().trim().toLowerCase();
@@ -71,11 +84,15 @@ export class SalesInvoicesPageComponent {
   });
 
   get currentOrganizationId(): string {
-    return this.auth.currentUser()?.organizationId || '';
+    return this.organizationContext.getActiveOrganizationId();
   }
 
   get currentOrganizationCurrency(): string {
     return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
+  }
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
   }
 
   ngOnInit(): void {
@@ -126,8 +143,26 @@ export class SalesInvoicesPageComponent {
     this.isCreateModalOpen.set(false);
   }
 
+  openImportModal(): void {
+    this.importFile = null;
+    this.importModalError.set('');
+    this.message.set('');
+    this.error.set('');
+    this.isImportModalOpen.set(true);
+  }
+
+  closeImportModal(): void {
+    this.isImportModalOpen.set(false);
+    this.importFile = null;
+    this.importModalError.set('');
+  }
+
   createInvoice(): void {
     if (!this.currentOrganizationId.trim()) {
+      if (this.organizationContext.isAllOrganizationsSelected()) {
+        this.error.set('Select a specific organization before creating a sales invoice.');
+        return;
+      }
       this.error.set('Logged in user has no organization assigned.');
       return;
     }
@@ -155,7 +190,91 @@ export class SalesInvoicesPageComponent {
     });
   }
 
-  removeInvoice(id: string): void {
+  onImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.importFile = target?.files && target.files.length > 0 ? target.files[0] : null;
+  }
+
+  importSalesInvoicesCsv(): void {
+    if (!this.importFile) {
+      this.importModalError.set('Please select a CSV file to import.');
+      return;
+    }
+    if (this.organizationContext.isAllOrganizationsSelected()) {
+      this.importModalError.set('Select a specific organization before importing sales invoices.');
+      return;
+    }
+
+    this.submitting.set(true);
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+    if (this.currentOrganizationId.trim()) {
+      formData.append('organizationId', this.currentOrganizationId.trim());
+    }
+
+    this.api.createFormData<Record<string, unknown>>('/api/v1/sales-invoices/import', formData).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.closeImportModal();
+        const data = (response.data || {}) as Record<string, unknown>;
+        const imported = Number(data['imported'] || 0);
+        const skipped = Number(data['skipped'] || 0);
+        this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.importModalError.set(err?.error?.message || 'Unable to import sales invoices.');
+      },
+    });
+  }
+
+  exportSalesInvoicesCsv(): void {
+    this.exporting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const params = new URLSearchParams();
+    const q = this.filter().trim();
+    if (q) {
+      params.set('q', q);
+    }
+
+    this.api.download(`/api/v1/sales-invoices/export?${params.toString()}`).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `sales-invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        this.message.set('Sales invoices CSV exported successfully.');
+      },
+      error: (err) => {
+        this.exporting.set(false);
+        this.error.set(err?.error?.message || 'Unable to export sales invoices.');
+      },
+    });
+  }
+
+  async removeInvoice(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Sales Invoice',
+      message: 'Delete this sales invoice? This action cannot be undone.',
+      confirmText: 'Delete Invoice',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-file-earmark-x',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');
@@ -231,6 +350,10 @@ export class SalesInvoicesPageComponent {
       default:
         return 'text-bg-secondary';
     }
+  }
+
+  organizationLabel(row: SalesInvoiceRow): string {
+    return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
   }
 
   private newInvoiceForm(): Record<string, unknown> {

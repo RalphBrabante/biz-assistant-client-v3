@@ -3,6 +3,8 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
@@ -14,6 +16,8 @@ import { TooltipDirective } from '../shared/tooltip.directive';
 })
 export class OrdersPageComponent {
   private readonly api = inject(ApiService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly organizationContext = inject(OrganizationContextService);
 
   rows: Record<string, unknown>[] = [];
   loading = false;
@@ -27,6 +31,10 @@ export class OrdersPageComponent {
   total = 0;
   totalPages = 1;
   readonly pageSizeOptions = [10, 20, 50, 100];
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
+  }
 
   ngOnInit(): void {
     this.load();
@@ -70,9 +78,19 @@ export class OrdersPageComponent {
     });
   }
 
-  remove(id: unknown): void {
+  async remove(id: unknown): Promise<void> {
     const orderId = String(id || '');
     if (!orderId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Order',
+      message: 'Delete this order? This action cannot be undone.',
+      confirmText: 'Delete Order',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-receipt-cutoff',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -131,6 +149,11 @@ export class OrdersPageComponent {
       default:
         return 'text-bg-secondary';
     }
+  }
+
+  organizationLabel(row: Record<string, unknown>): string {
+    const org = row['organization'] as { name?: string; legalName?: string } | undefined;
+    return org?.name || org?.legalName || String(row['organizationId'] || '-') || '-';
   }
 
   onSearchChange(value: string): void {

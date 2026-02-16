@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
+import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
@@ -45,6 +47,8 @@ interface CustomerRow {
 export class CustomersPageComponent {
   private readonly api: ApiService;
   private readonly auth: AuthService;
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly organizationContext = inject(OrganizationContextService);
 
   constructor(api: ApiService, auth: AuthService) {
     this.api = api;
@@ -57,6 +61,9 @@ export class CustomersPageComponent {
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
   readonly isEditModalOpen = signal(false);
+  readonly isImportModalOpen = signal(false);
+  readonly exporting = signal(false);
+  readonly importModalError = signal('');
 
   readonly message = signal('');
   readonly error = signal('');
@@ -70,6 +77,7 @@ export class CustomersPageComponent {
   createForm: Record<string, unknown> = this.newCustomerForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newCustomerForm();
+  private importFile: File | null = null;
 
   readonly filteredRows = computed(() => {
     const q = this.filter().trim().toLowerCase();
@@ -90,7 +98,11 @@ export class CustomersPageComponent {
   });
 
   get currentOrganizationId(): string {
-    return this.auth.currentUser()?.organizationId || '';
+    return this.organizationContext.getActiveOrganizationId();
+  }
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
   }
 
   ngOnInit(): void {
@@ -141,8 +153,26 @@ export class CustomersPageComponent {
     this.isCreateModalOpen.set(false);
   }
 
+  openImportModal(): void {
+    this.importFile = null;
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+    this.isImportModalOpen.set(true);
+  }
+
+  closeImportModal(): void {
+    this.isImportModalOpen.set(false);
+    this.importFile = null;
+    this.importModalError.set('');
+  }
+
   createCustomer(): void {
     if (!this.currentOrganizationId.trim()) {
+      if (this.organizationContext.isAllOrganizationsSelected()) {
+        this.error.set('Select a specific organization before creating a customer.');
+        return;
+      }
       this.error.set('Logged in user has no organization assigned.');
       return;
     }
@@ -238,7 +268,17 @@ export class CustomersPageComponent {
     });
   }
 
-  removeCustomer(id: string): void {
+  async removeCustomer(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Customer',
+      message: 'Delete this customer? This action cannot be undone.',
+      confirmText: 'Delete Customer',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-person-vcard',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');
@@ -279,6 +319,81 @@ export class CustomersPageComponent {
     }
     this.page = page;
     this.load();
+  }
+
+  onImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.importFile = target?.files && target.files.length > 0 ? target.files[0] : null;
+  }
+
+  importCustomersCsv(): void {
+    if (!this.importFile) {
+      this.importModalError.set('Please select a CSV file to import.');
+      return;
+    }
+    if (this.organizationContext.isAllOrganizationsSelected()) {
+      this.importModalError.set('Select a specific organization before importing customers.');
+      return;
+    }
+
+    this.submitting.set(true);
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+    if (this.currentOrganizationId.trim()) {
+      formData.append('organizationId', this.currentOrganizationId.trim());
+    }
+
+    this.api.createFormData<Record<string, unknown>>('/api/v1/customers/import', formData).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.closeImportModal();
+        const data = (response.data || {}) as Record<string, unknown>;
+        const imported = Number(data['imported'] || 0);
+        const skipped = Number(data['skipped'] || 0);
+        this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
+        this.page = 1;
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.importModalError.set(err?.error?.message || 'Unable to import customers.');
+      },
+    });
+  }
+
+  exportCustomersCsv(): void {
+    this.exporting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const params = new URLSearchParams();
+    const q = this.filter().trim();
+    if (q) {
+      params.set('q', q);
+    }
+
+    this.api.download(`/api/v1/customers/export?${params.toString()}`).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        this.message.set('Customers CSV exported successfully.');
+      },
+      error: (err) => {
+        this.exporting.set(false);
+        this.error.set(err?.error?.message || 'Unable to export customers.');
+      },
+    });
   }
 
   organizationLabel(row: CustomerRow): string {

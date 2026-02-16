@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
 interface RoleRow {
@@ -53,6 +54,7 @@ interface UserDetail {
 export class UserDetailPageComponent {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly loading = signal(false);
   readonly submitting = signal(false);
@@ -172,7 +174,17 @@ export class UserDetailPageComponent {
     });
   }
 
-  removeRole(roleId: string): void {
+  async removeRole(roleId: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Remove Role',
+      message: 'Remove this role from the user?',
+      confirmText: 'Remove Role',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-person-dash',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.removingRoleId.set(roleId);
     this.error.set('');
     this.message.set('');

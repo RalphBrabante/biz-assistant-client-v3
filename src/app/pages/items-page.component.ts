@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 import { TooltipDirective } from '../shared/tooltip.directive';
@@ -47,6 +48,7 @@ interface OrganizationOption {
 export class ItemsPageComponent {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
 
   readonly rows = signal<ItemRow[]>([]);
@@ -157,6 +159,10 @@ export class ItemsPageComponent {
 
   createItem(): void {
     if (!this.currentOrganizationId.trim()) {
+      if (this.organizationContext.isAllOrganizationsSelected()) {
+        this.error.set('Select a specific organization before creating an item.');
+        return;
+      }
       this.error.set('Logged in user has no organization assigned.');
       return;
     }
@@ -240,7 +246,17 @@ export class ItemsPageComponent {
     });
   }
 
-  removeItem(id: string): void {
+  async removeItem(id: string): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Item',
+      message: 'Delete this item? This action cannot be undone.',
+      confirmText: 'Delete Item',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-box-seam',
+    });
+    if (!confirmed) {
+      return;
+    }
     this.deletingId.set(id);
     this.error.set('');
     this.message.set('');

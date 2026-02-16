@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
 interface LicenseRow {
@@ -32,6 +33,7 @@ interface OrganizationOption {
   templateUrl: './license-edit-page.component.html',
 })
 export class LicenseEditPageComponent {
+  private readonly confirmDialog = inject(ConfirmDialogService);
   readonly loading = signal(false);
   readonly submitting = signal(false);
   readonly error = signal('');
@@ -124,12 +126,18 @@ export class LicenseEditPageComponent {
     });
   }
 
-  revoke(): void {
+  async revoke(): Promise<void> {
     if (!this.licenseId || this.submitting()) {
       return;
     }
 
-    const confirmed = window.confirm('Revoke this license? This will mark it inactive.');
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Revoke License',
+      message: 'Revoke this license? This will mark it inactive.',
+      confirmText: 'Revoke License',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-shield-x',
+    });
     if (!confirmed) {
       return;
     }

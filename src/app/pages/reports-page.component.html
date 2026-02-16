@@ -112,6 +112,7 @@
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
+          <th *ngIf="isSuperuser">Organization</th>
           <th>Quarter</th>
           <th>Period</th>
           <th>Invoices</th>
@@ -124,9 +125,10 @@
       </thead>
       <tbody>
         <tr *ngIf="!loadingSales() && salesRows().length === 0">
-          <td colspan="8" class="text-center text-secondary py-4">No sales reports found.</td>
+          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center text-secondary py-4">No sales reports found.</td>
         </tr>
         <tr *ngFor="let row of salesRows(); trackBy: trackById">
+          <td *ngIf="isSuperuser" class="small">{{ row.organization?.name || row.organization?.legalName || organizationLabelById(row.organizationId) }}</td>
           <td><span class="badge rounded-pill text-bg-primary">{{ quarterLabel(row.quarter) }}</span></td>
           <td>{{ row.periodStart }} to {{ row.periodEnd }}</td>
           <td>{{ row.invoiceCount }}</td>
@@ -231,6 +233,7 @@
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
+          <th *ngIf="isSuperuser">Organization</th>
           <th>Quarter</th>
           <th>Period</th>
           <th>Expenses</th>
@@ -243,9 +246,10 @@
       </thead>
       <tbody>
         <tr *ngIf="!loadingExpenses() && expenseRows().length === 0">
-          <td colspan="8" class="text-center text-secondary py-4">No expense reports found.</td>
+          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center text-secondary py-4">No expense reports found.</td>
         </tr>
         <tr *ngFor="let row of expenseRows(); trackBy: trackById">
+          <td *ngIf="isSuperuser" class="small">{{ row.organization?.name || row.organization?.legalName || organizationLabelById(row.organizationId) }}</td>
           <td><span class="badge rounded-pill text-bg-warning">{{ quarterLabel(row.quarter) }}</span></td>
           <td>{{ row.periodStart }} to {{ row.periodEnd }}</td>
           <td>{{ row.expenseCount }}</td>

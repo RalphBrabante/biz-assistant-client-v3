@@ -66,6 +66,7 @@
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
+            <th *ngIf="isSuperuser">Organization</th>
             <th>Order Number</th>
             <th>Status</th>
             <th>Payment</th>
@@ -75,9 +76,10 @@
         </thead>
         <tbody>
           <tr *ngIf="!loading && rows.length === 0">
-            <td colspan="5" class="text-center text-secondary py-4">No orders found.</td>
+            <td [attr.colspan]="isSuperuser ? 6 : 5" class="text-center text-secondary py-4">No orders found.</td>
           </tr>
           <tr *ngFor="let row of rows">
+            <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
             <td>{{ row['orderNumber'] }}</td>
             <td>
               <span class="badge rounded-pill" [ngClass]="orderStatusBadgeClass(row['status'])">

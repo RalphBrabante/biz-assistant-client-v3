@@ -59,8 +59,8 @@
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
+          <th *ngIf="isSuperuser">Organization</th>
           <th>Key</th>
-          <th>Assigned Organization</th>
           <th>Plan</th>
           <th>Status</th>
           <th>Expires At</th>
@@ -71,12 +71,12 @@
       </thead>
       <tbody>
         <tr *ngIf="!loading() && filteredRows().length === 0">
-          <td colspan="8" class="text-center text-secondary py-4">No licenses found.</td>
+          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center text-secondary py-4">No licenses found.</td>
         </tr>
 
         <tr *ngFor="let row of filteredRows(); trackBy: trackById">
+          <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
           <td class="fw-semibold">{{ row.key }}</td>
-          <td class="small">{{ organizationLabel(row) }}</td>
           <td>{{ row.planName || '-' }}</td>
           <td>
             <span class="badge" [class.text-bg-danger]="isExpired(row)" [class.text-bg-success]="!isExpired(row)">

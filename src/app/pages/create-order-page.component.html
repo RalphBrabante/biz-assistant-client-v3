@@ -195,6 +195,8 @@
         <hr class="my-3" />
 
         <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ subtotalAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>VAT Rate</span><strong>{{ organizationVatRate | number: '1.0-2' }}%</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Taxable Amount</span><strong>{{ taxableAmount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ taxAmount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ discountAmount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between small mb-3"><span>Shipping</span><strong>{{ shippingAmount | number: '1.2-2' }}</strong></div>
