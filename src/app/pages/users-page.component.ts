@@ -36,6 +36,13 @@ interface UserRow {
   lastLoginAt?: string;
 }
 
+interface UserCreateResponse extends UserRow {
+  inviteEmail?: {
+    sent?: boolean;
+    message?: string;
+  };
+}
+
 interface RoleOption {
   id: string;
   name?: string;
@@ -197,9 +204,21 @@ export class UsersPageComponent {
     payload['roleIds'] = [...this.createSelectedRoleIds];
     delete payload['role'];
 
-    this.api.create<UserRow>('/api/v1/users', payload).subscribe({
+    this.api.create<UserCreateResponse>('/api/v1/users', payload).subscribe({
       next: (response) => {
         this.submitting.set(false);
+        const inviteEmail = response.data?.inviteEmail;
+        const inviteSent = inviteEmail?.sent !== false;
+
+        if (!inviteSent) {
+          this.createModalError.set(
+            inviteEmail?.message || 'User was created, but invite email could not be sent.'
+          );
+          this.message.set(response.message || 'User created successfully.');
+          this.load();
+          return;
+        }
+
         this.isCreateModalOpen.set(false);
         this.message.set(response.message || 'User created successfully.');
         this.load();
