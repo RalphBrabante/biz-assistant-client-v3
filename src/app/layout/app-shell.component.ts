@@ -16,6 +16,11 @@ interface NavItem {
   superuserOnly?: boolean;
 }
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 @Component({
   selector: 'app-shell',
   standalone: true,
@@ -53,6 +58,9 @@ export class AppShellComponent {
   organizationOptions: Array<{ id: string; name?: string; legalName?: string }> = [];
   switchingOrganization = false;
   organizationDisplayName = 'Organization';
+  canInstallApp = false;
+  installingApp = false;
+  private deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
 
   get userLabel(): string {
     const user = this.auth.currentUser();
@@ -127,6 +135,8 @@ export class AppShellComponent {
   }
 
   ngOnInit(): void {
+    window.addEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', this.handleAppInstalled);
     this.resolveOrganizationDisplayName();
 
     if (!this.canSwitchOrganization) {
@@ -142,6 +152,11 @@ export class AppShellComponent {
         this.organizationOptions = [];
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
+    window.removeEventListener('appinstalled', this.handleAppInstalled);
   }
 
   closeUnauthorizedModal(): void {
@@ -170,6 +185,22 @@ export class AppShellComponent {
     setTimeout(() => {
       window.location.reload();
     }, 50);
+  }
+
+  async installApp(): Promise<void> {
+    if (!this.deferredInstallPrompt || this.installingApp) {
+      return;
+    }
+
+    this.installingApp = true;
+    try {
+      await this.deferredInstallPrompt.prompt();
+      await this.deferredInstallPrompt.userChoice;
+    } finally {
+      this.deferredInstallPrompt = null;
+      this.canInstallApp = false;
+      this.installingApp = false;
+    }
   }
 
   private resolveOrganizationDisplayName(): void {
@@ -212,4 +243,15 @@ export class AppShellComponent {
     this.organizationDisplayName =
       String(match.name || match.legalName || organizationId).trim() || 'Organization';
   }
+
+  private readonly handleBeforeInstallPrompt = (event: Event): void => {
+    event.preventDefault();
+    this.deferredInstallPrompt = event as BeforeInstallPromptEvent;
+    this.canInstallApp = true;
+  };
+
+  private readonly handleAppInstalled = (): void => {
+    this.deferredInstallPrompt = null;
+    this.canInstallApp = false;
+  };
 }

@@ -5,14 +5,6 @@
       <div class="small text-secondary">Biz Assistant</div>
     </div>
     <div class="d-flex gap-2">
-      <button
-        class="btn btn-outline-secondary btn-sm"
-        type="button"
-        (click)="toggleTheme()"
-        [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
-      >
-        <i class="bi" [class.bi-moon-stars]="!theme.isDark()" [class.bi-sun]="theme.isDark()"></i>
-      </button>
       <button class="btn btn-outline-primary btn-sm" type="button" (click)="openSidebar()">
         <i class="bi bi-list fs-5"></i>
       </button>
@@ -29,14 +21,6 @@
           <div class="text-secondary small">Biz Assistant</div>
         </div>
         <div class="d-flex gap-2">
-          <button
-            class="btn btn-outline-secondary btn-sm d-none d-lg-inline-flex"
-            type="button"
-            (click)="toggleTheme()"
-            [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
-          >
-            <i class="bi" [class.bi-moon-stars]="!theme.isDark()" [class.bi-sun]="theme.isDark()"></i>
-          </button>
           <button
             class="btn btn-outline-secondary btn-sm d-none d-lg-inline-flex"
             type="button"
@@ -113,6 +97,16 @@
     </main>
   </div>
 </div>
+
+<button
+  class="btn btn-outline-secondary rounded-circle position-fixed d-inline-flex align-items-center justify-content-center shadow-sm"
+  type="button"
+  (click)="toggleTheme()"
+  [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+  style="top: 12px; right: 12px; width: 42px; height: 42px; z-index: 1100;"
+>
+  <i class="bi fs-6" [class.bi-moon-stars]="!theme.isDark()" [class.bi-sun]="theme.isDark()"></i>
+</button>
 
 <div class="modal-backdrop fade show" *ngIf="auth.unauthorizedAccess().visible"></div>
 <div
