@@ -162,6 +162,7 @@ export class CreateOrderPageComponent {
 
     this.catalogLoadingMore = true;
     this.error = '';
+    // Initial search loads 10 records, and every "show more" appends the next 5 from API paging.
     const nextPage = Math.floor(this.catalogItems.length / this.catalogLoadMoreLimit) + 1;
 
     this.fetchCatalogPage(nextPage, this.catalogLoadMoreLimit).subscribe({
@@ -363,6 +364,7 @@ export class CreateOrderPageComponent {
     if (!Number.isFinite(percentage) || percentage <= 0) {
       return 0;
     }
+    // Withholding is derived from taxable amount (same basis used by backend recomputation).
     return Number((this.taxableAmount * (percentage / 100)).toFixed(2));
   }
 
@@ -393,6 +395,7 @@ export class CreateOrderPageComponent {
       return;
     }
 
+    // Backend recomputes totals again; payload values are kept for immediate UX preview consistency.
     const payload = {
       organizationId: this.currentOrganizationId.trim(),
       orderNumber: this.orderNumber.trim(),
@@ -474,6 +477,7 @@ export class CreateOrderPageComponent {
     }
 
     this.withholdingTaxLoading = true;
+    // Pull active types from DB table so finance admins can manage options without code changes.
     const endpoint = `/api/v1/withholding-tax-types?organizationId=${encodeURIComponent(
       orgId
     )}&activeOnly=true`;

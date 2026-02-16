@@ -118,6 +118,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     if (!organizationId) {
       return '';
     }
+    // Superuser "all organizations" mode intentionally omits organizationId filter.
     if (this.isSuperuser && !this.organizationContext.shouldApplySuperuserScope()) {
       return '';
     }
@@ -231,6 +232,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     this.chartLoading = true;
     this.chartError = '';
 
+    // Dashboard chart is derived from live transactional tables (not snapshot report tables).
     const salesParams = new URLSearchParams({
       issueDateFrom: `${this.selectedYear}-01-01`,
       issueDateTo: `${this.selectedYear}-12-31`,
@@ -266,6 +268,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
           expenses: [0, 0, 0, 0],
         };
 
+        // Aggregate by quarter client-side so the chart reflects selected year instantly.
         for (const row of sales) {
           const quarter = this.quarterFromDate(row.issueDate);
           if (!quarter) {

@@ -167,6 +167,7 @@ export class OrderPreviewPageComponent {
     this.loading = true;
     this.error = '';
     this.message = '';
+    // Keep item search pane intentionally empty until user searches (prevents noisy initial list).
     this.catalogItems = [];
     this.catalogHasMore = false;
     this.catalogLoadingMore = false;
@@ -252,6 +253,7 @@ export class OrderPreviewPageComponent {
       .map((row) => {
         const itemId = String(row.itemId || '');
         if (!itemId) return null;
+        // Prefer live catalog row; fallback to snapshot-derived stub so historical rows always render.
         const item =
           byId.get(itemId) ||
           ({
@@ -283,6 +285,7 @@ export class OrderPreviewPageComponent {
 
     this.catalogLoading = true;
     this.error = '';
+    // Reset to the first chunk for each new query (10 initial, then +5 via loadMoreItems).
     this.catalogCurrentLimit = this.catalogInitialLimit;
     const q = encodeURIComponent(this.itemSearchQuery.trim());
     this.api
@@ -313,6 +316,7 @@ export class OrderPreviewPageComponent {
 
     this.catalogLoadingMore = true;
     this.error = '';
+    // Uses growing limit on page 1 so previously loaded cards keep order and avoid duplicates.
     this.catalogCurrentLimit += this.catalogLoadMoreStep;
     const q = encodeURIComponent(this.itemSearchQuery.trim());
     this.api
@@ -501,6 +505,7 @@ export class OrderPreviewPageComponent {
     if (!Number.isFinite(percentage) || percentage <= 0) {
       return 0;
     }
+    // UI mirrors backend rule: withholding is a percentage of taxable amount.
     return Number((this.taxableAmount * (percentage / 100)).toFixed(2));
   }
 
@@ -604,6 +609,7 @@ export class OrderPreviewPageComponent {
     this.error = '';
     this.message = '';
 
+    // Send full financial fields; API still recomputes totals server-side for final source of truth.
     const payload: Record<string, unknown> = {
       customerId: this.selectedCustomerId,
       status: this.status,
