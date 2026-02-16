@@ -64,6 +64,7 @@ export class CustomersPageComponent {
   readonly isImportModalOpen = signal(false);
   readonly exporting = signal(false);
   readonly importModalError = signal('');
+  readonly countryOptions = this.buildCountryOptions();
 
   readonly message = signal('');
   readonly error = signal('');
@@ -498,5 +499,33 @@ export class CustomersPageComponent {
     }
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : undefined;
+  }
+
+  private buildCountryOptions(): string[] {
+    const fallback = ['United States'];
+    try {
+      const intlAny = Intl as unknown as {
+        DisplayNames?: new (locales: string[], options: { type: 'region' }) => Intl.DisplayNames;
+      };
+      if (!intlAny.DisplayNames) {
+        return fallback;
+      }
+      const regionNames = new intlAny.DisplayNames(['en'], { type: 'region' });
+      const names = new Set<string>();
+      for (let first = 65; first <= 90; first += 1) {
+        for (let second = 65; second <= 90; second += 1) {
+          const code = String.fromCharCode(first, second);
+          const value = regionNames.of(code);
+          if (!value || value === code || /unknown region/i.test(value)) {
+            continue;
+          }
+          names.add(value);
+        }
+      }
+      const result = Array.from(names).sort((a, b) => a.localeCompare(b));
+      return result.length > 0 ? result : fallback;
+    } catch (_err) {
+      return fallback;
+    }
   }
 }

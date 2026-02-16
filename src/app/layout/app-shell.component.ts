@@ -44,8 +44,8 @@ export class AppShellComponent {
     {
       title: 'Overview',
       items: [
-        { label: 'Dashboard', path: '/dashboard', icon: 'bi-speedometer2' },
-        { label: 'Reports', path: '/reports', icon: 'bi-bar-chart-line', permissions: ['reports.read'] },
+        { label: 'Dashboard', path: '/dashboard', icon: 'bi-speedometer2', permissions: ['dashboard.read'] },
+        { label: 'Reports', path: '/reports', icon: 'bi-bar-chart-line', permissions: ['reports.*'] },
       ],
     },
     {

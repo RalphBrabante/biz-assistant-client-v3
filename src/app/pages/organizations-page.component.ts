@@ -45,6 +45,11 @@ interface TaxTypeOption {
   isActive?: boolean;
 }
 
+interface CurrencyOption {
+  code: string;
+  label: string;
+}
+
 @Component({
   selector: 'app-organizations-page',
   standalone: true,
@@ -63,6 +68,8 @@ export class OrganizationsPageComponent {
   readonly isCreateModalOpen = signal(false);
   readonly taxTypes = signal<TaxTypeOption[]>([]);
   readonly createModalError = signal('');
+  readonly countryOptions = this.buildCountryOptions();
+  readonly currencyOptions = this.buildCurrencyOptions();
 
   readonly message = signal('');
   readonly error = signal('');
@@ -399,5 +406,68 @@ export class OrganizationsPageComponent {
     if (!phone) return 'Phone is required.';
     if (!taxTypeId) return 'Tax Type is required.';
     return '';
+  }
+
+  private buildCountryOptions(): string[] {
+    const fallback = ['United States'];
+    try {
+      const intlAny = Intl as unknown as {
+        DisplayNames?: new (locales: string[], options: { type: 'region' }) => Intl.DisplayNames;
+      };
+      if (!intlAny.DisplayNames) {
+        return fallback;
+      }
+      const regionNames = new intlAny.DisplayNames(['en'], { type: 'region' });
+      const names = new Set<string>();
+      for (let first = 65; first <= 90; first += 1) {
+        for (let second = 65; second <= 90; second += 1) {
+          const code = String.fromCharCode(first, second);
+          const value = regionNames.of(code);
+          if (!value || value === code || /unknown region/i.test(value)) {
+            continue;
+          }
+          names.add(value);
+        }
+      }
+      const result = Array.from(names).sort((a, b) => a.localeCompare(b));
+      return result.length > 0 ? result : fallback;
+    } catch (_err) {
+      return fallback;
+    }
+  }
+
+  private buildCurrencyOptions(): CurrencyOption[] {
+    const fallbackCodes = ['USD', 'PHP'];
+    try {
+      const intlAny = Intl as unknown as {
+        supportedValuesOf?: (key: string) => string[];
+        DisplayNames?: new (locales: string[], options: { type: 'currency' }) => Intl.DisplayNames;
+      };
+      const codes = Array.from(
+        new Set(
+          (intlAny.supportedValuesOf ? intlAny.supportedValuesOf('currency') : fallbackCodes).map(
+            (value) => String(value || '').toUpperCase().trim()
+          )
+        )
+      ).filter((value) => value.length === 3);
+
+      const currencyNames = intlAny.DisplayNames
+        ? new intlAny.DisplayNames(['en'], { type: 'currency' })
+        : null;
+
+      const options = codes
+        .map((code) => {
+          const name = currencyNames?.of(code);
+          return {
+            code,
+            label: name ? `${code} - ${name}` : code,
+          };
+        })
+        .sort((a, b) => a.code.localeCompare(b.code));
+
+      return options.length > 0 ? options : fallbackCodes.map((code) => ({ code, label: code }));
+    } catch (_err) {
+      return fallbackCodes.map((code) => ({ code, label: code }));
+    }
   }
 }

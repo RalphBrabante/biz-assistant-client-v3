@@ -21,10 +21,11 @@ export class HomeRedirectPageComponent {
         ? [
             { path: '/items', permissions: ['items.read'] },
             { path: '/orders', permissions: ['orders.read'] },
-            { path: '/dashboard', permissions: [] },
+            { path: '/dashboard', permissions: ['dashboard.read'] },
           ]
         : [
-            { path: '/dashboard', permissions: [] },
+            { path: '/dashboard', permissions: ['dashboard.read'] },
+            { path: '/reports', permissions: ['reports.*'] },
             { path: '/items', permissions: ['items.read'] },
             { path: '/orders', permissions: ['orders.read'] },
             { path: '/expenses', permissions: ['expenses.read'] },
@@ -34,7 +35,7 @@ export class HomeRedirectPageComponent {
 
     const destination =
       preferredRoutes.find((route) => this.auth.hasAnyPermission(route.permissions))?.path ||
-      '/dashboard';
+      '/reports';
     void this.router.navigateByUrl(destination);
   }
 }

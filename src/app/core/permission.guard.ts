@@ -15,6 +15,18 @@ export const permissionGuard: CanActivateFn = (route) => {
     ? `Missing required permission: ${required.join(' OR ')}`
     : 'You are not allowed to access this section.';
   auth.showUnauthorizedAccess(message);
-
-  return router.parseUrl('/dashboard');
+  const fallbackRoutes: Array<{ path: string; permissions: string[] }> = [
+    { path: '/dashboard', permissions: ['dashboard.read'] },
+    { path: '/reports', permissions: ['reports.*'] },
+    { path: '/items', permissions: ['items.read'] },
+    { path: '/orders', permissions: ['orders.read'] },
+    { path: '/expenses', permissions: ['expenses.read'] },
+    { path: '/sales-invoices', permissions: ['sales_invoices.read'] },
+    { path: '/users', permissions: ['users.read'] },
+    { path: '/organizations', permissions: ['organizations.read'] },
+  ];
+  const destination =
+    fallbackRoutes.find((candidate) => auth.hasAnyPermission(candidate.permissions))?.path ||
+    '/login';
+  return router.parseUrl(destination);
 };

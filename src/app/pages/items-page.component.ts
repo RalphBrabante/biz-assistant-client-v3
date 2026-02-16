@@ -154,10 +154,7 @@ export class ItemsPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = {
-      ...this.newItemForm(),
-      organizationId: this.currentOrganizationId,
-    };
+    this.createForm = this.newItemForm();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -181,10 +178,7 @@ export class ItemsPageComponent {
     this.error.set('');
     this.message.set('');
 
-    const payload = this.buildPayload({
-      ...this.createForm,
-      organizationId: this.currentOrganizationId,
-    });
+    const payload = this.buildPayload(this.createForm);
 
     this.api.create<ItemRow>('/api/v1/items', payload).subscribe({
       next: (response) => {
@@ -509,8 +503,7 @@ export class ItemsPageComponent {
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
-    return {
-      organizationId: this.asString(form['organizationId']),
+    const payload: Record<string, unknown> = {
       type: this.optionalString(form['type']),
       sku: this.optionalString(form['sku']),
       name: this.asString(form['name']),
@@ -524,6 +517,13 @@ export class ItemsPageComponent {
       reorderLevel: this.optionalNumber(form['reorderLevel']),
       isActive: Boolean(form['isActive']),
     };
+
+    const organizationId = this.asString(form['organizationId']);
+    if (organizationId) {
+      payload['organizationId'] = organizationId;
+    }
+
+    return payload;
   }
 
   private organizationOptionLabelById(id: string): string | undefined {

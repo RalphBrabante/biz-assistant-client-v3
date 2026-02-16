@@ -84,12 +84,62 @@ export class AuthService {
     if (this.isPrivileged()) {
       return true;
     }
-    const set = new Set(
-      (this.currentUser()?.permissionCodes || []).map((code) =>
-        String(code || '').toLowerCase()
-      )
-    );
-    return set.has(String(permission || '').toLowerCase());
+    const normalizedRequested = String(permission || '').toLowerCase().trim();
+    if (!normalizedRequested) {
+      return true;
+    }
+
+    const codes = (this.currentUser()?.permissionCodes || [])
+      .map((code) => String(code || '').toLowerCase().trim())
+      .filter((code) => code.length > 0);
+    const set = new Set(codes);
+
+    const matches = (requested: string): boolean => {
+      if (set.has('*') || set.has(requested)) {
+        return true;
+      }
+
+      // If requested permission is a wildcard (e.g. reports.*),
+      // allow when user has any permission within that namespace.
+      if (requested.endsWith('.*')) {
+        const requestedPrefix = requested.slice(0, -2);
+        if (!requestedPrefix) {
+          return false;
+        }
+        for (const code of set) {
+          if (
+            code === requestedPrefix ||
+            code === `${requestedPrefix}.*` ||
+            code.startsWith(`${requestedPrefix}.`)
+          ) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      // Support wildcard permissions like `reports.*` for any `reports.xxx` checks.
+      for (const code of set) {
+        if (!code.endsWith('.*')) {
+          continue;
+        }
+        const prefix = code.slice(0, -2);
+        if (!prefix) {
+          continue;
+        }
+        if (requested === prefix || requested.startsWith(`${prefix}.`)) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    if (matches(normalizedRequested)) {
+      return true;
+    }
+
+    return false;
   }
 
   hasAnyPermission(permissions: string[] = []): boolean {

@@ -213,7 +213,9 @@
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Country</label>
-            <input class="form-control" [(ngModel)]="createForm['country']" />
+            <select class="form-select" [(ngModel)]="createForm['country']">
+              <option *ngFor="let country of countryOptions" [value]="country">{{ country }}</option>
+            </select>
           </div>
 
           <div class="col-12 col-md-4">
@@ -364,7 +366,9 @@
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Country</label>
-            <input class="form-control" [(ngModel)]="editForm['country']" />
+            <select class="form-select" [(ngModel)]="editForm['country']">
+              <option *ngFor="let country of countryOptions" [value]="country">{{ country }}</option>
+            </select>
           </div>
 
           <div class="col-12 col-md-4">
