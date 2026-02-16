@@ -50,6 +50,7 @@ export class TaxTypesPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
+  viewMode: 'table' | 'card' = 'table';
 
   taxCreateForm: Record<string, unknown> = this.newTaxForm();
   withholdingCreateForm: Record<string, unknown> = this.newWithholdingForm();

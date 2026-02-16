@@ -31,6 +31,7 @@ export class OrdersPageComponent {
   total = 0;
   totalPages = 1;
   readonly pageSizeOptions = [10, 20, 50, 100];
+        viewMode: 'table' | 'card' = 'table';
   private readonly currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
   get isSuperuser(): boolean {

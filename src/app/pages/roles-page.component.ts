@@ -40,6 +40,7 @@ export class RolesPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
+  viewMode: 'table' | 'card' = 'table';
 
   createForm: Record<string, unknown> = {
     name: '',

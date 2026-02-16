@@ -46,6 +46,16 @@
           <div class="stat-value">{{ withholdingRows().length }}</div>
         </div>
       </div>
+      <div class="col-12 col-md-3">
+        <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table view" aria-label="Table view">
+            <i class="bi bi-table"></i>
+          </button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="viewMode = 'card'" title="Card view" aria-label="Card view">
+            <i class="bi bi-grid-3x2-gap"></i>
+          </button>
+        </div>
+      </div>
     </div>
     <div *ngIf="!canManageWithholding" class="alert alert-warning mt-3 mb-0 py-2">
       Select a specific organization to manage withholding tax types.
@@ -59,7 +69,7 @@
   <div class="card-header bg-transparent border-0 pt-4 px-4">
     <h2 class="h5 mb-0">Tax Types</h2>
   </div>
-  <div class="table-responsive">
+  <div class="table-responsive table-view-wrapper" [ngClass]="{ 'table-card-view': viewMode === 'card' }">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
@@ -83,7 +93,11 @@
             <td>{{ row.description || '-' }}</td>
             <td>{{ row.isActive ? 'Yes' : 'No' }}</td>
             <td class="text-end">
-              <div class="d-inline-flex gap-2">
+              <div class="actions-hover-menu">
+                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
+                  <i class="bi bi-three-dots"></i>
+                </button>
+                <div class="actions-hover-menu-list">
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startTaxEdit(row)" appTooltip title="Edit">
                   <i class="bi bi-pencil-square"></i>
                 </button>
@@ -98,6 +112,7 @@
                   <i class="bi bi-trash3"></i>
                 </button>
               </div>
+              </div>
             </td>
           </ng-container>
           <ng-template #taxEditRow>
@@ -111,13 +126,18 @@
               </div>
             </td>
             <td class="text-end">
-              <div class="d-inline-flex gap-2">
+              <div class="actions-hover-menu">
+                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
+                  <i class="bi bi-three-dots"></i>
+                </button>
+                <div class="actions-hover-menu-list">
                 <button class="btn btn-sm btn-outline-success" type="button" [disabled]="submitting()" (click)="saveTaxEdit()" appTooltip title="Save">
                   <i class="bi bi-floppy2"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="cancelTaxEdit()" appTooltip title="Cancel">
                   <i class="bi bi-x-lg"></i>
                 </button>
+              </div>
               </div>
             </td>
           </ng-template>
@@ -131,7 +151,7 @@
   <div class="card-header bg-transparent border-0 pt-4 px-4">
     <h2 class="h5 mb-0">Withholding Tax Types</h2>
   </div>
-  <div class="table-responsive">
+  <div class="table-responsive table-view-wrapper" [ngClass]="{ 'table-card-view': viewMode === 'card' }">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
@@ -157,7 +177,11 @@
             <td>{{ formatMoney(row.minimumBaseAmount ?? 0, currentOrganizationCurrency) }}</td>
             <td>{{ row.isActive ? 'Yes' : 'No' }}</td>
             <td class="text-end">
-              <div class="d-inline-flex gap-2">
+              <div class="actions-hover-menu">
+                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
+                  <i class="bi bi-three-dots"></i>
+                </button>
+                <div class="actions-hover-menu-list">
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startWithholdingEdit(row)" appTooltip title="Edit">
                   <i class="bi bi-pencil-square"></i>
                 </button>
@@ -171,6 +195,7 @@
                 >
                   <i class="bi bi-trash3"></i>
                 </button>
+              </div>
               </div>
             </td>
           </ng-container>
@@ -192,13 +217,18 @@
               </div>
             </td>
             <td class="text-end">
-              <div class="d-inline-flex gap-2">
+              <div class="actions-hover-menu">
+                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
+                  <i class="bi bi-three-dots"></i>
+                </button>
+                <div class="actions-hover-menu-list">
                 <button class="btn btn-sm btn-outline-success" type="button" [disabled]="submitting()" (click)="saveWithholdingEdit()" appTooltip title="Save">
                   <i class="bi bi-floppy2"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="cancelWithholdingEdit()" appTooltip title="Cancel">
                   <i class="bi bi-x-lg"></i>
                 </button>
+              </div>
               </div>
             </td>
           </ng-template>

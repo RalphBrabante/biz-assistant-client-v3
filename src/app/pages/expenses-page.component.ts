@@ -120,7 +120,7 @@ export class ExpensesPageComponent {
   readonly editModalError = signal('');
   readonly importModalError = signal('');
   readonly importSummary = signal<ExpenseImportSummary | null>(null);
-  readonly pageSizeOptions = [10, 20, 50, 100];
+        viewMode: 'table' | 'card' = 'table';
   searchQuery = '';
   statusFilter = '';
   paymentMethodFilter = '';
@@ -130,6 +130,7 @@ export class ExpensesPageComponent {
   pageSize = 20;
   total = 0;
   totalPages = 1;
+  readonly pageSizeOptions = [10, 20, 50, 100];
 
   createForm: Record<string, unknown> = this.newExpenseForm();
   vendorCreateForm: Record<string, unknown> = this.newVendorForm();

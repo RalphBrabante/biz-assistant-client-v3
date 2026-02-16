@@ -99,6 +99,7 @@ export class ReportsPageComponent {
   expenseTotalPages = 1;
 
   readonly pageSizeOptions = [10, 20, 50, 100];
+  viewMode: 'table' | 'card' = 'table';
   private readonly organizationNameMap = signal<Record<string, string>>({});
 
   readonly availableYears = computed(() => {

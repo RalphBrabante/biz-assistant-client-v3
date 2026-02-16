@@ -36,6 +36,16 @@
         </select>
       </div>
       <div class="col-6 col-md-2">
+        <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table view" aria-label="Table view">
+            <i class="bi bi-table"></i>
+          </button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="viewMode = 'card'" title="Card view" aria-label="Card view">
+            <i class="bi bi-grid-3x2-gap"></i>
+          </button>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
         <div class="stat-chip">
           <div class="stat-label">Total Permissions</div>
           <div class="stat-value">{{ total }}</div>
@@ -55,7 +65,7 @@
 </section>
 
 <section class="card border-0 shadow-sm rounded-4">
-  <div class="table-responsive">
+  <div class="table-responsive table-view-wrapper" [ngClass]="{ 'table-card-view': viewMode === 'card' }">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
@@ -82,7 +92,11 @@
             <td>{{ row.isSystem ? 'Yes' : 'No' }}</td>
             <td>{{ row.isActive ? 'Yes' : 'No' }}</td>
             <td class="text-end">
-              <div class="d-inline-flex gap-2">
+              <div class="actions-hover-menu">
+                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
+                  <i class="bi bi-three-dots"></i>
+                </button>
+                <div class="actions-hover-menu-list">
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
                   <i class="bi bi-pencil-square"></i>
                 </button>
@@ -96,6 +110,7 @@
                 >
                   <i class="bi bi-trash3"></i>
                 </button>
+              </div>
               </div>
             </td>
           </ng-container>
@@ -116,13 +131,18 @@
               </div>
             </td>
             <td class="text-end">
-              <div class="d-inline-flex gap-2">
+              <div class="actions-hover-menu">
+                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
+                  <i class="bi bi-three-dots"></i>
+                </button>
+                <div class="actions-hover-menu-list">
                 <button class="btn btn-sm btn-outline-success" type="button" [disabled]="submitting()" (click)="saveEdit()" appTooltip title="Save">
                   <i class="bi bi-floppy2"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="cancelEdit()" appTooltip title="Cancel">
                   <i class="bi bi-x-lg"></i>
                 </button>
+              </div>
               </div>
             </td>
           </ng-template>

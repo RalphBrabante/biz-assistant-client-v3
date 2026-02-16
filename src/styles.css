@@ -152,6 +152,14 @@ body {
   background-color: #ffecee;
 }
 
+.theme-toggle-fab {
+  top: 12px;
+  right: 12px;
+  width: 42px;
+  height: 42px;
+  z-index: 1100;
+}
+
 .print-delivery-sheet {
   border: 1px solid #dbe4f5;
 }
@@ -237,6 +245,14 @@ body {
     min-height: calc(100vh - 60px);
   }
 
+  .theme-toggle-fab {
+    top: 50%;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    transform: translateY(-50%);
+  }
+
   .app-sidebar {
     position: fixed;
     top: 0;
@@ -276,4 +292,130 @@ body {
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
   }
+}
+
+/* Consolidated data-table actions: one trigger with hover list */
+.actions-hover-menu {
+  position: relative;
+  display: inline-block;
+  text-align: left;
+}
+
+.actions-hover-trigger {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actions-hover-menu-list {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 0.35rem);
+  display: none;
+  width: max-content;
+  min-width: 0;
+  padding: 0.25rem;
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.12);
+  z-index: 3000;
+  justify-items: stretch;
+}
+
+.actions-hover-trigger:focus + .actions-hover-menu-list,
+.actions-hover-menu:focus-within .actions-hover-menu-list {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.actions-hover-menu-list .btn,
+.actions-hover-menu-list a.btn {
+  width: 100%;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+/* Table/Card toggle rendering for data tables */
+.table-view-wrapper.table-card-view table,
+.table-view-wrapper.table-card-view tbody,
+.table-view-wrapper.table-card-view tr,
+.table-view-wrapper.table-card-view td {
+  display: block;
+  width: 100%;
+}
+
+.table-view-wrapper.table-card-view thead {
+  display: none;
+}
+
+.table-view-wrapper.table-card-view tbody tr {
+  position: relative;
+  padding: 0.75rem;
+  padding-top: 2.75rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.table-view-wrapper.table-card-view tbody td {
+  border: 0;
+  padding: 0.2rem 0;
+  text-align: left !important;
+}
+
+.table-view-wrapper.table-card-view tbody td:last-child {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: auto;
+  margin-top: 0;
+  z-index: 2;
+}
+
+.view-toggle-group {
+  width: auto !important;
+}
+
+.view-toggle-group .btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-bs-theme='dark'] .actions-hover-menu-list {
+  background: #182437;
+  border-color: #2d415f;
+  box-shadow: 0 0.65rem 1.2rem rgba(0, 0, 0, 0.45);
+}
+
+[data-bs-theme='dark'] .actions-hover-menu-list .btn,
+[data-bs-theme='dark'] .actions-hover-menu-list a.btn {
+  border-color: #3a5274;
+  color: #dce7f7;
+}
+
+[data-bs-theme='dark'] .actions-hover-menu-list .btn:hover,
+[data-bs-theme='dark'] .actions-hover-menu-list a.btn:hover {
+  background: #243754;
+  color: #ffffff;
+}
+
+[data-bs-theme='dark'] .view-toggle-group .btn {
+  border-color: #3a5274;
+  color: #dce7f7;
+}
+
+[data-bs-theme='dark'] .view-toggle-group .btn.active {
+  background: #2a3f5f;
+  border-color: #5b9bff;
+  color: #ffffff;
+}
+
+.tooltip {
+  z-index: 4000 !important;
 }

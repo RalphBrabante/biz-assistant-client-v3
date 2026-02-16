@@ -33,6 +33,7 @@ export class ResourcePageComponent {
   error = '';
   searchQuery = '';
   activeFilter = '';
+  viewMode: 'table' | 'card' = 'table';
 
   ngOnInit(): void {
     this.load();

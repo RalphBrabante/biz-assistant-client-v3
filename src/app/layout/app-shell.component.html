@@ -45,6 +45,7 @@
               *ngFor="let item of section.items; trackBy: trackByNavItem"
               class="nav-link rounded-3 px-3 py-2 d-flex align-items-center gap-2"
               [routerLink]="item.path"
+              [attr.title]="sidebarCollapsed ? item.label : null"
               routerLinkActive="active"
               (click)="closeSidebarAfterNav()"
             >
@@ -106,11 +107,10 @@
 </div>
 
 <button
-  class="btn btn-outline-secondary rounded-circle position-fixed d-inline-flex align-items-center justify-content-center shadow-sm"
+  class="btn btn-outline-secondary rounded-circle position-fixed d-inline-flex align-items-center justify-content-center shadow-sm theme-toggle-fab"
   type="button"
   (click)="toggleTheme()"
   [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
-  style="top: 12px; right: 12px; width: 42px; height: 42px; z-index: 1100;"
 >
   <i class="bi fs-6" [class.bi-moon-stars]="!theme.isDark()" [class.bi-sun]="theme.isDark()"></i>
 </button>
