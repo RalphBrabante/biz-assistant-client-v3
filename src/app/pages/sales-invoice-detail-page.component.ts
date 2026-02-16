@@ -3,6 +3,7 @@ import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
 interface SalesInvoiceRow {
@@ -15,6 +16,9 @@ interface SalesInvoiceRow {
   status?: string;
   paymentStatus?: string;
   currency?: string;
+  amount?: number;
+  taxableAmount?: number;
+  withHoldingTaxAmount?: number;
   subtotalAmount?: number;
   taxAmount?: number;
   discountAmount?: number;
@@ -75,7 +79,8 @@ export class SalesInvoiceDetailPageComponent {
 
   constructor(
     private readonly api: ApiService,
-    private readonly route: ActivatedRoute
+    private readonly route: ActivatedRoute,
+    private readonly confirmDialog: ConfirmDialogService
   ) {}
 
   ngOnInit(): void {
@@ -109,6 +114,23 @@ export class SalesInvoiceDetailPageComponent {
     return Number(value.toFixed(2));
   }
 
+  get invoiceAmount(): number {
+    return Number(this.invoice()?.amount ?? this.invoice()?.subtotalAmount ?? this.itemsSubtotal ?? 0);
+  }
+
+  get invoiceTaxableAmount(): number {
+    const row = this.invoice();
+    if (!row) return 0;
+    if (row.taxableAmount !== undefined && row.taxableAmount !== null) {
+      return Number(row.taxableAmount || 0);
+    }
+    return Number(Math.max(this.invoiceAmount - Number(row.taxAmount || 0), 0).toFixed(2));
+  }
+
+  get invoiceWithHoldingTaxAmount(): number {
+    return Number(this.invoice()?.withHoldingTaxAmount || 0);
+  }
+
   get itemsDiscount(): number {
     const value = this.orderedItems.reduce((acc, row) => acc + Number(row.lineDiscount || 0), 0);
     return Number(value.toFixed(2));
@@ -124,8 +146,32 @@ export class SalesInvoiceDetailPageComponent {
     return Number(value.toFixed(2));
   }
 
-  saveStatus(): void {
+  get invoicePaidTotal(): number {
+    const row = this.invoice();
+    if (!row) {
+      return 0;
+    }
+    if (row.totalAmount !== undefined && row.totalAmount !== null) {
+      return Number(row.totalAmount || 0);
+    }
+    const subtotal = Number(row.subtotalAmount ?? row.amount ?? this.itemsSubtotal);
+    const discount = Number(row.discountAmount || 0);
+    const withholding = Number(row.withHoldingTaxAmount || 0);
+    return Number(Math.max(subtotal - discount - withholding, 0).toFixed(2));
+  }
+
+  async saveStatus(): Promise<void> {
     if (this.submitting() || !this.invoiceId || this.isPaid) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Sales Invoice',
+      message: 'Save the new sales invoice status?',
+      confirmText: 'Update Invoice',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -148,12 +194,12 @@ export class SalesInvoiceDetailPageComponent {
       });
   }
 
-  markCancelled(): void {
+  async markCancelled(): Promise<void> {
     if (this.submitting() || this.isPaid) {
       return;
     }
     this.status = 'cancelled';
-    this.saveStatus();
+    await this.saveStatus();
   }
 
   printInvoice(): void {

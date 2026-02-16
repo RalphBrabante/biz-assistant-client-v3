@@ -152,8 +152,18 @@ export class RolesPageComponent {
     this.editingId = '';
   }
 
-  saveEdit(): void {
+  async saveEdit(): Promise<void> {
     if (!this.editingId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Role',
+      message: 'Save changes to this role?',
+      confirmText: 'Update Role',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 

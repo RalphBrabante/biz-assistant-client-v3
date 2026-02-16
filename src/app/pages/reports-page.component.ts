@@ -3,6 +3,7 @@ import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
 
@@ -57,11 +58,13 @@ interface QuarterlyExpenseReportRow {
 export class ReportsPageComponent {
   private readonly api: ApiService;
   private readonly auth: AuthService;
+  private readonly confirmDialog: ConfirmDialogService;
   private readonly organizationContext: OrganizationContextService;
 
-  constructor(api: ApiService, auth: AuthService, organizationContext: OrganizationContextService) {
+  constructor(api: ApiService, auth: AuthService, confirmDialog: ConfirmDialogService, organizationContext: OrganizationContextService) {
     this.api = api;
     this.auth = auth;
+    this.confirmDialog = confirmDialog;
     this.organizationContext = organizationContext;
   }
 
@@ -69,6 +72,7 @@ export class ReportsPageComponent {
   readonly latestSalesReport = signal<QuarterlySalesReportRow | null>(null);
   readonly loadingSales = signal(false);
   readonly generatingSales = signal(false);
+  readonly deletingSalesReportId = signal('');
   readonly salesError = signal('');
   readonly salesMessage = signal('');
 
@@ -76,6 +80,7 @@ export class ReportsPageComponent {
   readonly latestExpenseReport = signal<QuarterlyExpenseReportRow | null>(null);
   readonly loadingExpenses = signal(false);
   readonly generatingExpenses = signal(false);
+  readonly deletingExpenseReportId = signal('');
   readonly expenseError = signal('');
   readonly expenseMessage = signal('');
 
@@ -162,8 +167,6 @@ export class ReportsPageComponent {
     const params = new URLSearchParams({
       page: String(this.salesPage),
       limit: String(this.salesPageSize),
-      year: String(this.selectedYear()),
-      quarter: String(this.selectedQuarter()),
     });
     if (this.orgParamValue) {
       params.set('organizationId', this.orgParamValue);
@@ -176,7 +179,7 @@ export class ReportsPageComponent {
           this.isSuperuser || row.organizationId === this.orgParamValue
         );
         this.salesRows.set(rows);
-        this.latestSalesReport.set(rows[0] || null);
+        this.latestSalesReport.set(this.findSelectedSalesReport(rows));
 
         const meta = response.meta || {};
         this.salesTotal = Number(meta.total || 0);
@@ -198,8 +201,6 @@ export class ReportsPageComponent {
     const params = new URLSearchParams({
       page: String(this.expensePage),
       limit: String(this.expensePageSize),
-      year: String(this.selectedYear()),
-      quarter: String(this.selectedQuarter()),
     });
     if (this.orgParamValue) {
       params.set('organizationId', this.orgParamValue);
@@ -212,7 +213,7 @@ export class ReportsPageComponent {
           this.isSuperuser || row.organizationId === this.orgParamValue
         );
         this.expenseRows.set(rows);
-        this.latestExpenseReport.set(rows[0] || null);
+        this.latestExpenseReport.set(this.findSelectedExpenseReport(rows));
 
         const meta = response.meta || {};
         this.expenseTotal = Number(meta.total || 0);
@@ -322,6 +323,70 @@ export class ReportsPageComponent {
     this.loadExpenseReports();
   }
 
+  async deleteSalesReport(id: string): Promise<void> {
+    const reportId = String(id || '').trim();
+    if (!reportId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Sales Report',
+      message: 'Delete this quarterly sales report? This action cannot be undone.',
+      confirmText: 'Delete Report',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-trash3',
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingSalesReportId.set(reportId);
+    this.salesError.set('');
+    this.salesMessage.set('');
+    this.api.remove('/api/v1/reports/quarterly-sales', reportId).subscribe({
+      next: (response) => {
+        this.deletingSalesReportId.set('');
+        this.salesMessage.set(response.message || 'Quarterly sales report deleted successfully.');
+        this.loadSalesReports();
+      },
+      error: (err) => {
+        this.deletingSalesReportId.set('');
+        this.salesError.set(err?.error?.message || 'Unable to delete sales report.');
+      },
+    });
+  }
+
+  async deleteExpenseReport(id: string): Promise<void> {
+    const reportId = String(id || '').trim();
+    if (!reportId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Delete Expense Report',
+      message: 'Delete this quarterly expense report? This action cannot be undone.',
+      confirmText: 'Delete Report',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-trash3',
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingExpenseReportId.set(reportId);
+    this.expenseError.set('');
+    this.expenseMessage.set('');
+    this.api.remove('/api/v1/reports/quarterly-expenses', reportId).subscribe({
+      next: (response) => {
+        this.deletingExpenseReportId.set('');
+        this.expenseMessage.set(response.message || 'Quarterly expense report deleted successfully.');
+        this.loadExpenseReports();
+      },
+      error: (err) => {
+        this.deletingExpenseReportId.set('');
+        this.expenseError.set(err?.error?.message || 'Unable to delete expense report.');
+      },
+    });
+  }
+
   quarterLabel(quarter: number): string {
     return `Q${quarter}`;
   }
@@ -342,5 +407,21 @@ export class ReportsPageComponent {
 
   private getCurrentQuarter(): number {
     return Math.floor(new Date().getMonth() / 3) + 1;
+  }
+
+  private findSelectedSalesReport(rows: QuarterlySalesReportRow[]): QuarterlySalesReportRow | null {
+    return (
+      rows.find(
+        (row) => Number(row.year) === this.selectedYear() && Number(row.quarter) === this.selectedQuarter()
+      ) || null
+    );
+  }
+
+  private findSelectedExpenseReport(rows: QuarterlyExpenseReportRow[]): QuarterlyExpenseReportRow | null {
+    return (
+      rows.find(
+        (row) => Number(row.year) === this.selectedYear() && Number(row.quarter) === this.selectedQuarter()
+      ) || null
+    );
   }
 }

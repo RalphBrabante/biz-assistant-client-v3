@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Subject, Subscription, of } from 'rxjs';
@@ -77,6 +77,13 @@ interface WithholdingTaxTypeOption {
   isActive?: boolean;
 }
 
+interface ExpenseImportSummary {
+  imported: number;
+  skipped: number;
+  totalRows: number;
+  errors: string[];
+}
+
 @Component({
   selector: 'app-expenses-page',
   standalone: true,
@@ -112,7 +119,17 @@ export class ExpensesPageComponent {
   readonly createModalError = signal('');
   readonly editModalError = signal('');
   readonly importModalError = signal('');
-  readonly filter = signal('');
+  readonly importSummary = signal<ExpenseImportSummary | null>(null);
+  readonly pageSizeOptions = [10, 20, 50, 100];
+  searchQuery = '';
+  statusFilter = '';
+  paymentMethodFilter = '';
+  expenseDateFrom = '';
+  expenseDateTo = '';
+  page = 1;
+  pageSize = 20;
+  total = 0;
+  totalPages = 1;
 
   createForm: Record<string, unknown> = this.newExpenseForm();
   vendorCreateForm: Record<string, unknown> = this.newVendorForm();
@@ -122,22 +139,6 @@ export class ExpensesPageComponent {
   private vendorSearchSub?: Subscription;
   private createFile: File | null = null;
   private importFile: File | null = null;
-
-  readonly filteredRows = computed(() => {
-    const q = this.filter().trim().toLowerCase();
-    if (!q) {
-      return this.rows();
-    }
-    return this.rows().filter((row) => {
-      return (
-        String(row.expenseNumber || '').toLowerCase().includes(q) ||
-        String(row.category || '').toLowerCase().includes(q) ||
-        String(row.status || '').toLowerCase().includes(q) ||
-        String(row.vendor?.name || '').toLowerCase().includes(q) ||
-        String(row.vendorTaxId || '').toLowerCase().includes(q)
-      );
-    });
-  });
 
   get currentOrganizationId(): string {
     return this.organizationContext.getActiveOrganizationId();
@@ -198,20 +199,39 @@ export class ExpensesPageComponent {
     this.vendorSearchSub?.unsubscribe();
   }
 
-  load(): void {
+  load(resetPage = false): void {
     if (!this.currentOrganizationId && !this.organizationContext.isAllOrganizationsSelected()) {
       this.error.set('Logged in user has no organization assigned.');
       this.rows.set([]);
       return;
+    }
+    if (resetPage) {
+      this.page = 1;
     }
 
     this.loading.set(true);
     this.error.set('');
 
     const params = new URLSearchParams({
-      q: this.filter().trim(),
-      limit: '100',
+      page: String(this.page),
+      limit: String(this.pageSize),
     });
+    const q = this.searchQuery.trim();
+    if (q) {
+      params.set('q', q);
+    }
+    if (this.statusFilter) {
+      params.set('status', this.statusFilter);
+    }
+    if (this.paymentMethodFilter) {
+      params.set('paymentMethod', this.paymentMethodFilter);
+    }
+    if (this.expenseDateFrom) {
+      params.set('expenseDateFrom', this.expenseDateFrom);
+    }
+    if (this.expenseDateTo) {
+      params.set('expenseDateTo', this.expenseDateTo);
+    }
     if (this.currentOrganizationId) {
       params.set('organizationId', this.currentOrganizationId);
     }
@@ -220,6 +240,15 @@ export class ExpensesPageComponent {
         next: (response) => {
           this.loading.set(false);
           this.rows.set(response.data || []);
+          const meta = response.meta || {};
+          this.total = Number(meta.total || 0);
+          this.totalPages = Math.max(1, Number(meta.totalPages || 1));
+          this.page = Math.max(1, Number(meta.page || this.page));
+          this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+          if (this.page > this.totalPages) {
+            this.page = this.totalPages;
+            this.load();
+          }
         },
         error: (err) => {
           this.loading.set(false);
@@ -376,8 +405,18 @@ export class ExpensesPageComponent {
     this.isEditModalOpen.set(false);
   }
 
-  saveEdit(): void {
+  async saveEdit(): Promise<void> {
     if (!this.editingId) return;
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Expense',
+      message: 'Save changes to this expense?',
+      confirmText: 'Update Expense',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
+      return;
+    }
 
     this.submitting.set(true);
     this.error.set('');
@@ -457,6 +496,7 @@ export class ExpensesPageComponent {
     this.importModalError.set('');
     this.error.set('');
     this.message.set('');
+    this.importSummary.set(null);
 
     const formData = new FormData();
     formData.append('file', this.importFile);
@@ -471,6 +511,16 @@ export class ExpensesPageComponent {
         const data = (response.data || {}) as Record<string, unknown>;
         const imported = Number(data['imported'] || 0);
         const skipped = Number(data['skipped'] || 0);
+        const totalRows = Number(data['totalRows'] || imported + skipped);
+        const errors = Array.isArray(data['errors'])
+          ? data['errors'].map((row) => String(row || '').trim()).filter((row) => row.length > 0)
+          : [];
+        this.importSummary.set({
+          imported,
+          skipped,
+          totalRows,
+          errors,
+        });
         this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
         this.load();
       },
@@ -481,15 +531,34 @@ export class ExpensesPageComponent {
     });
   }
 
+  clearImportSummary(): void {
+    this.importSummary.set(null);
+  }
+
   exportExpensesCsv(): void {
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');
 
     const params = new URLSearchParams();
-    const q = this.filter().trim();
+    const q = this.searchQuery.trim();
     if (q) {
       params.set('q', q);
+    }
+    if (this.statusFilter) {
+      params.set('status', this.statusFilter);
+    }
+    if (this.paymentMethodFilter) {
+      params.set('paymentMethod', this.paymentMethodFilter);
+    }
+    if (this.expenseDateFrom) {
+      params.set('expenseDateFrom', this.expenseDateFrom);
+    }
+    if (this.expenseDateTo) {
+      params.set('expenseDateTo', this.expenseDateTo);
+    }
+    if (this.currentOrganizationId) {
+      params.set('organizationId', this.currentOrganizationId);
     }
 
     this.api.download(`/api/v1/expenses/export?${params.toString()}`).subscribe({
@@ -510,6 +579,33 @@ export class ExpensesPageComponent {
         this.error.set(err?.error?.message || 'Unable to export expenses.');
       },
     });
+  }
+
+  applyFilters(): void {
+    this.load(true);
+  }
+
+  clearFilters(): void {
+    this.searchQuery = '';
+    this.statusFilter = '';
+    this.paymentMethodFilter = '';
+    this.expenseDateFrom = '';
+    this.expenseDateTo = '';
+    this.load(true);
+  }
+
+  onPageSizeChange(value: string): void {
+    const parsed = Number(value);
+    this.pageSize = Number.isFinite(parsed) ? parsed : 20;
+    this.load(true);
+  }
+
+  goToPage(page: number): void {
+    if (this.loading() || page < 1 || page > this.totalPages || page === this.page) {
+      return;
+    }
+    this.page = page;
+    this.load();
   }
 
   vendorLabel(row: ExpenseRow): string {

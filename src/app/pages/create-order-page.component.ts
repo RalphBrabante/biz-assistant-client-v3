@@ -49,6 +49,15 @@ interface OrganizationTaxInfo {
   };
 }
 
+interface WithholdingTaxTypeOption {
+  id: string;
+  code?: string;
+  name?: string;
+  percentage?: number;
+  appliesTo?: 'expense' | 'invoice' | 'both';
+  isActive?: boolean;
+}
+
 @Component({
   selector: 'app-create-order-page',
   standalone: true,
@@ -72,6 +81,11 @@ export class CreateOrderPageComponent {
   searchQuery = '';
   customerSearchQuery = '';
   catalogItems: ItemRow[] = [];
+  catalogHasMore = false;
+  catalogLoadingMore = false;
+  private catalogPage = 1;
+  private readonly catalogInitialLimit = 10;
+  private readonly catalogLoadMoreLimit = 5;
   cart: CartItem[] = [];
   customerResults: CustomerRow[] = [];
   selectedCustomerId = '';
@@ -79,8 +93,12 @@ export class CreateOrderPageComponent {
   customerSearchPerformed = false;
   customerSearchStatus = '';
   organizationVatRate = 0;
+  applyWithholdingTax = false;
+  withholdingTaxTypeId = '';
+  withholdingTaxTypes: WithholdingTaxTypeOption[] = [];
 
   catalogLoading = false;
+  withholdingTaxLoading = false;
   submitting = false;
   error = '';
   message = '';
@@ -103,6 +121,7 @@ export class CreateOrderPageComponent {
 
   ngOnInit(): void {
     this.loadOrganizationTaxRate();
+    this.loadWithholdingTaxTypes();
   }
 
   searchItems(): void {
@@ -111,24 +130,51 @@ export class CreateOrderPageComponent {
         ? 'Select a specific organization first.'
         : 'Logged in user has no organization assigned.';
       this.catalogItems = [];
+      this.catalogHasMore = false;
       return;
     }
 
     this.catalogLoading = true;
     this.error = '';
+    this.catalogPage = 1;
 
-    const query = encodeURIComponent(this.searchQuery.trim());
-    const orgId = encodeURIComponent(this.currentOrganizationId.trim());
-    const endpoint = `/api/v1/items?organizationId=${orgId}&q=${query}&isActive=true&limit=100`;
-
-    this.api.list<ItemRow>(endpoint).subscribe({
+    this.fetchCatalogPage(this.catalogPage, this.catalogInitialLimit).subscribe({
       next: (response: ApiResponse<ItemRow[]>) => {
         this.catalogLoading = false;
-        this.catalogItems = (response.data || []).filter((item) => item.isActive !== false);
+        const rows = (response.data || []).filter((item) => item.isActive !== false);
+        this.catalogItems = rows;
+        const total = Number(response.meta?.total || rows.length);
+        this.catalogHasMore = this.catalogItems.length < total;
       },
       error: (err) => {
         this.catalogLoading = false;
+        this.catalogHasMore = false;
+        this.catalogItems = [];
         this.error = err?.error?.message || 'Unable to search items.';
+      },
+    });
+  }
+
+  loadMoreItems(): void {
+    if (!this.catalogHasMore || this.catalogLoadingMore || this.catalogLoading) {
+      return;
+    }
+
+    this.catalogLoadingMore = true;
+    this.error = '';
+    const nextPage = Math.floor(this.catalogItems.length / this.catalogLoadMoreLimit) + 1;
+
+    this.fetchCatalogPage(nextPage, this.catalogLoadMoreLimit).subscribe({
+      next: (response: ApiResponse<ItemRow[]>) => {
+        this.catalogLoadingMore = false;
+        const incoming = (response.data || []).filter((item) => item.isActive !== false);
+        this.catalogItems = [...this.catalogItems, ...incoming];
+        const total = Number(response.meta?.total || this.catalogItems.length);
+        this.catalogHasMore = this.catalogItems.length < total;
+      },
+      error: (err) => {
+        this.catalogLoadingMore = false;
+        this.error = err?.error?.message || 'Unable to load more items.';
       },
     });
   }
@@ -210,6 +256,34 @@ export class CreateOrderPageComponent {
     entry.quantity += 1;
   }
 
+  updateQuantity(itemId: string, value: unknown): void {
+    const entry = this.cart.find((row) => row.item.id === itemId);
+    if (!entry) {
+      return;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+
+    let nextQuantity = Math.trunc(parsed);
+    if (nextQuantity < 1) {
+      nextQuantity = 1;
+    }
+
+    if (entry.item.type === 'product') {
+      const availableStock = this.maxStock(entry.item);
+      if (availableStock <= 0) {
+        this.message = `${entry.item.name} is currently out of stock.`;
+      } else if (nextQuantity > availableStock) {
+        this.message = `Quantity for ${entry.item.name} exceeds available stock (${availableStock}).`;
+      }
+    }
+
+    entry.quantity = nextQuantity;
+  }
+
   decrease(itemId: string): void {
     const entry = this.cart.find((row) => row.item.id === itemId);
     if (!entry) return;
@@ -272,8 +346,24 @@ export class CreateOrderPageComponent {
   }
 
   get totalAmount(): number {
-    const total = this.subtotalAmount + Number(this.shippingAmount || 0);
+    const total =
+      this.subtotalAmount + Number(this.shippingAmount || 0) - this.withHoldingTaxAmount;
     return Number(total.toFixed(2));
+  }
+
+  get selectedWithholdingTaxType(): WithholdingTaxTypeOption | undefined {
+    return this.withholdingTaxTypes.find((row) => row.id === this.withholdingTaxTypeId);
+  }
+
+  get withHoldingTaxAmount(): number {
+    if (!this.applyWithholdingTax || !this.withholdingTaxTypeId) {
+      return 0;
+    }
+    const percentage = Number(this.selectedWithholdingTaxType?.percentage || 0);
+    if (!Number.isFinite(percentage) || percentage <= 0) {
+      return 0;
+    }
+    return Number((this.taxableAmount * (percentage / 100)).toFixed(2));
   }
 
   placeOrder(): void {
@@ -295,8 +385,16 @@ export class CreateOrderPageComponent {
       this.error = 'Add at least one item to place an order.';
       return;
     }
+    const invalidStockEntry = this.cart.find(
+      (row) => row.item.type === 'product' && row.quantity > this.maxStock(row.item)
+    );
+    if (invalidStockEntry) {
+      this.error = `Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`;
+      return;
+    }
 
     const payload = {
+      organizationId: this.currentOrganizationId.trim(),
       orderNumber: this.orderNumber.trim(),
       customerId: this.selectedCustomerId.trim(),
       source: 'web',
@@ -306,6 +404,8 @@ export class CreateOrderPageComponent {
       currency: this.currentOrganizationCurrency,
       subtotalAmount: this.subtotalAmount,
       taxAmount: this.taxAmount,
+      withHoldingTaxAmount: this.withHoldingTaxAmount,
+      withholdingTaxTypeId: this.applyWithholdingTax && this.withholdingTaxTypeId ? this.withholdingTaxTypeId : null,
       discountAmount: this.discountAmount,
       shippingAmount: Number(this.shippingAmount || 0),
       totalAmount: this.totalAmount,
@@ -356,6 +456,48 @@ export class CreateOrderPageComponent {
 
   customerLabel(row: CustomerRow): string {
     return `${row.name} (${row.taxId})`;
+  }
+
+  onApplyWithholdingTaxChange(): void {
+    if (!this.applyWithholdingTax) {
+      this.withholdingTaxTypeId = '';
+    }
+  }
+
+  private loadWithholdingTaxTypes(): void {
+    const orgId = this.currentOrganizationId.trim();
+    if (!orgId) {
+      this.withholdingTaxTypes = [];
+      this.applyWithholdingTax = false;
+      this.withholdingTaxTypeId = '';
+      return;
+    }
+
+    this.withholdingTaxLoading = true;
+    const endpoint = `/api/v1/withholding-tax-types?organizationId=${encodeURIComponent(
+      orgId
+    )}&activeOnly=true`;
+    this.api.list<WithholdingTaxTypeOption>(endpoint).subscribe({
+      next: (response) => {
+        this.withholdingTaxLoading = false;
+        this.withholdingTaxTypes = response.data || [];
+      },
+      error: () => {
+        this.withholdingTaxLoading = false;
+        this.withholdingTaxTypes = [];
+      },
+    });
+  }
+
+  exceedsStock(row: CartItem): boolean {
+    return row.item.type === 'product' && row.quantity > this.maxStock(row.item);
+  }
+
+  private fetchCatalogPage(page: number, limit: number) {
+    const query = encodeURIComponent(this.searchQuery.trim());
+    const orgId = encodeURIComponent(this.currentOrganizationId.trim());
+    const endpoint = `/api/v1/items?organizationId=${orgId}&q=${query}&isActive=true&page=${page}&limit=${limit}`;
+    return this.api.list<ItemRow>(endpoint);
   }
 
   private loadOrganizationTaxRate(): void {

@@ -187,8 +187,16 @@ export class TaxTypesPageComponent {
     this.taxEditForm = this.newTaxForm();
   }
 
-  saveTaxEdit(): void {
+  async saveTaxEdit(): Promise<void> {
     if (!this.editingTaxId) return;
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Tax Type',
+      message: 'Save changes to this tax type?',
+      confirmText: 'Update Tax Type',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) return;
     this.submitting.set(true);
     this.error.set('');
     this.api
@@ -285,8 +293,16 @@ export class TaxTypesPageComponent {
     this.withholdingEditForm = this.newWithholdingForm();
   }
 
-  saveWithholdingEdit(): void {
+  async saveWithholdingEdit(): Promise<void> {
     if (!this.editingWithholdingId) return;
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Withholding Tax',
+      message: 'Save changes to this withholding tax type?',
+      confirmText: 'Update Withholding Tax',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) return;
     this.submitting.set(true);
     this.error.set('');
     this.api
@@ -387,4 +403,3 @@ export class TaxTypesPageComponent {
     };
   }
 }
-

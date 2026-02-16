@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
 interface CacheSettingPayload {
@@ -19,6 +20,7 @@ interface CacheSettingPayload {
 export class SettingsPageComponent {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly loading = signal(false);
   readonly submitting = signal(false);
@@ -58,9 +60,19 @@ export class SettingsPageComponent {
     });
   }
 
-  save(): void {
+  async save(): Promise<void> {
     if (!this.isSuperuser) {
       this.error.set('Only superuser can update cache settings.');
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Settings',
+      message: 'Save cache setting changes?',
+      confirmText: 'Save Settings',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-gear',
+    });
+    if (!confirmed) {
       return;
     }
 

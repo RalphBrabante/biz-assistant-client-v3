@@ -217,8 +217,18 @@ export class VendorsPageComponent {
     this.isEditModalOpen.set(false);
   }
 
-  saveEdit(): void {
+  async saveEdit(): Promise<void> {
     if (!this.editingId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Vendor',
+      message: 'Save changes to this vendor?',
+      confirmText: 'Update Vendor',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 

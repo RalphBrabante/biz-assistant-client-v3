@@ -204,8 +204,18 @@ export class UsersPageComponent {
     this.editForm = this.newUserForm(false);
   }
 
-  saveEdit(): void {
+  async saveEdit(): Promise<void> {
     if (!this.editingId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update User',
+      message: 'Save changes to this user?',
+      confirmText: 'Update User',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 

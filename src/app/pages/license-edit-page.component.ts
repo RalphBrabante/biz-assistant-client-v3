@@ -102,8 +102,18 @@ export class LicenseEditPageComponent {
     });
   }
 
-  save(): void {
+  async save(): Promise<void> {
     if (!this.licenseId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update License',
+      message: 'Save changes to this license?',
+      confirmText: 'Update License',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 

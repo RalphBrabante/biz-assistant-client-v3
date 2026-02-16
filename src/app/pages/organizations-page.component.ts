@@ -204,13 +204,23 @@ export class OrganizationsPageComponent {
     this.editForm = this.newOrgForm();
   }
 
-  saveEdit(): void {
+  async saveEdit(): Promise<void> {
     if (!this.editingId) {
       return;
     }
     const editValidationError = this.validateRequiredFields(this.editForm);
     if (editValidationError) {
       this.error.set(editValidationError);
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Organization',
+      message: 'Save changes to this organization?',
+      confirmText: 'Update Organization',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 

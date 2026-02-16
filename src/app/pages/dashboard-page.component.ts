@@ -27,18 +27,16 @@ interface DashboardMetrics {
   totalSalesInvoices: number | null;
 }
 
-interface QuarterlySalesReportRow {
-  quarter: number;
-  organizationId: string;
-  totalAmount: number;
-  currency: string;
+interface SalesInvoiceDashboardRow {
+  issueDate?: string;
+  totalAmount?: number;
+  currency?: string;
 }
 
-interface QuarterlyExpenseReportRow {
-  quarter: number;
-  organizationId: string;
-  totalAmount: number;
-  currency: string;
+interface ExpenseDashboardRow {
+  expenseDate?: string;
+  totalAmount?: number;
+  currency?: string;
 }
 
 @Component({
@@ -234,13 +232,15 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     this.chartError = '';
 
     const salesParams = new URLSearchParams({
-      year: String(this.selectedYear),
-      limit: '100',
+      issueDateFrom: `${this.selectedYear}-01-01`,
+      issueDateTo: `${this.selectedYear}-12-31`,
+      limit: '10000',
       page: '1',
     });
     const expenseParams = new URLSearchParams({
-      year: String(this.selectedYear),
-      limit: '100',
+      expenseDateFrom: `${this.selectedYear}-01-01`,
+      expenseDateTo: `${this.selectedYear}-12-31`,
+      limit: '10000',
       page: '1',
     });
 
@@ -250,11 +250,11 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     }
 
     forkJoin({
-      sales: this.api.list<QuarterlySalesReportRow>(`/api/v1/reports/quarterly-sales?${salesParams.toString()}`).pipe(
+      sales: this.api.list<SalesInvoiceDashboardRow>(`/api/v1/sales-invoices?${salesParams.toString()}`).pipe(
         map((response) => response.data || []),
         catchError(() => of([]))
       ),
-      expenses: this.api.list<QuarterlyExpenseReportRow>(`/api/v1/reports/quarterly-expenses?${expenseParams.toString()}`).pipe(
+      expenses: this.api.list<ExpenseDashboardRow>(`/api/v1/expenses?${expenseParams.toString()}`).pipe(
         map((response) => response.data || []),
         catchError(() => of([]))
       ),
@@ -267,13 +267,21 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
         };
 
         for (const row of sales) {
-          const qIndex = Math.max(1, Math.min(4, Number(row.quarter || 0))) - 1;
-          quarterTotals.sales[qIndex] = Number(row.totalAmount || 0);
+          const quarter = this.quarterFromDate(row.issueDate);
+          if (!quarter) {
+            continue;
+          }
+          const qIndex = quarter - 1;
+          quarterTotals.sales[qIndex] += Number(row.totalAmount || 0);
         }
 
         for (const row of expenses) {
-          const qIndex = Math.max(1, Math.min(4, Number(row.quarter || 0))) - 1;
-          quarterTotals.expenses[qIndex] = Number(row.totalAmount || 0);
+          const quarter = this.quarterFromDate(row.expenseDate);
+          if (!quarter) {
+            continue;
+          }
+          const qIndex = quarter - 1;
+          quarterTotals.expenses[qIndex] += Number(row.totalAmount || 0);
         }
 
         this.yearlySalesTotal = quarterTotals.sales.reduce((sum, value) => sum + value, 0);
@@ -288,6 +296,19 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
         this.chartError = 'Unable to load yearly sales and expense reports.';
       },
     });
+  }
+
+  private quarterFromDate(value: unknown): number | null {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return null;
+    }
+    const monthToken = raw.split('-')[1];
+    const month = Number(monthToken);
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      return null;
+    }
+    return Math.floor((month - 1) / 3) + 1;
   }
 
   private renderYearlyChart(sales: number[], expenses: number[]): void {

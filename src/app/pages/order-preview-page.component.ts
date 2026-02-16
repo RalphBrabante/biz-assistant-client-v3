@@ -32,6 +32,7 @@ interface CustomerRow {
 interface OrderSnapshotRow {
   id: string;
   itemId?: string;
+  type?: string;
   sku?: string;
   name?: string;
   quantity?: number;
@@ -60,14 +61,36 @@ interface OrderRow {
   status?: string;
   paymentStatus?: string;
   fulfillmentStatus?: string;
+  subtotalAmount?: number;
+  taxAmount?: number;
+  withHoldingTaxAmount?: number;
+  withholdingTaxTypeId?: string | null;
+  discountAmount?: number;
+  totalAmount?: number;
   shippingAmount?: number;
   notes?: string;
   orderedItemSnapshots?: OrderSnapshotRow[];
+  withholdingTaxType?: {
+    id: string;
+    code?: string;
+    name?: string;
+    percentage?: number;
+    appliesTo?: 'expense' | 'invoice' | 'both';
+  };
 }
 
 interface CartItem {
   item: ItemRow;
   quantity: number;
+}
+
+interface WithholdingTaxTypeOption {
+  id: string;
+  code?: string;
+  name?: string;
+  percentage?: number;
+  appliesTo?: 'expense' | 'invoice' | 'both';
+  isActive?: boolean;
 }
 
 @Component({
@@ -101,12 +124,23 @@ export class OrderPreviewPageComponent {
 
   itemSearchQuery = '';
   catalogItems: ItemRow[] = [];
+  catalogHasMore = false;
+  catalogLoadingMore = false;
+  private catalogCurrentLimit = 10;
+  private readonly catalogInitialLimit = 10;
+  private readonly catalogLoadMoreStep = 5;
+  private catalogLookup = new Map<string, ItemRow>();
   catalogLoading = false;
   cart: CartItem[] = [];
   showCompleteModal = false;
   completionSalesInvoiceId = '';
   completionSalesInvoiceIssueDate = '';
   completionModalError = '';
+  organizationVatRate = 0;
+  applyWithholdingTax = false;
+  withholdingTaxTypeId = '';
+  withholdingTaxTypes: WithholdingTaxTypeOption[] = [];
+  loadingWithholdingTaxTypes = false;
 
   ngOnInit(): void {
     this.orderId = String(this.route.snapshot.paramMap.get('id') || '');
@@ -133,6 +167,10 @@ export class OrderPreviewPageComponent {
     this.loading = true;
     this.error = '';
     this.message = '';
+    this.catalogItems = [];
+    this.catalogHasMore = false;
+    this.catalogLoadingMore = false;
+    this.catalogCurrentLimit = this.catalogInitialLimit;
 
     this.api.get<OrderRow>(`/api/v1/orders/${this.orderId}`).subscribe({
       next: (response: ApiResponse<OrderRow>) => {
@@ -149,14 +187,39 @@ export class OrderPreviewPageComponent {
         this.fulfillmentStatus = String(order.fulfillmentStatus || 'unfulfilled');
         this.shippingAmount = Number(order.shippingAmount || 0);
         this.notes = String(order.notes || '');
+        this.applyWithholdingTax = Boolean(order.withholdingTaxTypeId);
+        this.withholdingTaxTypeId = String(order.withholdingTaxTypeId || '');
         this.selectedCustomerId = String(order.customerId || order.customer?.id || '');
         this.customerResults = order.customer ? [{ id: order.customer.id, organizationId: order.organizationId, name: order.customer.name || '', taxId: order.customer.taxId || '' }] : [];
 
+        this.loadOrganizationTaxRate();
+        this.loadWithholdingTaxTypes();
         this.loadItemsForOrganization();
       },
       error: (err) => {
         this.loading = false;
         this.error = err?.error?.message || 'Unable to load order.';
+      },
+    });
+  }
+
+  loadOrganizationTaxRate(): void {
+    if (!this.organizationId) {
+      this.organizationVatRate = 0;
+      return;
+    }
+
+    this.api.get<{ taxType?: { percentage?: number } }>(`/api/v1/organizations/${this.organizationId}`).subscribe({
+      next: (response) => {
+        const percentage = Number(response.data?.taxType?.percentage ?? NaN);
+        if (Number.isFinite(percentage) && percentage > 0) {
+          this.organizationVatRate = Number(percentage.toFixed(2));
+          return;
+        }
+        this.organizationVatRate = this.derivedVatRateFromOrder();
+      },
+      error: () => {
+        this.organizationVatRate = this.derivedVatRateFromOrder();
       },
     });
   }
@@ -168,7 +231,11 @@ export class OrderPreviewPageComponent {
     this.api.list<ItemRow>(`/api/v1/items?organizationId=${encodeURIComponent(this.organizationId)}&isActive=true&limit=300`).subscribe({
       next: (response: ApiResponse<ItemRow[]>) => {
         this.catalogLoading = false;
-        this.catalogItems = response.data || [];
+        const allItems = response.data || [];
+        this.catalogLookup = new Map(allItems.map((item) => [item.id, item]));
+        this.catalogItems = [];
+        this.catalogHasMore = false;
+        this.catalogCurrentLimit = this.catalogInitialLimit;
         this.initializeCartFromOrder();
       },
       error: (err) => {
@@ -180,13 +247,25 @@ export class OrderPreviewPageComponent {
 
   initializeCartFromOrder(): void {
     const snapshots = this.order?.orderedItemSnapshots || [];
-    const byId = new Map(this.catalogItems.map((item) => [item.id, item]));
+    const byId = this.catalogLookup;
     this.cart = snapshots
       .map((row) => {
         const itemId = String(row.itemId || '');
         if (!itemId) return null;
-        const item = byId.get(itemId);
-        if (!item) return null;
+        const item =
+          byId.get(itemId) ||
+          ({
+            id: itemId,
+            organizationId: this.organizationId,
+            type: row.type || 'product',
+            name: row.name || 'Unknown Item',
+            sku: row.sku || '',
+            price: Number(row.unitPrice ?? 0),
+            discountedPrice: Number(row.discountedUnitPrice ?? row.unitPrice ?? 0),
+            currency: row.currency || this.orderCurrency,
+            stock: 0,
+            isActive: true,
+          } as ItemRow);
         return {
           item,
           quantity: Math.max(1, Number(row.quantity || 1)),
@@ -204,17 +283,53 @@ export class OrderPreviewPageComponent {
 
     this.catalogLoading = true;
     this.error = '';
+    this.catalogCurrentLimit = this.catalogInitialLimit;
     const q = encodeURIComponent(this.itemSearchQuery.trim());
     this.api
-      .list<ItemRow>(`/api/v1/items?organizationId=${encodeURIComponent(this.organizationId)}&q=${q}&isActive=true&limit=100`)
+      .list<ItemRow>(
+        `/api/v1/items?organizationId=${encodeURIComponent(this.organizationId)}&q=${q}&isActive=true&page=1&limit=${this.catalogCurrentLimit}`
+      )
       .subscribe({
         next: (response: ApiResponse<ItemRow[]>) => {
           this.catalogLoading = false;
-          this.catalogItems = response.data || [];
+          const rows = response.data || [];
+          this.catalogItems = rows;
+          const total = Number(response.meta?.total || rows.length);
+          this.catalogHasMore = this.catalogItems.length < total;
         },
         error: (err) => {
           this.catalogLoading = false;
+          this.catalogHasMore = false;
+          this.catalogItems = [];
           this.error = err?.error?.message || 'Unable to search items.';
+        },
+      });
+  }
+
+  loadMoreItems(): void {
+    if (this.isLocked || this.catalogLoading || this.catalogLoadingMore || !this.catalogHasMore) {
+      return;
+    }
+
+    this.catalogLoadingMore = true;
+    this.error = '';
+    this.catalogCurrentLimit += this.catalogLoadMoreStep;
+    const q = encodeURIComponent(this.itemSearchQuery.trim());
+    this.api
+      .list<ItemRow>(
+        `/api/v1/items?organizationId=${encodeURIComponent(this.organizationId)}&q=${q}&isActive=true&page=1&limit=${this.catalogCurrentLimit}`
+      )
+      .subscribe({
+        next: (response: ApiResponse<ItemRow[]>) => {
+          this.catalogLoadingMore = false;
+          const rows = response.data || [];
+          this.catalogItems = rows;
+          const total = Number(response.meta?.total || rows.length);
+          this.catalogHasMore = this.catalogItems.length < total;
+        },
+        error: (err) => {
+          this.catalogLoadingMore = false;
+          this.error = err?.error?.message || 'Unable to load more items.';
         },
       });
   }
@@ -279,6 +394,34 @@ export class OrderPreviewPageComponent {
     }
   }
 
+  updateQuantity(itemId: string, value: unknown): void {
+    if (this.isLocked) return;
+    const entry = this.cart.find((row) => row.item.id === itemId);
+    if (!entry) {
+      return;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+
+    let nextQuantity = Math.trunc(parsed);
+    if (nextQuantity < 1) {
+      nextQuantity = 1;
+    }
+
+    if (entry.item.type === 'product') {
+      const availableStock = this.maxStock(entry.item);
+      if (availableStock <= 0) {
+        this.message = `${entry.item.name} is currently out of stock.`;
+      } else if (nextQuantity > availableStock) {
+        this.message = `Quantity for ${entry.item.name} exceeds available stock (${availableStock}).`;
+      }
+    }
+
+    entry.quantity = nextQuantity;
+  }
+
   async removeFromCart(itemId: string): Promise<void> {
     if (this.isLocked) return;
     const confirmed = await this.confirmDialog.confirm({
@@ -308,16 +451,27 @@ export class OrderPreviewPageComponent {
 
   get subtotalAmount(): number {
     const subtotal = this.cart.reduce((acc, row) => acc + this.itemUnitPrice(row.item) * row.quantity, 0);
-    return Number(subtotal.toFixed(2));
+    const computed = Number(subtotal.toFixed(2));
+    if (computed > 0) return computed;
+    return Number(Number(this.order?.subtotalAmount || 0).toFixed(2));
+  }
+
+  get taxableAmount(): number {
+    const rate = Number(this.organizationVatRate || 0);
+    if (rate <= 0) {
+      return this.subtotalAmount;
+    }
+    return Number((this.subtotalAmount / (1 + rate / 100)).toFixed(2));
   }
 
   get taxAmount(): number {
-    const tax = this.cart.reduce((acc, row) => {
-      const base = this.itemUnitPrice(row.item) * row.quantity;
-      const rate = Number(row.item.taxRate ?? 0) / 100;
-      return acc + base * rate;
-    }, 0);
-    return Number(tax.toFixed(2));
+    const rate = Number(this.organizationVatRate || 0);
+    if (rate <= 0) {
+      return Number(Number(this.order?.taxAmount || 0).toFixed(2));
+    }
+    const computed = Number((this.taxableAmount * (rate / 100)).toFixed(2));
+    if (computed > 0) return computed;
+    return Number(Number(this.order?.taxAmount || 0).toFixed(2));
   }
 
   get discountAmount(): number {
@@ -326,11 +480,28 @@ export class OrderPreviewPageComponent {
       const effective = this.itemUnitPrice(row.item) * row.quantity;
       return acc + Math.max(0, full - effective);
     }, 0);
-    return Number(discount.toFixed(2));
+    const computed = Number(discount.toFixed(2));
+    if (computed > 0) return computed;
+    return Number(Number(this.order?.discountAmount || 0).toFixed(2));
   }
 
   get totalAmount(): number {
-    return Number((this.subtotalAmount + this.taxAmount + Number(this.shippingAmount || 0)).toFixed(2));
+    return Number((this.subtotalAmount + Number(this.shippingAmount || 0) - this.withHoldingTaxAmount).toFixed(2));
+  }
+
+  get selectedWithholdingTaxType(): WithholdingTaxTypeOption | undefined {
+    return this.withholdingTaxTypes.find((row) => row.id === this.withholdingTaxTypeId);
+  }
+
+  get withHoldingTaxAmount(): number {
+    if (!this.applyWithholdingTax || !this.withholdingTaxTypeId) {
+      return 0;
+    }
+    const percentage = Number(this.selectedWithholdingTaxType?.percentage || 0);
+    if (!Number.isFinite(percentage) || percentage <= 0) {
+      return 0;
+    }
+    return Number((this.taxableAmount * (percentage / 100)).toFixed(2));
   }
 
   get selectedCustomer(): CustomerRow | undefined {
@@ -341,6 +512,17 @@ export class OrderPreviewPageComponent {
     return this.order?.orderedItemSnapshots || [];
   }
 
+  get printProductLines(): OrderSnapshotRow[] {
+    return this.deliveryLines.filter((line) => {
+      const snapshotType = String(line.type || '').toLowerCase();
+      if (snapshotType) {
+        return snapshotType === 'product';
+      }
+      const catalogType = String(this.catalogLookup.get(String(line.itemId || ''))?.type || '').toLowerCase();
+      return catalogType === 'product';
+    });
+  }
+
   get deliverySubtotal(): number {
     const value = this.deliveryLines.reduce((acc, row) => acc + Number(row.lineSubtotal || 0), 0);
     return Number(value.toFixed(2));
@@ -348,20 +530,56 @@ export class OrderPreviewPageComponent {
 
   get deliveryTax(): number {
     const value = this.deliveryLines.reduce((acc, row) => acc + Number(row.lineTax || 0), 0);
-    return Number(value.toFixed(2));
+    const computed = Number(value.toFixed(2));
+    if (computed > 0) return computed;
+    return Number(Number(this.order?.taxAmount || 0).toFixed(2));
+  }
+
+  get deliveryTaxable(): number {
+    const taxable = this.deliverySubtotal - this.deliveryTax;
+    return Number(Math.max(0, taxable).toFixed(2));
   }
 
   get deliveryDiscount(): number {
     const value = this.deliveryLines.reduce((acc, row) => acc + Number(row.lineDiscount || 0), 0);
-    return Number(value.toFixed(2));
+    const computed = Number(value.toFixed(2));
+    if (computed > 0) return computed;
+    return Number(Number(this.order?.discountAmount || 0).toFixed(2));
   }
 
   get deliveryTotal(): number {
-    const value = this.deliveryLines.reduce((acc, row) => acc + Number(row.lineTotal || 0), 0) + Number(this.shippingAmount || 0);
+    const value = this.deliveryLines.reduce((acc, row) => acc + Number(row.lineTotal || 0), 0);
+    const computed = Number((value + Number(this.shippingAmount || 0)).toFixed(2));
+    if (computed > 0) return computed;
+    return Number(Number(this.order?.totalAmount || 0).toFixed(2));
+  }
+
+  get printSubtotal(): number {
+    const value = this.printProductLines.reduce((acc, row) => acc + Number(row.lineSubtotal || 0), 0);
     return Number(value.toFixed(2));
   }
 
-  saveOrder(): void {
+  get printTax(): number {
+    const value = this.printProductLines.reduce((acc, row) => acc + Number(row.lineTax || 0), 0);
+    return Number(value.toFixed(2));
+  }
+
+  get printTaxable(): number {
+    const taxable = this.printSubtotal - this.printTax;
+    return Number(Math.max(0, taxable).toFixed(2));
+  }
+
+  get printDiscount(): number {
+    const value = this.printProductLines.reduce((acc, row) => acc + Number(row.lineDiscount || 0), 0);
+    return Number(value.toFixed(2));
+  }
+
+  get printTotal(): number {
+    const value = this.printProductLines.reduce((acc, row) => acc + Number(row.lineTotal || 0), 0);
+    return Number((value + Number(this.shippingAmount || 0)).toFixed(2));
+  }
+
+  async saveOrder(): Promise<void> {
     if (this.isCompleted) {
       this.error = 'Completed orders are locked and can no longer be edited.';
       return;
@@ -373,6 +591,13 @@ export class OrderPreviewPageComponent {
     }
     if (this.cart.length === 0) {
       this.error = 'Order must have at least one item.';
+      return;
+    }
+    const invalidStockEntry = this.cart.find(
+      (row) => row.item.type === 'product' && row.quantity > this.maxStock(row.item)
+    );
+    if (invalidStockEntry) {
+      this.error = `Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`;
       return;
     }
 
@@ -387,6 +612,8 @@ export class OrderPreviewPageComponent {
       shippingAmount: Number(this.shippingAmount || 0),
       subtotalAmount: this.subtotalAmount,
       taxAmount: this.taxAmount,
+      withHoldingTaxAmount: this.withHoldingTaxAmount,
+      withholdingTaxTypeId: this.applyWithholdingTax && this.withholdingTaxTypeId ? this.withholdingTaxTypeId : null,
       discountAmount: this.discountAmount,
       totalAmount: this.totalAmount,
       notes: this.notes.trim() || undefined,
@@ -405,6 +632,17 @@ export class OrderPreviewPageComponent {
       this.completionSalesInvoiceIssueDate = this.todayIsoDate();
       this.completionModalError = '';
       this.showCompleteModal = true;
+      return;
+    }
+
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Order',
+      message: 'Save changes to this order?',
+      confirmText: 'Update Order',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -433,6 +671,8 @@ export class OrderPreviewPageComponent {
       shippingAmount: Number(this.shippingAmount || 0),
       subtotalAmount: this.subtotalAmount,
       taxAmount: this.taxAmount,
+      withHoldingTaxAmount: this.withHoldingTaxAmount,
+      withholdingTaxTypeId: this.applyWithholdingTax && this.withholdingTaxTypeId ? this.withholdingTaxTypeId : null,
       discountAmount: this.discountAmount,
       totalAmount: this.totalAmount,
       notes: this.notes.trim() || undefined,
@@ -475,11 +715,59 @@ export class OrderPreviewPageComponent {
     return `${row.name} (${row.taxId})`;
   }
 
+  onApplyWithholdingTaxChange(): void {
+    if (!this.applyWithholdingTax) {
+      this.withholdingTaxTypeId = '';
+    }
+  }
+
+  get orderCurrency(): string {
+    const snapshots = this.order?.orderedItemSnapshots || [];
+    return String(snapshots[0]?.currency || 'USD').toUpperCase();
+  }
+
+  exceedsStock(row: CartItem): boolean {
+    return row.item.type === 'product' && row.quantity > this.maxStock(row.item);
+  }
+
   printOrder(): void {
     window.print();
   }
 
   private todayIsoDate(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  private derivedVatRateFromOrder(): number {
+    const subtotal = Number(this.order?.subtotalAmount || 0);
+    const tax = Number(this.order?.taxAmount || 0);
+    const taxable = subtotal - tax;
+    if (subtotal > 0 && tax > 0 && taxable > 0) {
+      return Number(((tax / taxable) * 100).toFixed(2));
+    }
+    const snapshotRate = Number(this.order?.orderedItemSnapshots?.[0]?.taxRate ?? 0);
+    return Number.isFinite(snapshotRate) && snapshotRate > 0 ? Number(snapshotRate.toFixed(2)) : 0;
+  }
+
+  private loadWithholdingTaxTypes(): void {
+    if (!this.organizationId) {
+      this.withholdingTaxTypes = [];
+      return;
+    }
+    this.loadingWithholdingTaxTypes = true;
+    this.api
+      .list<WithholdingTaxTypeOption>(
+        `/api/v1/withholding-tax-types?organizationId=${encodeURIComponent(this.organizationId)}&activeOnly=true`
+      )
+      .subscribe({
+        next: (response) => {
+          this.loadingWithholdingTaxTypes = false;
+          this.withholdingTaxTypes = response.data || [];
+        },
+        error: () => {
+          this.loadingWithholdingTaxTypes = false;
+          this.withholdingTaxTypes = [];
+        },
+      });
   }
 }

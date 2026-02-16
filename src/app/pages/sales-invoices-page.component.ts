@@ -17,13 +17,16 @@ interface SalesInvoiceRow {
     name?: string;
     legalName?: string;
   };
-  orderId: string;
+  orderId?: string;
   invoiceNumber: string;
   issueDate: string;
   dueDate?: string;
   status?: string;
   paymentStatus?: string;
   currency?: string;
+  amount?: number;
+  taxableAmount?: number;
+  withHoldingTaxAmount?: number;
   subtotalAmount?: number;
   taxAmount?: number;
   discountAmount?: number;
@@ -32,6 +35,14 @@ interface SalesInvoiceRow {
   notes?: string;
   createdBy?: string;
   updatedBy?: string;
+}
+
+interface SalesInvoiceImportSummary {
+  imported: number;
+  updated: number;
+  skipped: number;
+  totalRows: number;
+  errors: string[];
 }
 
 @Component({
@@ -57,7 +68,14 @@ export class SalesInvoicesPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly importModalError = signal('');
-  readonly filter = signal('');
+  readonly importSummary = signal<SalesInvoiceImportSummary | null>(null);
+  searchQuery = '';
+  statusFilter = '';
+  paymentStatusFilter = '';
+  issueDateFrom = '';
+  issueDateTo = '';
+  sortBy = 'createdAt';
+  sortDirection: 'asc' | 'desc' = 'desc';
   page = 1;
   pageSize = 20;
   total = 0;
@@ -66,22 +84,11 @@ export class SalesInvoicesPageComponent {
 
   createForm: Record<string, unknown> = this.newInvoiceForm();
   private importFile: File | null = null;
+  forceImport = false;
 
-  readonly filteredRows = computed(() => {
-    const q = this.filter().trim().toLowerCase();
-    if (!q) {
-      return this.rows();
-    }
-
-    return this.rows().filter((row) => {
-      return (
-        String(row.invoiceNumber || '').toLowerCase().includes(q) ||
-        String(row.organizationId || '').toLowerCase().includes(q) ||
-        String(row.orderId || '').toLowerCase().includes(q) ||
-        String(row.status || '').toLowerCase().includes(q)
-      );
-    });
-  });
+  readonly sortIcon = computed(() =>
+    this.sortDirection === 'asc' ? 'bi-sort-up-alt' : 'bi-sort-down-alt'
+  );
 
   get currentOrganizationId(): string {
     return this.organizationContext.getActiveOrganizationId();
@@ -102,13 +109,30 @@ export class SalesInvoicesPageComponent {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    const q = this.filter().trim();
     const params = new URLSearchParams({
       page: String(this.page),
       limit: String(this.pageSize),
+      sortBy: this.sortBy,
+      sortDirection: this.sortDirection,
     });
+    const q = this.searchQuery.trim();
     if (q) {
       params.set('q', q);
+    }
+    if (this.statusFilter) {
+      params.set('status', this.statusFilter);
+    }
+    if (this.paymentStatusFilter) {
+      params.set('paymentStatus', this.paymentStatusFilter);
+    }
+    if (this.issueDateFrom) {
+      params.set('issueDateFrom', this.issueDateFrom);
+    }
+    if (this.issueDateTo) {
+      params.set('issueDateTo', this.issueDateTo);
+    }
+    if (this.currentOrganizationId) {
+      params.set('organizationId', this.currentOrganizationId);
     }
 
     this.api.list<SalesInvoiceRow>(`/api/v1/sales-invoices?${params.toString()}`).subscribe({
@@ -145,6 +169,7 @@ export class SalesInvoicesPageComponent {
 
   openImportModal(): void {
     this.importFile = null;
+    this.forceImport = false;
     this.importModalError.set('');
     this.message.set('');
     this.error.set('');
@@ -154,6 +179,7 @@ export class SalesInvoicesPageComponent {
   closeImportModal(): void {
     this.isImportModalOpen.set(false);
     this.importFile = null;
+    this.forceImport = false;
     this.importModalError.set('');
   }
 
@@ -209,9 +235,13 @@ export class SalesInvoicesPageComponent {
     this.importModalError.set('');
     this.error.set('');
     this.message.set('');
+    this.importSummary.set(null);
 
     const formData = new FormData();
     formData.append('file', this.importFile);
+    if (this.forceImport) {
+      formData.append('forceImport', 'true');
+    }
     if (this.currentOrganizationId.trim()) {
       formData.append('organizationId', this.currentOrganizationId.trim());
     }
@@ -222,8 +252,20 @@ export class SalesInvoicesPageComponent {
         this.closeImportModal();
         const data = (response.data || {}) as Record<string, unknown>;
         const imported = Number(data['imported'] || 0);
+        const updated = Number(data['updated'] || 0);
         const skipped = Number(data['skipped'] || 0);
-        this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
+        const totalRows = Number(data['totalRows'] || imported + updated + skipped);
+        const errors = Array.isArray(data['errors'])
+          ? data['errors'].map((row) => String(row || '').trim()).filter((row) => row.length > 0)
+          : [];
+        this.importSummary.set({
+          imported,
+          updated,
+          skipped,
+          totalRows,
+          errors,
+        });
+        this.message.set(response.message || `Imported ${imported}, updated ${updated}, skipped ${skipped}.`);
         this.load();
       },
       error: (err) => {
@@ -233,16 +275,37 @@ export class SalesInvoicesPageComponent {
     });
   }
 
+  clearImportSummary(): void {
+    this.importSummary.set(null);
+  }
+
   exportSalesInvoicesCsv(): void {
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');
 
     const params = new URLSearchParams();
-    const q = this.filter().trim();
+    const q = this.searchQuery.trim();
     if (q) {
       params.set('q', q);
     }
+    if (this.statusFilter) {
+      params.set('status', this.statusFilter);
+    }
+    if (this.paymentStatusFilter) {
+      params.set('paymentStatus', this.paymentStatusFilter);
+    }
+    if (this.issueDateFrom) {
+      params.set('issueDateFrom', this.issueDateFrom);
+    }
+    if (this.issueDateTo) {
+      params.set('issueDateTo', this.issueDateTo);
+    }
+    if (this.currentOrganizationId) {
+      params.set('organizationId', this.currentOrganizationId);
+    }
+    params.set('sortBy', this.sortBy);
+    params.set('sortDirection', this.sortDirection);
 
     this.api.download(`/api/v1/sales-invoices/export?${params.toString()}`).subscribe({
       next: (blob) => {
@@ -296,8 +359,36 @@ export class SalesInvoicesPageComponent {
     return row.id;
   }
 
-  onFilterChange(value: string): void {
-    this.filter.set(value);
+  onFilterChange(): void {
+    this.page = 1;
+    this.load();
+  }
+
+  clearFilters(): void {
+    this.searchQuery = '';
+    this.statusFilter = '';
+    this.paymentStatusFilter = '';
+    this.issueDateFrom = '';
+    this.issueDateTo = '';
+    this.sortBy = 'createdAt';
+    this.sortDirection = 'desc';
+    this.page = 1;
+    this.load();
+  }
+
+  setSort(sortBy: string): void {
+    if (this.sortBy === sortBy) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortBy = sortBy;
+      this.sortDirection = 'desc';
+    }
+    this.page = 1;
+    this.load();
+  }
+
+  toggleSortDirection(): void {
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
     this.page = 1;
     this.load();
   }
@@ -366,6 +457,9 @@ export class SalesInvoicesPageComponent {
       status: 'draft',
       paymentStatus: 'unpaid',
       currency: this.currentOrganizationCurrency,
+      amount: 0,
+      taxableAmount: 0,
+      withHoldingTaxAmount: 0,
       subtotalAmount: 0,
       taxAmount: 0,
       discountAmount: 0,
@@ -380,12 +474,15 @@ export class SalesInvoicesPageComponent {
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
     return {
       organizationId: this.asString(form['organizationId']),
-      orderId: this.asString(form['orderId']),
+      orderId: this.optionalString(form['orderId']),
       invoiceNumber: this.asString(form['invoiceNumber']),
       issueDate: this.asString(form['issueDate']),
       dueDate: this.optionalString(form['dueDate']),
       status: this.optionalString(form['status']),
       paymentStatus: this.optionalString(form['paymentStatus']),
+      amount: this.optionalNumber(form['amount']),
+      taxableAmount: this.optionalNumber(form['taxableAmount']),
+      withHoldingTaxAmount: this.optionalNumber(form['withHoldingTaxAmount']),
       subtotalAmount: this.optionalNumber(form['subtotalAmount']),
       taxAmount: this.optionalNumber(form['taxAmount']),
       discountAmount: this.optionalNumber(form['discountAmount']),

@@ -8,7 +8,7 @@
       </div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-dark" (click)="load()" [disabled]="loading()">
-          {{ loading() ? 'Refreshing...' : 'Refresh' }}
+          <i class="bi bi-arrow-clockwise me-1"></i>{{ loading() ? 'Refreshing...' : 'Refresh' }}
         </button>
         <button class="btn btn-outline-success" (click)="exportSalesInvoicesCsv()" [disabled]="exporting()">
           <i class="bi bi-download me-1"></i>{{ exporting() ? 'Exporting...' : 'Export CSV' }}
@@ -25,15 +25,68 @@
 <section class="card border-0 shadow-sm rounded-4 mb-4">
   <div class="card-body p-4">
     <div class="row g-3 align-items-center">
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-4">
         <label class="form-label fw-semibold">Filter invoices</label>
         <input
           type="text"
           class="form-control"
-          placeholder="Search by invoice #, org, order, status"
-          [ngModel]="filter()"
-          (ngModelChange)="onFilterChange($event)"
+          placeholder="Invoice #, status, payment, order"
+          [(ngModel)]="searchQuery"
+          (ngModelChange)="onFilterChange()"
         />
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Status</label>
+        <select class="form-select" [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
+          <option value="">All</option>
+          <option value="draft">draft</option>
+          <option value="issued">issued</option>
+          <option value="sent">sent</option>
+          <option value="partially_paid">partially_paid</option>
+          <option value="paid">paid</option>
+          <option value="overdue">overdue</option>
+          <option value="void">void</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Payment</label>
+        <select class="form-select" [(ngModel)]="paymentStatusFilter" (ngModelChange)="onFilterChange()">
+          <option value="">All</option>
+          <option value="unpaid">unpaid</option>
+          <option value="partially_paid">partially_paid</option>
+          <option value="paid">paid</option>
+          <option value="refunded">refunded</option>
+          <option value="failed">failed</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Issue Date From</label>
+        <input type="date" class="form-control" [(ngModel)]="issueDateFrom" (ngModelChange)="onFilterChange()" />
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Issue Date To</label>
+        <input type="date" class="form-control" [(ngModel)]="issueDateTo" (ngModelChange)="onFilterChange()" />
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Sort By</label>
+        <select class="form-select" [ngModel]="sortBy" (ngModelChange)="setSort($event)">
+          <option value="createdAt">Created</option>
+          <option value="updatedAt">Updated</option>
+          <option value="invoiceNumber">Invoice #</option>
+          <option value="issueDate">Issue Date</option>
+          <option value="dueDate">Due Date</option>
+          <option value="status">Status</option>
+          <option value="paymentStatus">Payment</option>
+          <option value="amount">Amount</option>
+          <option value="totalAmount">Total</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Sort Direction</label>
+        <button class="btn btn-outline-secondary w-100" type="button" (click)="toggleSortDirection()">
+          <i class="bi" [ngClass]="sortIcon()"></i>
+          {{ sortDirection === 'asc' ? 'Ascending' : 'Descending' }}
+        </button>
       </div>
       <div class="col-6 col-md-2">
         <label class="form-label fw-semibold">Rows per page</label>
@@ -53,10 +106,37 @@
           <div class="stat-value">{{ page }} / {{ totalPages }}</div>
         </div>
       </div>
+      <div class="col-12 col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-secondary w-100" type="button" (click)="clearFilters()">
+          <i class="bi bi-funnel me-1"></i>Clear Filters
+        </button>
+      </div>
     </div>
 
     <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
     <div *ngIf="error()" class="alert alert-danger mt-3 mb-0">{{ error() }}</div>
+    <div *ngIf="importSummary() as summary" class="alert alert-info mt-3 mb-0">
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <div class="fw-semibold">Import Summary</div>
+          <div class="small">
+            Processed {{ summary.totalRows }} rows.
+            Imported: {{ summary.imported }}.
+            Updated: {{ summary.updated }}.
+            Skipped: {{ summary.skipped }}.
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearImportSummary()">
+          <i class="bi bi-x-lg me-1"></i>Dismiss
+        </button>
+      </div>
+      <div *ngIf="summary.skipped > 0 && summary.errors.length > 0" class="mt-3">
+        <div class="small fw-semibold mb-2">Skipped row details</div>
+        <ul class="small mb-0 ps-3">
+          <li *ngFor="let rowError of summary.errors">{{ rowError }}</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -70,20 +150,22 @@
           <th>Order</th>
           <th>Status</th>
           <th>Payment</th>
+          <th>Amount</th>
+          <th>Taxable</th>
           <th>Total</th>
           <th>Issue Date</th>
           <th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngIf="!loading() && filteredRows().length === 0">
-          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center text-secondary py-4">No sales invoices found.</td>
+        <tr *ngIf="!loading() && rows().length === 0">
+          <td [attr.colspan]="isSuperuser ? 10 : 9" class="text-center text-secondary py-4">No sales invoices found.</td>
         </tr>
 
-        <tr *ngFor="let row of filteredRows(); trackBy: trackById">
+        <tr *ngFor="let row of rows(); trackBy: trackById">
           <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
           <td class="fw-semibold">{{ row.invoiceNumber }}</td>
-          <td class="small">{{ row.orderId }}</td>
+          <td class="small">{{ row.orderId || '-' }}</td>
           <td>
             <span class="badge rounded-pill" [ngClass]="invoiceStatusBadgeClass(row.status)">
               {{ row.status || '-' }}
@@ -94,6 +176,8 @@
               {{ row.paymentStatus || '-' }}
             </span>
           </td>
+          <td>{{ row.amount ?? row.subtotalAmount ?? 0 }}</td>
+          <td>{{ row.taxableAmount ?? ((row.amount ?? row.subtotalAmount ?? 0) - (row.taxAmount ?? 0)) }}</td>
           <td>{{ row.totalAmount ?? 0 }}</td>
           <td>
             <span class="badge rounded-pill text-bg-light border border-secondary-subtle text-secondary">
@@ -124,10 +208,10 @@
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
     <div class="small text-secondary">Showing {{ rows().length }} of {{ total }} invoices</div>
     <div class="btn-group">
-      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(1)" [disabled]="loading() || page <= 1">First</button>
-      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading() || page <= 1">Prev</button>
-      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading() || page >= totalPages">Next</button>
-      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading() || page >= totalPages">Last</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(1)" [disabled]="loading() || page <= 1"><i class="bi bi-chevron-double-left"></i></button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading() || page <= 1"><i class="bi bi-chevron-left"></i></button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading() || page >= totalPages"><i class="bi bi-chevron-right"></i></button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading() || page >= totalPages"><i class="bi bi-chevron-double-right"></i></button>
     </div>
   </div>
 </section>
@@ -153,7 +237,7 @@
             <input class="form-control" [value]="currentOrganizationId || 'No organization on logged in user'" readonly />
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Order ID</label>
+            <label class="form-label fw-semibold">Order ID (Optional)</label>
             <input class="form-control" [(ngModel)]="createForm['orderId']" />
           </div>
           <div class="col-12 col-md-4">
@@ -179,12 +263,20 @@
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Subtotal</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['subtotalAmount']" />
+            <label class="form-label fw-semibold">Amount</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['amount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Tax</label>
             <input type="number" class="form-control" [(ngModel)]="createForm['taxAmount']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Taxable Amount</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['taxableAmount']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Withholding Tax Amount</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['withHoldingTaxAmount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Discount</label>
@@ -232,10 +324,16 @@
       </div>
       <div class="modal-body pt-3">
         <div class="small text-secondary mb-2">
-          Required columns: <code>orderId</code>, <code>invoiceNumber</code>, <code>issueDate</code>
+          Required columns: <code>invoiceNumber</code>, <code>issueDate</code>
         </div>
         <div class="small text-secondary mb-3">
-          Optional columns: dueDate, status, paymentStatus, subtotalAmount, taxAmount, discountAmount, totalAmount, paidAt, notes
+          Optional columns: orderId, dueDate, status, paymentStatus, amount, taxableAmount, taxAmount, withHoldingTaxAmount, discountAmount, totalAmount, paidAt, notes
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="forceImportInvoices" [(ngModel)]="forceImport" />
+          <label class="form-check-label" for="forceImportInvoices">
+            Force Import (overwrite existing records by invoice number or order)
+          </label>
         </div>
         <input type="file" class="form-control" accept=".csv,text/csv" (change)="onImportFileChange($event)" />
         <div *ngIf="importModalError()" class="alert alert-danger py-2 mt-3 mb-0">{{ importModalError() }}</div>

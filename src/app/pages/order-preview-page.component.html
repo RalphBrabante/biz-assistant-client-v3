@@ -37,6 +37,31 @@
         <label class="form-label">Shipping Amount</label>
         <input type="number" class="form-control" [(ngModel)]="shippingAmount" [disabled]="isLocked" />
       </div>
+      <div class="col-12 col-md-4">
+        <div class="form-check mt-4">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="applyWithholdingTaxOrderEdit"
+            [(ngModel)]="applyWithholdingTax"
+            (ngModelChange)="onApplyWithholdingTaxChange()"
+            [disabled]="isLocked"
+          />
+          <label class="form-check-label" for="applyWithholdingTaxOrderEdit">
+            Apply Withholding Tax
+          </label>
+        </div>
+      </div>
+      <div class="col-12 col-md-4" *ngIf="applyWithholdingTax">
+        <label class="form-label">Withholding Tax Type</label>
+        <select class="form-select" [(ngModel)]="withholdingTaxTypeId" [disabled]="isLocked">
+          <option value="">Select withholding tax type</option>
+          <option *ngFor="let row of withholdingTaxTypes" [value]="row.id">
+            {{ row.code || 'N/A' }} - {{ row.name || 'Unnamed' }} ({{ row.percentage || 0 }}%)
+          </option>
+        </select>
+        <div class="small text-secondary mt-1" *ngIf="loadingWithholdingTaxTypes">Loading withholding tax types...</div>
+      </div>
 
       <div class="col-12 col-md-4">
         <label class="form-label">Status</label>
@@ -131,6 +156,42 @@
   </div>
 </section>
 
+<section class="card border-0 shadow-sm rounded-4 mb-4" *ngIf="order">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">Financial Breakdown</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Subtotal</div>
+        <div class="fw-semibold">{{ subtotalAmount | number: '1.2-2' }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">VAT Rate</div>
+        <div class="fw-semibold">{{ organizationVatRate | number: '1.2-2' }}%</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="small text-secondary text-uppercase">Taxable Amount</div>
+        <div class="fw-semibold">{{ taxableAmount | number: '1.2-2' }}</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="small text-secondary text-uppercase">Tax</div>
+        <div class="fw-semibold">{{ taxAmount | number: '1.2-2' }}</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="small text-secondary text-uppercase">Discount</div>
+        <div class="fw-semibold">{{ discountAmount | number: '1.2-2' }}</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="small text-secondary text-uppercase">Shipping</div>
+        <div class="fw-semibold">{{ shippingAmount | number: '1.2-2' }}</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="small text-secondary text-uppercase">Total</div>
+        <div class="fw-semibold">{{ totalAmount | number: '1.2-2' }}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <div class="row g-4 no-print" *ngIf="order">
   <div class="col-12 col-xl-7" *ngIf="!isLocked">
     <section class="card border-0 shadow-sm rounded-4 h-100">
@@ -168,6 +229,16 @@
               </button>
             </article>
           </div>
+
+          <div class="col-12" *ngIf="!catalogLoading && catalogItems.length === 0">
+            <div class="text-secondary small">No items shown yet. Use search to load items.</div>
+          </div>
+
+          <div class="col-12 d-flex justify-content-center" *ngIf="catalogItems.length > 0 && catalogHasMore">
+            <button class="btn btn-outline-primary" type="button" (click)="loadMoreItems()" [disabled]="catalogLoadingMore || isLocked">
+              <i class="bi bi-plus-circle me-1"></i>{{ catalogLoadingMore ? 'Loading...' : 'Show 5 More' }}
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -193,16 +264,33 @@
 
             <div class="d-flex align-items-center gap-2 mt-3">
               <button class="btn btn-sm btn-outline-secondary" type="button" (click)="decrease(row.item.id)" [disabled]="isLocked">-</button>
-              <input class="form-control form-control-sm text-center" style="max-width: 70px" [value]="row.quantity" readonly />
+              <input
+                type="number"
+                class="form-control form-control-sm text-center"
+                [class.is-invalid]="exceedsStock(row)"
+                style="max-width: 90px"
+                min="1"
+                step="1"
+                [max]="row.item.type === 'product' ? maxStock(row.item) : null"
+                [ngModel]="row.quantity"
+                (ngModelChange)="updateQuantity(row.item.id, $event)"
+                [disabled]="isLocked"
+              />
               <button class="btn btn-sm btn-outline-secondary" type="button" (click)="increase(row.item.id)" [disabled]="isLocked">+</button>
               <div class="ms-auto fw-semibold">{{ (itemUnitPrice(row.item) * row.quantity) | number: '1.2-2' }}</div>
+            </div>
+            <div class="small text-danger mt-1" *ngIf="exceedsStock(row)">
+              Entered quantity is higher than available stock.
             </div>
           </div>
         </div>
 
         <hr class="my-3" />
         <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ subtotalAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>VAT Rate</span><strong>{{ organizationVatRate | number: '1.2-2' }}%</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Taxable Amount</span><strong>{{ taxableAmount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ taxAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Withholding Tax</span><strong>{{ withHoldingTaxAmount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ discountAmount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between small mb-3"><span>Shipping</span><strong>{{ shippingAmount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between fs-5 mb-3">
@@ -275,6 +363,7 @@
       <div>
         <h2 class="h4 mb-1">Order Receipt</h2>
         <div class="text-secondary">Completed Order Client Copy</div>
+        <span class="badge text-bg-dark mt-2">Products-only receipt</span>
       </div>
       <div class="text-end small">
         <div><strong>Order #:</strong> {{ order.orderNumber }}</div>
@@ -283,30 +372,11 @@
       </div>
     </div>
 
-    <div class="row g-3 mb-4">
-      <div class="col-12 col-md-6">
-        <div class="border rounded-3 p-3 h-100">
-          <div class="small text-secondary text-uppercase mb-2">Customer</div>
-          <div class="fw-semibold">{{ selectedCustomer?.name || order.customer?.name || '-' }}</div>
-          <div class="small">Tax ID: {{ selectedCustomer?.taxId || order.customer?.taxId || '-' }}</div>
-          <div class="small text-secondary">Customer ID: {{ selectedCustomerId || order.customerId || '-' }}</div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6">
-        <div class="border rounded-3 p-3 h-100">
-          <div class="small text-secondary text-uppercase mb-2">Order Summary</div>
-          <div class="small"><strong>Payment:</strong> {{ order.paymentStatus }}</div>
-          <div class="small"><strong>Fulfillment:</strong> {{ order.fulfillmentStatus }}</div>
-          <div class="small"><strong>Notes:</strong> {{ order.notes || '-' }}</div>
-        </div>
-      </div>
-    </div>
-
     <div class="table-responsive mb-4">
       <table class="table table-sm table-bordered align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Item</th>
+            <th>Product</th>
             <th>SKU</th>
             <th class="text-end">Qty</th>
             <th class="text-end">Unit Price</th>
@@ -315,7 +385,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let line of deliveryLines">
+          <tr *ngFor="let line of printProductLines">
             <td>{{ line.name || '-' }}</td>
             <td>{{ line.sku || '-' }}</td>
             <td class="text-end">{{ line.quantity || 0 }}</td>
@@ -323,8 +393,8 @@
             <td class="text-end">{{ line.lineTax || 0 | number: '1.2-2' }}</td>
             <td class="text-end fw-semibold">{{ line.lineTotal || 0 | number: '1.2-2' }}</td>
           </tr>
-          <tr *ngIf="deliveryLines.length === 0">
-            <td colspan="6" class="text-center text-secondary">No items found for this order.</td>
+          <tr *ngIf="printProductLines.length === 0">
+            <td colspan="6" class="text-center text-secondary">No product items found for this order.</td>
           </tr>
         </tbody>
       </table>
@@ -332,14 +402,17 @@
 
     <div class="d-flex justify-content-end">
       <div style="min-width: 300px">
-        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ deliverySubtotal | number: '1.2-2' }}</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ deliveryTax | number: '1.2-2' }}</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ deliveryDiscount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ printSubtotal | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>VAT Rate</span><strong>{{ organizationVatRate | number: '1.2-2' }}%</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Taxable Amount</span><strong>{{ printTaxable | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ printTax | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Withholding Tax</span><strong>{{ withHoldingTaxAmount | number: '1.2-2' }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ printDiscount | number: '1.2-2' }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span>Shipping</span><strong>{{ shippingAmount | number: '1.2-2' }}</strong></div>
         <hr class="my-2" />
         <div class="d-flex justify-content-between">
           <span class="fw-semibold">Total</span>
-          <strong>{{ deliveryTotal | number: '1.2-2' }}</strong>
+          <strong>{{ printTotal | number: '1.2-2' }}</strong>
         </div>
       </div>
     </div>

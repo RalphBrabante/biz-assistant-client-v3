@@ -36,7 +36,7 @@
   <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
     <div>
       <h2 class="h5 mb-1">Quarterly Sales Reports</h2>
-      <div class="text-secondary small">Based on sales invoices for selected quarter.</div>
+      <div class="text-secondary small">All saved quarterly sales reports.</div>
     </div>
     <button class="btn btn-primary" [disabled]="generatingSales()" (click)="generateQuarterlySalesReport()">
       <i class="bi bi-calculator me-1"></i>{{ generatingSales() ? 'Generating...' : 'Generate Sales Report' }}
@@ -84,6 +84,9 @@
       </div>
     </div>
   </section>
+  <div class="px-4 pb-4 text-secondary small" *ngIf="!latestSalesReport()">
+    No saved sales report for Year {{ selectedYear() }}, {{ quarterLabel(selectedQuarter()) }}.
+  </div>
 
   <div class="px-4 pb-3">
     <div class="row g-3 align-items-end">
@@ -113,6 +116,7 @@
       <thead class="table-light">
         <tr>
           <th *ngIf="isSuperuser">Organization</th>
+          <th>Year</th>
           <th>Quarter</th>
           <th>Period</th>
           <th>Invoices</th>
@@ -121,14 +125,16 @@
           <th>Discount</th>
           <th>Total</th>
           <th>Generated</th>
+          <th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngIf="!loadingSales() && salesRows().length === 0">
-          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center text-secondary py-4">No sales reports found.</td>
+          <td [attr.colspan]="isSuperuser ? 11 : 10" class="text-center text-secondary py-4">No sales reports found.</td>
         </tr>
         <tr *ngFor="let row of salesRows(); trackBy: trackById">
           <td *ngIf="isSuperuser" class="small">{{ row.organization?.name || row.organization?.legalName || organizationLabelById(row.organizationId) }}</td>
+          <td>{{ row.year }}</td>
           <td><span class="badge rounded-pill text-bg-primary">{{ quarterLabel(row.quarter) }}</span></td>
           <td>{{ row.periodStart }} to {{ row.periodEnd }}</td>
           <td>{{ row.invoiceCount }}</td>
@@ -137,6 +143,16 @@
           <td>{{ toCurrency(row.discountAmount, row.currency) }}</td>
           <td class="fw-semibold">{{ toCurrency(row.totalAmount, row.currency) }}</td>
           <td>{{ row.generatedAt | date : 'medium' }}</td>
+          <td class="text-end">
+            <button
+              class="btn btn-sm btn-outline-danger"
+              type="button"
+              [disabled]="deletingSalesReportId() === row.id"
+              (click)="deleteSalesReport(row.id)"
+            >
+              <i class="bi bi-trash3"></i>
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -157,7 +173,7 @@
   <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
     <div>
       <h2 class="h5 mb-1">Quarterly Expense Reports</h2>
-      <div class="text-secondary small">Based on expenses for selected quarter (excluding cancelled).</div>
+      <div class="text-secondary small">All saved quarterly expense reports (excluding cancelled entries).</div>
     </div>
     <button class="btn btn-outline-primary" [disabled]="generatingExpenses()" (click)="generateQuarterlyExpenseReport()">
       <i class="bi bi-calculator me-1"></i>{{ generatingExpenses() ? 'Generating...' : 'Generate Expense Report' }}
@@ -205,6 +221,9 @@
       </div>
     </div>
   </section>
+  <div class="px-4 pb-4 text-secondary small" *ngIf="!latestExpenseReport()">
+    No saved expense report for Year {{ selectedYear() }}, {{ quarterLabel(selectedQuarter()) }}.
+  </div>
 
   <div class="px-4 pb-3">
     <div class="row g-3 align-items-end">
@@ -234,6 +253,7 @@
       <thead class="table-light">
         <tr>
           <th *ngIf="isSuperuser">Organization</th>
+          <th>Year</th>
           <th>Quarter</th>
           <th>Period</th>
           <th>Expenses</th>
@@ -242,14 +262,16 @@
           <th>Discount</th>
           <th>Total</th>
           <th>Generated</th>
+          <th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngIf="!loadingExpenses() && expenseRows().length === 0">
-          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center text-secondary py-4">No expense reports found.</td>
+          <td [attr.colspan]="isSuperuser ? 11 : 10" class="text-center text-secondary py-4">No expense reports found.</td>
         </tr>
         <tr *ngFor="let row of expenseRows(); trackBy: trackById">
           <td *ngIf="isSuperuser" class="small">{{ row.organization?.name || row.organization?.legalName || organizationLabelById(row.organizationId) }}</td>
+          <td>{{ row.year }}</td>
           <td><span class="badge rounded-pill text-bg-warning">{{ quarterLabel(row.quarter) }}</span></td>
           <td>{{ row.periodStart }} to {{ row.periodEnd }}</td>
           <td>{{ row.expenseCount }}</td>
@@ -258,6 +280,16 @@
           <td>{{ toCurrency(row.discountAmount, row.currency) }}</td>
           <td class="fw-semibold">{{ toCurrency(row.totalAmount, row.currency) }}</td>
           <td>{{ row.generatedAt | date : 'medium' }}</td>
+          <td class="text-end">
+            <button
+              class="btn btn-sm btn-outline-danger"
+              type="button"
+              [disabled]="deletingExpenseReportId() === row.id"
+              (click)="deleteExpenseReport(row.id)"
+            >
+              <i class="bi bi-trash3"></i>
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>

@@ -10,6 +10,12 @@
         <button class="btn btn-outline-dark" (click)="load()" [disabled]="loading()">
           {{ loading() ? 'Refreshing...' : 'Refresh' }}
         </button>
+        <button class="btn btn-outline-success" (click)="exportItemsCsv()" [disabled]="exporting()">
+          <i class="bi bi-download me-1"></i>{{ exporting() ? 'Exporting...' : 'Export CSV' }}
+        </button>
+        <button class="btn btn-outline-primary" (click)="openImportModal()">
+          <i class="bi bi-upload me-1"></i>Import CSV
+        </button>
         <button class="btn btn-primary" (click)="openCreateModal()"><i class="bi bi-plus-lg me-1"></i>Create Item</button>
       </div>
     </div>
@@ -51,6 +57,27 @@
 
     <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
     <div *ngIf="error()" class="alert alert-danger mt-3 mb-0">{{ error() }}</div>
+    <div *ngIf="importSummary() as summary" class="alert alert-info mt-3 mb-0">
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <div class="fw-semibold">Import Summary</div>
+          <div class="small">
+            Processed {{ summary.totalRows }} rows.
+            Imported: {{ summary.imported }}.
+            Skipped: {{ summary.skipped }}.
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearImportSummary()">
+          <i class="bi bi-x-lg me-1"></i>Dismiss
+        </button>
+      </div>
+      <div *ngIf="summary.skipped > 0 && summary.errors.length > 0" class="mt-3">
+        <div class="small fw-semibold mb-2">Skipped row details</div>
+        <ul class="small mb-0 ps-3">
+          <li *ngFor="let rowError of summary.errors">{{ rowError }}</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -64,6 +91,7 @@
           <th>SKU</th>
           <th>Type</th>
           <th>Price</th>
+          <th>Cost</th>
           <th>Stock</th>
           <th>Active</th>
           <th class="text-end">Actions</th>
@@ -71,7 +99,7 @@
       </thead>
       <tbody>
         <tr *ngIf="!loading() && rows().length === 0">
-          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center text-secondary py-4">No items found.</td>
+          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center text-secondary py-4">No items found.</td>
         </tr>
 
         <tr *ngFor="let row of rows(); trackBy: trackById">
@@ -84,6 +112,7 @@
             </span>
           </td>
           <td>{{ row.price ?? 0 }}</td>
+          <td>{{ row.cost ?? 0 }}</td>
           <td>
             <span class="badge rounded-pill" [ngClass]="itemStockBadgeClass(row)">
               {{ row.stock ?? 0 }}
@@ -183,6 +212,10 @@
             <input type="number" class="form-control" [(ngModel)]="createForm['price']" />
           </div>
           <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Cost</label>
+            <input type="number" class="form-control" [(ngModel)]="createForm['cost']" />
+          </div>
+          <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Discounted Price</label>
             <input type="number" class="form-control" [(ngModel)]="createForm['discountedPrice']" />
           </div>
@@ -190,24 +223,12 @@
             <label class="form-label fw-semibold">Stock</label>
             <input type="number" class="form-control" [(ngModel)]="createForm['stock']" />
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Tax Rate</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['taxRate']" />
-          </div>
 
           <div class="col-12">
             <label class="form-label fw-semibold">Description</label>
             <textarea rows="2" class="form-control" [(ngModel)]="createForm['description']"></textarea>
           </div>
 
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Created By (User ID)</label>
-            <input class="form-control" [(ngModel)]="createForm['createdBy']" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Updated By (User ID)</label>
-            <input class="form-control" [(ngModel)]="createForm['updatedBy']" />
-          </div>
           <div class="col-12 col-md-4 d-flex align-items-end">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isActive']" />
@@ -280,6 +301,10 @@
             <input type="number" class="form-control" [(ngModel)]="editForm['price']" />
           </div>
           <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Cost</label>
+            <input type="number" class="form-control" [(ngModel)]="editForm['cost']" />
+          </div>
+          <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Discounted Price</label>
             <input type="number" class="form-control" [(ngModel)]="editForm['discountedPrice']" />
           </div>
@@ -287,24 +312,12 @@
             <label class="form-label fw-semibold">Stock</label>
             <input type="number" class="form-control" [(ngModel)]="editForm['stock']" />
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Tax Rate</label>
-            <input type="number" class="form-control" [(ngModel)]="editForm['taxRate']" />
-          </div>
 
           <div class="col-12">
             <label class="form-label fw-semibold">Description</label>
             <textarea rows="2" class="form-control" [(ngModel)]="editForm['description']"></textarea>
           </div>
 
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Created By (User ID)</label>
-            <input class="form-control" [(ngModel)]="editForm['createdBy']" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Updated By (User ID)</label>
-            <input class="form-control" [(ngModel)]="editForm['updatedBy']" />
-          </div>
           <div class="col-12 col-md-4 d-flex align-items-end">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" [(ngModel)]="editForm['isActive']" />
@@ -317,6 +330,37 @@
         <button class="btn btn-outline-secondary" (click)="closeEditModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
         <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
           {{ submitting() ? 'Saving...' : 'Save Item' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="isImportModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isImportModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isImportModalOpen()"
+  *ngIf="isImportModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Import Items CSV</h5>
+        <button type="button" class="btn-close" (click)="closeImportModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <p class="text-secondary small mb-3">
+          Upload a CSV file to import items for the selected organization.
+        </p>
+        <input type="file" class="form-control" accept=".csv,text/csv" (change)="onImportFileChange($event)" />
+        <div *ngIf="importModalError()" class="alert alert-danger py-2 mt-3 mb-0">{{ importModalError() }}</div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeImportModal()" [disabled]="submitting()">Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="importItemsCsv()">
+          {{ submitting() ? 'Importing...' : 'Import CSV' }}
         </button>
       </div>
     </div>

@@ -130,7 +130,18 @@ export class UserDetailPageComponent {
     });
   }
 
-  saveUser(): void {
+  async saveUser(): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update User',
+      message: 'Save changes to this user profile?',
+      confirmText: 'Update User',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');

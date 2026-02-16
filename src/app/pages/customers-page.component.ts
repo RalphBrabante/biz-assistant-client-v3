@@ -239,8 +239,18 @@ export class CustomersPageComponent {
     this.isEditModalOpen.set(false);
   }
 
-  saveEdit(): void {
+  async saveEdit(): Promise<void> {
     if (!this.editingId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Customer',
+      message: 'Save changes to this customer?',
+      confirmText: 'Update Customer',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 

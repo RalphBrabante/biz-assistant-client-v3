@@ -108,7 +108,18 @@ export class RoleDetailPageComponent {
       });
   }
 
-  saveRole(): void {
+  async saveRole(): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Role',
+      message: 'Save changes to this role?',
+      confirmText: 'Update Role',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');

@@ -76,11 +76,13 @@
         <div class="border rounded-3 p-3 h-100">
           <div class="small text-secondary text-uppercase mb-2">Amounts</div>
           <div><strong>Currency:</strong> {{ row.currency || 'USD' }}</div>
-          <div><strong>Subtotal:</strong> {{ itemsSubtotal | number: '1.2-2' }}</div>
-          <div><strong>Tax:</strong> {{ itemsTax | number: '1.2-2' }}</div>
-          <div><strong>Discount:</strong> {{ itemsDiscount | number: '1.2-2' }}</div>
+          <div><strong>Amount:</strong> {{ invoiceAmount | number: '1.2-2' }}</div>
+          <div><strong>Taxable Amount:</strong> {{ invoiceTaxableAmount | number: '1.2-2' }}</div>
+          <div><strong>Tax Amount:</strong> {{ (row.taxAmount ?? itemsTax) | number: '1.2-2' }}</div>
+          <div><strong>Withholding Tax Amount:</strong> {{ invoiceWithHoldingTaxAmount | number: '1.2-2' }}</div>
+          <div><strong>Discount:</strong> {{ (row.discountAmount ?? itemsDiscount) | number: '1.2-2' }}</div>
           <div><strong>Shipping:</strong> {{ orderShippingAmount | number: '1.2-2' }}</div>
-          <div class="fs-5 mt-2"><strong>Total:</strong> {{ itemsTotal | number: '1.2-2' }}</div>
+          <div class="fs-5 mt-2"><strong>Total Paid:</strong> {{ invoicePaidTotal | number: '1.2-2' }}</div>
         </div>
       </div>
       <div class="col-12" *ngIf="row.notes">

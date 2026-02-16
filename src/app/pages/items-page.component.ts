@@ -23,20 +23,25 @@ interface ItemRow {
   category?: string;
   unit?: string;
   price?: number;
+  cost?: number;
   discountedPrice?: number;
   currency?: string;
   stock?: number;
   reorderLevel?: number;
-  taxRate?: number;
   isActive?: boolean;
-  createdBy?: string;
-  updatedBy?: string;
 }
 
 interface OrganizationOption {
   id: string;
   name?: string;
   legalName?: string;
+}
+
+interface ItemImportSummary {
+  imported: number;
+  skipped: number;
+  totalRows: number;
+  errors: string[];
 }
 
 @Component({
@@ -57,10 +62,14 @@ export class ItemsPageComponent {
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
   readonly isEditModalOpen = signal(false);
+  readonly isImportModalOpen = signal(false);
+  readonly exporting = signal(false);
   readonly organizations = signal<OrganizationOption[]>([]);
 
   readonly message = signal('');
   readonly error = signal('');
+  readonly importModalError = signal('');
+  readonly importSummary = signal<ItemImportSummary | null>(null);
   readonly filter = signal('');
   page = 1;
   pageSize = 20;
@@ -72,6 +81,7 @@ export class ItemsPageComponent {
 
   editingId = '';
   editForm: Record<string, unknown> = this.newItemForm();
+  private importFile: File | null = null;
 
   get currentOrganizationId(): string {
     return this.organizationContext.getActiveOrganizationId();
@@ -201,14 +211,12 @@ export class ItemsPageComponent {
       category: row.category || '',
       unit: row.unit || '',
       price: row.price ?? 0,
-      discountedPrice: row.discountedPrice ?? 0,
+      cost: row.cost ?? 0,
+      discountedPrice: row.discountedPrice ?? '',
       currency: row.currency || this.currentOrganizationCurrency,
       stock: row.stock ?? 0,
       reorderLevel: row.reorderLevel ?? 0,
-      taxRate: row.taxRate ?? 0,
       isActive: row.isActive !== false,
-      createdBy: row.createdBy || '',
-      updatedBy: row.updatedBy || '',
     };
     this.error.set('');
     this.message.set('');
@@ -221,8 +229,124 @@ export class ItemsPageComponent {
     this.isEditModalOpen.set(false);
   }
 
-  saveEdit(): void {
+  openImportModal(): void {
+    this.importFile = null;
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+    this.isImportModalOpen.set(true);
+  }
+
+  closeImportModal(): void {
+    this.importFile = null;
+    this.importModalError.set('');
+    this.isImportModalOpen.set(false);
+  }
+
+  onImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.importFile = target?.files && target.files.length > 0 ? target.files[0] : null;
+  }
+
+  importItemsCsv(): void {
+    if (!this.importFile) {
+      this.importModalError.set('Please select a CSV file to import.');
+      return;
+    }
+    if (this.organizationContext.isAllOrganizationsSelected()) {
+      this.importModalError.set('Select a specific organization before importing items.');
+      return;
+    }
+
+    this.submitting.set(true);
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+    this.importSummary.set(null);
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+    if (this.currentOrganizationId.trim()) {
+      formData.append('organizationId', this.currentOrganizationId.trim());
+    }
+
+    this.api.createFormData<Record<string, unknown>>('/api/v1/items/import', formData).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.closeImportModal();
+        const data = (response.data || {}) as Record<string, unknown>;
+        const imported = Number(data['imported'] || 0);
+        const skipped = Number(data['skipped'] || 0);
+        const totalRows = Number(data['totalRows'] || imported + skipped);
+        const errors = Array.isArray(data['errors'])
+          ? data['errors'].map((row) => String(row || '').trim()).filter((row) => row.length > 0)
+          : [];
+        this.importSummary.set({
+          imported,
+          skipped,
+          totalRows,
+          errors,
+        });
+        this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.importModalError.set(err?.error?.message || 'Unable to import items.');
+      },
+    });
+  }
+
+  clearImportSummary(): void {
+    this.importSummary.set(null);
+  }
+
+  exportItemsCsv(): void {
+    this.exporting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    const params = new URLSearchParams();
+    const q = this.filter().trim();
+    if (q) {
+      params.set('q', q);
+    }
+    if (this.currentOrganizationId) {
+      params.set('organizationId', this.currentOrganizationId);
+    }
+
+    this.api.download(`/api/v1/items/export?${params.toString()}`).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `items-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        this.message.set('Items CSV exported successfully.');
+      },
+      error: (err) => {
+        this.exporting.set(false);
+        this.error.set(err?.error?.message || 'Unable to export items.');
+      },
+    });
+  }
+
+  async saveEdit(): Promise<void> {
     if (!this.editingId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Item',
+      message: 'Save changes to this item?',
+      confirmText: 'Update Item',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -360,14 +484,12 @@ export class ItemsPageComponent {
       category: '',
       unit: 'pcs',
       price: 0,
-      discountedPrice: 0,
+      cost: 0,
+      discountedPrice: '',
       currency: this.currentOrganizationCurrency,
       stock: 0,
       reorderLevel: 0,
-      taxRate: 0,
       isActive: true,
-      createdBy: '',
-      updatedBy: '',
     };
   }
 
@@ -381,13 +503,11 @@ export class ItemsPageComponent {
       category: this.optionalString(form['category']),
       unit: this.optionalString(form['unit']),
       price: this.optionalNumber(form['price']),
+      cost: this.optionalNumber(form['cost']),
       discountedPrice: this.optionalNumber(form['discountedPrice']),
       stock: this.optionalNumber(form['stock']),
       reorderLevel: this.optionalNumber(form['reorderLevel']),
-      taxRate: this.optionalNumber(form['taxRate']),
       isActive: Boolean(form['isActive']),
-      createdBy: this.optionalString(form['createdBy']),
-      updatedBy: this.optionalString(form['updatedBy']),
     };
   }
 

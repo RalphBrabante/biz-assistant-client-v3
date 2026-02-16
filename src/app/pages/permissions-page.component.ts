@@ -186,8 +186,18 @@ export class PermissionsPageComponent {
     this.editingId = '';
   }
 
-  saveEdit(): void {
+  async saveEdit(): Promise<void> {
     if (!this.editingId) {
+      return;
+    }
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Update Permission',
+      message: 'Save changes to this permission?',
+      confirmText: 'Update Permission',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-pencil-square',
+    });
+    if (!confirmed) {
       return;
     }
 

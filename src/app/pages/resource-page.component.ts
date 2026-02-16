@@ -99,7 +99,20 @@ export class ResourcePageComponent {
     this.form = this.makeInitialForm();
   }
 
-  submit(): void {
+  async submit(): Promise<void> {
+    if (this.editingId) {
+      const confirmed = await this.confirmDialog.confirm({
+        title: `Update ${this.config.title}`,
+        message: `Save changes to this ${this.config.title.toLowerCase()}?`,
+        confirmText: 'Update',
+        confirmButtonClass: 'btn-primary',
+        iconClass: 'bi-pencil-square',
+      });
+      if (!confirmed) {
+        return;
+      }
+    }
+
     this.submitting = true;
     this.error = '';
     this.message = '';
