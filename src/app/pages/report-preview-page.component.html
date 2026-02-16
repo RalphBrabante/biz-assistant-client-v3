@@ -1,0 +1,145 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+  <div class="card-body p-4 p-lg-5 role-hero d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+      <div class="text-uppercase small fw-semibold text-secondary mb-2">Reports</div>
+      <h1 class="h3 mb-2">Report Preview</h1>
+      <p class="text-secondary mb-0">Quarter details and all related expenses with VAT computations.</p>
+    </div>
+    <a class="btn btn-outline-dark" routerLink="/reports">
+      <i class="bi bi-arrow-left me-1"></i>Back to Reports
+    </a>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4" *ngIf="error()">
+  <div class="card-body p-4">
+    <div class="alert alert-danger mb-0">{{ error() }}</div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4" *ngIf="loading()">
+  <div class="card-body p-4 text-secondary">Loading report preview...</div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4" *ngIf="!loading() && report() as report">
+  <div class="card-body p-4">
+    <div class="row g-3">
+      <div class="col-12 col-md-4"><strong>Organization:</strong> {{ report.organization?.name || report.organization?.legalName || '-' }}</div>
+      <div class="col-12 col-md-2"><strong>Year:</strong> {{ report.year }}</div>
+      <div class="col-12 col-md-2"><strong>Quarter:</strong> {{ quarterLabel(report.quarter) }}</div>
+      <div class="col-12 col-md-4"><strong>Period:</strong> {{ report.periodStart }} to {{ report.periodEnd }}</div>
+    </div>
+  </div>
+</section>
+
+<section class="row g-3 mb-4" *ngIf="!loading() && summary() as summary">
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Expenses</div>
+        <div class="display-6 fw-semibold">{{ summary.expenseCount }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Amount</div>
+        <div class="h5 fw-semibold mb-0">{{ toCurrency(summary.amount, summary.currency) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Taxable Amount</div>
+        <div class="h5 fw-semibold mb-0">{{ toCurrency(summary.taxableAmount, summary.currency) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Tax Amount</div>
+        <div class="h5 fw-semibold mb-0">{{ toCurrency(summary.taxAmount, summary.currency) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">VAT Exempt Amount</div>
+        <div class="h5 fw-semibold mb-0">{{ toCurrency(summary.vatExemptAmount, summary.currency) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Withholding Tax</div>
+        <div class="h5 fw-semibold mb-0">{{ toCurrency(summary.withHoldingTaxAmount, summary.currency) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Discount</div>
+        <div class="h5 fw-semibold mb-0">{{ toCurrency(summary.discountAmount, summary.currency) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card border-0 bg-light rounded-4 h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Total</div>
+        <div class="h5 fw-semibold mb-0">{{ toCurrency(summary.totalAmount, summary.currency) }}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">Expenses Under This Quarter</h2>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Vendor</th>
+            <th>Tax Type</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Amount</th>
+            <th>Taxable</th>
+            <th>Tax</th>
+            <th>VAT Exempt</th>
+            <th>WHT</th>
+            <th>Discount</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="!loading() && expenses().length === 0">
+            <td colspan="12" class="text-center text-secondary py-4">No expenses found for this report period.</td>
+          </tr>
+          <tr *ngFor="let row of expenses(); trackBy: trackById">
+            <td>{{ row.expenseDate }}</td>
+            <td>{{ vendorLabel(row) }}</td>
+            <td>{{ taxTypeLabel(row) }}</td>
+            <td>{{ row.category || '-' }}</td>
+            <td>{{ row.status || '-' }}</td>
+            <td>{{ toCurrency(row.amount, row.currency || report()?.currency || 'USD') }}</td>
+            <td>{{ toCurrency(row.taxableAmount, row.currency || report()?.currency || 'USD') }}</td>
+            <td>{{ toCurrency(row.taxAmount, row.currency || report()?.currency || 'USD') }}</td>
+            <td>{{ toCurrency(row.vatExemptAmount, row.currency || report()?.currency || 'USD') }}</td>
+            <td>{{ toCurrency(row.withHoldingTaxAmount, row.currency || report()?.currency || 'USD') }}</td>
+            <td>{{ toCurrency(row.discountAmount, row.currency || report()?.currency || 'USD') }}</td>
+            <td class="fw-semibold">{{ toCurrency(row.totalAmount, row.currency || report()?.currency || 'USD') }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

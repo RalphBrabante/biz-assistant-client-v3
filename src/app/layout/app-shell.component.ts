@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ApiService } from '../core/api.service';
@@ -14,6 +14,11 @@ interface NavItem {
   icon: string;
   permissions?: string[];
   superuserOnly?: boolean;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
 }
 
 interface BeforeInstallPromptEvent extends Event {
@@ -35,22 +40,42 @@ export class AppShellComponent {
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
 
-  readonly navItems: NavItem[] = [
-    { label: 'Dashboard', path: '/dashboard', icon: 'bi-speedometer2' },
-    { label: 'Organizations', path: '/organizations', icon: 'bi-buildings', permissions: ['organizations.read'] },
-    { label: 'Users', path: '/users', icon: 'bi-people', permissions: ['users.read'] },
-    { label: 'Roles', path: '/roles', icon: 'bi-shield-check', permissions: ['roles.manage'] },
-    { label: 'Permissions', path: '/permissions', icon: 'bi-key', permissions: ['permissions.manage'] },
-    { label: 'Reports', path: '/reports', icon: 'bi-bar-chart-line', permissions: ['reports.read'] },
-    { label: 'Settings', path: '/settings', icon: 'bi-sliders', permissions: ['settings.update'], superuserOnly: true },
-    { label: 'Items', path: '/items', icon: 'bi-box-seam', permissions: ['items.read'] },
-    { label: 'Customers', path: '/customers', icon: 'bi-person-vcard', permissions: ['organizations.read'] },
-    { label: 'Vendors', path: '/vendors', icon: 'bi-truck', permissions: ['vendors.read'] },
-    { label: 'Expenses', path: '/expenses', icon: 'bi-cash-stack', permissions: ['expenses.read'] },
-    { label: 'Taxes', path: '/taxes', icon: 'bi-percent', permissions: ['expenses.read'] },
-    { label: 'Orders', path: '/orders', icon: 'bi-receipt', permissions: ['orders.read'] },
-    { label: 'Licenses', path: '/licenses', icon: 'bi-patch-check', permissions: ['licenses.read'] },
-    { label: 'Sales Invoices', path: '/sales-invoices', icon: 'bi-file-earmark-text', permissions: ['sales_invoices.read'] },
+  readonly navSections: NavSection[] = [
+    {
+      title: 'Overview',
+      items: [
+        { label: 'Dashboard', path: '/dashboard', icon: 'bi-speedometer2' },
+        { label: 'Reports', path: '/reports', icon: 'bi-bar-chart-line', permissions: ['reports.read'] },
+      ],
+    },
+    {
+      title: 'Sales',
+      items: [
+        { label: 'Items', path: '/items', icon: 'bi-box-seam', permissions: ['items.read'] },
+        { label: 'Customers', path: '/customers', icon: 'bi-person-vcard', permissions: ['organizations.read'] },
+        { label: 'Orders', path: '/orders', icon: 'bi-receipt', permissions: ['orders.read'] },
+        { label: 'Sales Invoices', path: '/sales-invoices', icon: 'bi-file-earmark-text', permissions: ['sales_invoices.read'] },
+      ],
+    },
+    {
+      title: 'Operations',
+      items: [
+        { label: 'Expenses', path: '/expenses', icon: 'bi-cash-stack', permissions: ['expenses.read'] },
+        { label: 'Vendors', path: '/vendors', icon: 'bi-truck', permissions: ['vendors.read'] },
+        { label: 'Taxes', path: '/taxes', icon: 'bi-percent', permissions: ['expenses.read'] },
+      ],
+    },
+    {
+      title: 'Administration',
+      items: [
+        { label: 'Organizations', path: '/organizations', icon: 'bi-buildings', permissions: ['organizations.read'] },
+        { label: 'Users', path: '/users', icon: 'bi-people', permissions: ['users.read'] },
+        { label: 'Roles', path: '/roles', icon: 'bi-shield-check', permissions: ['roles.manage'] },
+        { label: 'Permissions', path: '/permissions', icon: 'bi-key', permissions: ['permissions.manage'] },
+        { label: 'Licenses', path: '/licenses', icon: 'bi-patch-check', permissions: ['licenses.read'] },
+        { label: 'Settings', path: '/settings', icon: 'bi-sliders', permissions: ['settings.update'], superuserOnly: true },
+      ],
+    },
   ];
   sidebarOpen = false;
   sidebarCollapsed = false;
@@ -109,14 +134,21 @@ export class AppShellComponent {
     this.sidebarCollapsed = !this.sidebarCollapsed;
   }
 
-  get visibleNavItems(): NavItem[] {
-    return this.navItems.filter((item) => {
+  readonly visibleNavSections = computed<NavSection[]>(() => {
+    const canSee = (item: NavItem): boolean => {
       if (item.superuserOnly && !this.organizationContext.isSuperuser()) {
         return false;
       }
       return this.auth.hasAnyPermission(item.permissions || []);
-    });
-  }
+    };
+
+    return this.navSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter(canSee),
+      }))
+      .filter((section) => section.items.length > 0);
+  });
 
   get canSwitchOrganization(): boolean {
     return this.organizationContext.isSuperuser();
@@ -178,7 +210,16 @@ export class AppShellComponent {
     if (!this.canSwitchOrganization) {
       return;
     }
-    this.organizationContext.setSelectedOrganizationId(organizationId);
+    if (this.switchingOrganization) {
+      return;
+    }
+    const nextOrganizationId = String(organizationId || '').trim();
+    const currentOrganizationId = String(this.selectedOrganizationId || '').trim();
+    if (nextOrganizationId === currentOrganizationId) {
+      return;
+    }
+
+    this.organizationContext.setSelectedOrganizationId(nextOrganizationId);
     this.updateDisplayNameFromOptions();
     this.switchingOrganization = true;
     setTimeout(() => {

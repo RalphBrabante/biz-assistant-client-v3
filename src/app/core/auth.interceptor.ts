@@ -35,7 +35,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     req.url.includes('/api/v1/') &&
     !req.url.includes('/api/v1/auth/') &&
     !req.url.includes('/api/v1/dev/') &&
-    organizationContext.isAllOrganizationsSelected()
+    organizationContext.isAllOrganizationsSelected() &&
+    isCreateOrImportPost(req.url)
   ) {
     const message = 'Select a specific organization first. Imports and data creation are disabled in All Organizations mode.';
     auth.showUnauthorizedAccess(message);
@@ -72,3 +73,19 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     })
   );
 };
+
+function isCreateOrImportPost(rawUrl: string): boolean {
+  let pathname = rawUrl;
+  try {
+    pathname = new URL(rawUrl, window.location.origin).pathname;
+  } catch (_err) {
+    pathname = rawUrl.split('?')[0] || rawUrl;
+  }
+
+  if (pathname.includes('/import')) {
+    return true;
+  }
+
+  const normalized = pathname.replace(/\/+$/, '');
+  return /^\/api\/v1\/[^/]+$/.test(normalized);
+}

@@ -66,6 +66,7 @@ interface OrderActivityRow {
 interface OrderRow {
   id: string;
   organizationId: string;
+  currency?: string;
   orderNumber: string;
   createdAt?: string;
   customerId?: string;
@@ -179,6 +180,33 @@ export class OrderPreviewPageComponent {
 
   get organizationId(): string {
     return this.order?.organizationId || '';
+  }
+
+  get orderCurrency(): string {
+    const explicit = String(this.order?.currency || '').trim();
+    if (explicit) {
+      return explicit.toUpperCase();
+    }
+    const snapshotCurrency = String(this.order?.orderedItemSnapshots?.[0]?.currency || '').trim();
+    if (snapshotCurrency) {
+      return snapshotCurrency.toUpperCase();
+    }
+    return 'USD';
+  }
+
+  formatMoney(value: unknown, currency?: string): string {
+    const amount = Number(value ?? 0);
+    const code = String(currency || this.orderCurrency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number.isFinite(amount) ? amount : 0);
+    } catch (_err) {
+      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+    }
   }
 
   loadOrder(): void {
@@ -756,11 +784,6 @@ export class OrderPreviewPageComponent {
     if (!this.applyWithholdingTax) {
       this.withholdingTaxTypeId = '';
     }
-  }
-
-  get orderCurrency(): string {
-    const snapshots = this.order?.orderedItemSnapshots || [];
-    return String(snapshots[0]?.currency || 'USD').toUpperCase();
   }
 
   exceedsStock(row: CartItem): boolean {

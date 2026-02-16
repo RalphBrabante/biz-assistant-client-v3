@@ -52,13 +52,13 @@
       <div class="col-12">
         <div class="fw-semibold text-uppercase small text-secondary">Computed Breakdown</div>
       </div>
-      <div class="col-12 col-md-3"><strong>Amount:</strong> {{ row.amount ?? 0 }}</div>
-      <div class="col-12 col-md-3"><strong>VAT Exempt Amount:</strong> {{ row.vatExemptAmount ?? 0 }}</div>
-      <div class="col-12 col-md-3"><strong>Taxable Amount:</strong> {{ row.taxableAmount ?? 0 }}</div>
-      <div class="col-12 col-md-3"><strong>Tax Amount:</strong> {{ row.taxAmount ?? 0 }}</div>
-      <div class="col-12 col-md-3"><strong>Withholding Tax Amount:</strong> {{ row.withHoldingTaxAmount ?? 0 }}</div>
-      <div class="col-12 col-md-3"><strong>Discount Amount:</strong> {{ row.discountAmount ?? 0 }}</div>
-      <div class="col-12 col-md-3"><strong>Total Amount:</strong> {{ row.totalAmount ?? 0 }}</div>
+      <div class="col-12 col-md-3"><strong>Amount:</strong> {{ formatMoney(row.amount ?? 0, row.currency || 'USD') }}</div>
+      <div class="col-12 col-md-3"><strong>VAT Exempt Amount:</strong> {{ formatMoney(row.vatExemptAmount ?? 0, row.currency || 'USD') }}</div>
+      <div class="col-12 col-md-3"><strong>Taxable Amount:</strong> {{ formatMoney(row.taxableAmount ?? 0, row.currency || 'USD') }}</div>
+      <div class="col-12 col-md-3"><strong>Tax Amount:</strong> {{ formatMoney(row.taxAmount ?? 0, row.currency || 'USD') }}</div>
+      <div class="col-12 col-md-3"><strong>Withholding Tax Amount:</strong> {{ formatMoney(row.withHoldingTaxAmount ?? 0, row.currency || 'USD') }}</div>
+      <div class="col-12 col-md-3"><strong>Discount Amount:</strong> {{ formatMoney(row.discountAmount ?? 0, row.currency || 'USD') }}</div>
+      <div class="col-12 col-md-3"><strong>Total Amount:</strong> {{ formatMoney(row.totalAmount ?? 0, row.currency || 'USD') }}</div>
       <div class="col-12 col-md-3"><strong>Currency:</strong> {{ row.currency || '-' }}</div>
     </div>
 

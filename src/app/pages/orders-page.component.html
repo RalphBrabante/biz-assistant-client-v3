@@ -91,7 +91,7 @@
                 {{ row['paymentStatus'] }}
               </span>
             </td>
-            <td>{{ row['totalAmount'] }}</td>
+            <td>{{ formatMoney(row['totalAmount'], row) }}</td>
             <td class="text-end">
               <div class="d-inline-flex gap-2">
                 <a

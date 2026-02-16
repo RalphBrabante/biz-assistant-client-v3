@@ -289,8 +289,9 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
 
         this.yearlySalesTotal = quarterTotals.sales.reduce((sum, value) => sum + value, 0);
         this.yearlyExpenseTotal = quarterTotals.expenses.reduce((sum, value) => sum + value, 0);
-        this.yearlyCurrency =
-          String(sales[0]?.currency || expenses[0]?.currency || this.currentOrganizationCurrency).toUpperCase();
+        this.yearlyCurrency = this.normalizeCurrencyCode(
+          sales[0]?.currency || expenses[0]?.currency || this.currentOrganizationCurrency
+        );
 
         this.renderYearlyChart(quarterTotals.sales, quarterTotals.expenses);
       },
@@ -359,12 +360,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
             callbacks: {
               label: (ctx: TooltipItem<'bar'>) => {
                 const value = Number(ctx.raw || 0);
-                const formatted = new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: this.yearlyCurrency,
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }).format(value);
+                const formatted = this.toCurrency(value, this.yearlyCurrency);
                 return `${ctx.dataset.label}: ${formatted}`;
               },
             },
@@ -376,11 +372,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
             ticks: {
               callback: (tickValue: string | number) => {
                 const value = Number(tickValue || 0);
-                return new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: this.yearlyCurrency,
-                  maximumFractionDigits: 0,
-                }).format(value);
+                return this.toCurrency(value, this.yearlyCurrency, 0, 0);
               },
             },
           },
@@ -389,13 +381,31 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  toCurrency(value: number | string | null | undefined, currency = 'USD'): string {
+  toCurrency(
+    value: number | string | null | undefined,
+    currency = 'USD',
+    minimumFractionDigits = 2,
+    maximumFractionDigits = 2
+  ): string {
     const numeric = Number(value || 0);
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Number.isFinite(numeric) ? numeric : 0);
+    const safeCurrency = this.normalizeCurrencyCode(currency);
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: safeCurrency,
+        minimumFractionDigits,
+        maximumFractionDigits,
+      }).format(Number.isFinite(numeric) ? numeric : 0);
+    } catch (_err) {
+      return `${safeCurrency} ${(Number.isFinite(numeric) ? numeric : 0).toFixed(2)}`;
+    }
+  }
+
+  private normalizeCurrencyCode(currency: unknown): string {
+    const raw = String(currency || '').trim().toUpperCase();
+    if (/^[A-Z]{3}$/.test(raw)) {
+      return raw;
+    }
+    return 'USD';
   }
 }

@@ -447,6 +447,21 @@ export class SalesInvoicesPageComponent {
     return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
   }
 
+  formatMoney(value: unknown, currency?: string): string {
+    const amount = Number(value ?? 0);
+    const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number.isFinite(amount) ? amount : 0);
+    } catch (_err) {
+      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+    }
+  }
+
   private newInvoiceForm(): Record<string, unknown> {
     return {
       organizationId: '',

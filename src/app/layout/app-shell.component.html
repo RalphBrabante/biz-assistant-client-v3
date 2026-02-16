@@ -35,17 +35,24 @@
         </div>
       </div>
 
-      <nav class="nav flex-column gap-2 mb-4">
-        <a
-          *ngFor="let item of visibleNavItems"
-          class="nav-link rounded-3 px-3 py-2 d-flex align-items-center gap-2"
-          [routerLink]="item.path"
-          routerLinkActive="active"
-          (click)="closeSidebarAfterNav()"
-        >
-          <i [ngClass]="['bi', item.icon]"></i>
-          <span class="nav-label">{{ item.label }}</span>
-        </a>
+      <nav class="mb-4">
+        <div *ngFor="let section of visibleNavSections()" class="mb-3">
+          <div class="small text-uppercase text-secondary fw-semibold px-3 mb-2 nav-label">
+            {{ section.title }}
+          </div>
+          <div class="nav flex-column gap-2">
+            <a
+              *ngFor="let item of section.items"
+              class="nav-link rounded-3 px-3 py-2 d-flex align-items-center gap-2"
+              [routerLink]="item.path"
+              routerLinkActive="active"
+              (click)="closeSidebarAfterNav()"
+            >
+              <i [ngClass]="['bi', item.icon]"></i>
+              <span class="nav-label">{{ item.label }}</span>
+            </a>
+          </div>
+        </div>
       </nav>
 
       <div class="user-block">

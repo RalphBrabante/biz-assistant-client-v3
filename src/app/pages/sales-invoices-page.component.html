@@ -176,9 +176,9 @@
               {{ row.paymentStatus || '-' }}
             </span>
           </td>
-          <td>{{ row.amount ?? row.subtotalAmount ?? 0 }}</td>
-          <td>{{ row.taxableAmount ?? ((row.amount ?? row.subtotalAmount ?? 0) - (row.taxAmount ?? 0)) }}</td>
-          <td>{{ row.totalAmount ?? 0 }}</td>
+          <td>{{ formatMoney(row.amount ?? row.subtotalAmount ?? 0, row.currency || currentOrganizationCurrency) }}</td>
+          <td>{{ formatMoney(row.taxableAmount ?? ((row.amount ?? row.subtotalAmount ?? 0) - (row.taxAmount ?? 0)), row.currency || currentOrganizationCurrency) }}</td>
+          <td>{{ formatMoney(row.totalAmount ?? 0, row.currency || currentOrganizationCurrency) }}</td>
           <td>
             <span class="badge rounded-pill text-bg-light border border-secondary-subtle text-secondary">
               {{ row.issueDate ? (row.issueDate | date: 'mediumDate') : '-' }}
@@ -264,27 +264,27 @@
 
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Amount</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['amount']" />
+            <input type="number" step="0.01" class="form-control" [(ngModel)]="createForm['amount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Tax</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['taxAmount']" />
+            <input type="number" step="0.01" class="form-control" [(ngModel)]="createForm['taxAmount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Taxable Amount</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['taxableAmount']" />
+            <input type="number" step="0.01" class="form-control" [(ngModel)]="createForm['taxableAmount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Withholding Tax Amount</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['withHoldingTaxAmount']" />
+            <input type="number" step="0.01" class="form-control" [(ngModel)]="createForm['withHoldingTaxAmount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Discount</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['discountAmount']" />
+            <input type="number" step="0.01" class="form-control" [(ngModel)]="createForm['discountAmount']" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Total</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['totalAmount']" />
+            <input type="number" step="0.01" class="form-control" [(ngModel)]="createForm['totalAmount']" />
           </div>
 
           <div class="col-12 col-md-6">

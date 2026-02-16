@@ -76,13 +76,13 @@
         <div class="border rounded-3 p-3 h-100">
           <div class="small text-secondary text-uppercase mb-2">Amounts</div>
           <div><strong>Currency:</strong> {{ row.currency || 'USD' }}</div>
-          <div><strong>Amount:</strong> {{ invoiceAmount | number: '1.2-2' }}</div>
-          <div><strong>Taxable Amount:</strong> {{ invoiceTaxableAmount | number: '1.2-2' }}</div>
-          <div><strong>Tax Amount:</strong> {{ (row.taxAmount ?? itemsTax) | number: '1.2-2' }}</div>
-          <div><strong>Withholding Tax Amount:</strong> {{ invoiceWithHoldingTaxAmount | number: '1.2-2' }}</div>
-          <div><strong>Discount:</strong> {{ (row.discountAmount ?? itemsDiscount) | number: '1.2-2' }}</div>
-          <div><strong>Shipping:</strong> {{ orderShippingAmount | number: '1.2-2' }}</div>
-          <div class="fs-5 mt-2"><strong>Total Paid:</strong> {{ invoicePaidTotal | number: '1.2-2' }}</div>
+          <div><strong>Amount:</strong> {{ formatMoney(invoiceAmount, invoiceCurrency) }}</div>
+          <div><strong>Taxable Amount:</strong> {{ formatMoney(invoiceTaxableAmount, invoiceCurrency) }}</div>
+          <div><strong>Tax Amount:</strong> {{ formatMoney((row.taxAmount ?? itemsTax), invoiceCurrency) }}</div>
+          <div><strong>Withholding Tax Amount:</strong> {{ formatMoney(invoiceWithHoldingTaxAmount, invoiceCurrency) }}</div>
+          <div><strong>Discount:</strong> {{ formatMoney((row.discountAmount ?? itemsDiscount), invoiceCurrency) }}</div>
+          <div><strong>Shipping:</strong> {{ formatMoney(orderShippingAmount, invoiceCurrency) }}</div>
+          <div class="fs-5 mt-2"><strong>Total Paid:</strong> {{ formatMoney(invoicePaidTotal, invoiceCurrency) }}</div>
         </div>
       </div>
       <div class="col-12" *ngIf="row.notes">
@@ -112,9 +112,9 @@
                   <td>{{ line.name || '-' }}</td>
                   <td>{{ line.sku || '-' }}</td>
                   <td class="text-end">{{ line.quantity || 0 }}</td>
-                  <td class="text-end">{{ line.unitPrice || 0 | number: '1.2-2' }}</td>
-                  <td class="text-end">{{ line.lineTax || 0 | number: '1.2-2' }}</td>
-                  <td class="text-end fw-semibold">{{ line.lineTotal || 0 | number: '1.2-2' }}</td>
+                  <td class="text-end">{{ formatMoney(line.unitPrice || 0, invoiceCurrency) }}</td>
+                  <td class="text-end">{{ formatMoney(line.lineTax || 0, invoiceCurrency) }}</td>
+                  <td class="text-end fw-semibold">{{ formatMoney(line.lineTotal || 0, invoiceCurrency) }}</td>
                 </tr>
                 <tr *ngIf="orderedItems.length === 0">
                   <td colspan="6" class="text-center text-secondary">No ordered item snapshots found for this invoice.</td>

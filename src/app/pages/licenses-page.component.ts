@@ -56,6 +56,7 @@ export class LicensesPageComponent {
 
   readonly message = signal('');
   readonly error = signal('');
+  readonly createModalError = signal('');
   readonly filter = signal('');
   page = 1;
   pageSize = 20;
@@ -137,6 +138,7 @@ export class LicensesPageComponent {
 
   openCreateModal(): void {
     this.createForm = this.newLicenseForm();
+    this.createModalError.set('');
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -148,6 +150,7 @@ export class LicensesPageComponent {
 
   createLicense(): void {
     this.submitting.set(true);
+    this.createModalError.set('');
     this.error.set('');
     this.message.set('');
 
@@ -162,7 +165,7 @@ export class LicensesPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to create license.');
+        this.createModalError.set(err?.error?.message || 'Unable to create license.');
       },
     });
   }

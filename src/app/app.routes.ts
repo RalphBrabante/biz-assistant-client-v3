@@ -18,6 +18,8 @@ import { OrdersPageComponent } from './pages/orders-page.component';
 import { OrderPreviewPageComponent } from './pages/order-preview-page.component';
 import { PermissionsPageComponent } from './pages/permissions-page.component';
 import { ReportsPageComponent } from './pages/reports-page.component';
+import { ReportPreviewPageComponent } from './pages/report-preview-page.component';
+import { SalesReportPreviewPageComponent } from './pages/sales-report-preview-page.component';
 import { ResourcePageComponent } from './pages/resource-page.component';
 import { RolesPageComponent } from './pages/roles-page.component';
 import { RoleDetailPageComponent } from './pages/role-detail-page.component';
@@ -50,6 +52,8 @@ export const routes: Routes = [
       { path: 'roles/:id', component: RoleDetailPageComponent, canActivate: [permissionGuard], data: { permissions: ['roles.manage'] } },
       { path: 'permissions', component: PermissionsPageComponent, canActivate: [permissionGuard], data: { permissions: ['permissions.manage'] } },
       { path: 'reports', component: ReportsPageComponent, canActivate: [permissionGuard], data: { permissions: ['reports.read'] } },
+      { path: 'reports/:id', component: ReportPreviewPageComponent, canActivate: [permissionGuard], data: { permissions: ['reports.read'] } },
+      { path: 'reports/sales/:id', component: SalesReportPreviewPageComponent, canActivate: [permissionGuard], data: { permissions: ['reports.read'] } },
       { path: 'settings', component: SettingsPageComponent, canActivate: [permissionGuard], data: { permissions: ['settings.update'] } },
       { path: 'items', component: ItemsPageComponent, canActivate: [permissionGuard], data: { permissions: ['items.read'] } },
       { path: 'orders', component: OrdersPageComponent, canActivate: [permissionGuard], data: { permissions: ['orders.read'] } },

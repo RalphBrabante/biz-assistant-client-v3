@@ -239,6 +239,9 @@
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
       <div class="modal-body pt-3">
+        <div *ngIf="createModalError()" class="alert alert-danger mb-3">
+          {{ createModalError() }}
+        </div>
         <div class="row g-3">
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Name</label>

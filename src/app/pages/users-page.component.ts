@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -35,6 +36,19 @@ interface UserRow {
   lastLoginAt?: string;
 }
 
+interface RoleOption {
+  id: string;
+  name?: string;
+  code?: string;
+  description?: string;
+}
+
+interface OrganizationOption {
+  id: string;
+  name?: string;
+  legalName?: string;
+}
+
 @Component({
   selector: 'app-users-page',
   standalone: true,
@@ -57,6 +71,10 @@ export class UsersPageComponent {
   readonly submitting = signal(false);
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
+  readonly createOptionsLoading = signal(false);
+  readonly createRoleOptions = signal<RoleOption[]>([]);
+  readonly createOrganizationOptions = signal<OrganizationOption[]>([]);
+  readonly createModalError = signal('');
 
   readonly message = signal('');
   readonly error = signal('');
@@ -68,6 +86,7 @@ export class UsersPageComponent {
   readonly pageSizeOptions = [10, 20, 50, 100];
 
   createForm: Record<string, unknown> = this.newUserForm(true);
+  createSelectedRoleIds: string[] = [];
 
   editingId = '';
   editForm: Record<string, unknown> = this.newUserForm(false);
@@ -136,32 +155,47 @@ export class UsersPageComponent {
 
   openCreateModal(): void {
     this.createForm = this.newUserForm(true);
-    this.error.set('');
+    this.createSelectedRoleIds = [];
+    this.createForm['organizationId'] = this.isSuperuser ? '' : this.currentOrganizationId;
+    this.createModalError.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
+    this.loadCreateModalOptions();
   }
 
   closeCreateModal(): void {
     this.isCreateModalOpen.set(false);
+    this.createModalError.set('');
   }
 
   createUser(): void {
-    if (!this.currentOrganizationId.trim()) {
-      this.error.set('Logged in user has no organization assigned.');
+    if (!this.isSuperuser && !this.currentOrganizationId.trim()) {
+      this.createModalError.set('Logged in user has no organization assigned.');
+      return;
+    }
+    if (this.isSuperuser && !this.optionalString(this.createForm['organizationId'])) {
+      this.createModalError.set('Please select an organization.');
+      return;
+    }
+    if (this.createSelectedRoleIds.length === 0) {
+      this.createModalError.set('Please select at least one role.');
+      return;
+    }
+    if (!this.asString(this.createForm['password'])) {
+      this.createModalError.set('Password is required.');
       return;
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.createModalError.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(
-      {
-        ...this.createForm,
-        organizationId: this.currentOrganizationId,
-      },
-      true
-    );
+    const payload = this.buildPayload(this.createForm, true);
+    payload['organizationId'] = this.isSuperuser
+      ? this.optionalString(this.createForm['organizationId'])
+      : this.currentOrganizationId;
+    payload['roleIds'] = [...this.createSelectedRoleIds];
+    delete payload['role'];
 
     this.api.create<UserRow>('/api/v1/users', payload).subscribe({
       next: (response) => {
@@ -172,7 +206,7 @@ export class UsersPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to create user.');
+        this.createModalError.set(err?.error?.message || 'Unable to create user.');
       },
     });
   }
@@ -335,13 +369,80 @@ export class UsersPageComponent {
     return row.primaryOrganization?.name || row.primaryOrganization?.legalName || row.organizationId || '-';
   }
 
+  roleOptionLabel(role: RoleOption): string {
+    const name = String(role.name || '').trim();
+    const code = String(role.code || '').trim();
+    if (name && code) {
+      return `${name} (${code.toUpperCase()})`;
+    }
+    return name || code || role.id;
+  }
+
+  organizationOptionLabel(organization: OrganizationOption): string {
+    return organization.name || organization.legalName || organization.id;
+  }
+
+  isCreateRoleSelected(roleId: string): boolean {
+    return this.createSelectedRoleIds.includes(roleId);
+  }
+
+  toggleCreateRoleSelection(roleId: string, checked: boolean): void {
+    if (!checked) {
+      this.createSelectedRoleIds = this.createSelectedRoleIds.filter((id) => id !== roleId);
+      return;
+    }
+    if (!this.createSelectedRoleIds.includes(roleId)) {
+      this.createSelectedRoleIds = [...this.createSelectedRoleIds, roleId];
+    }
+  }
+
+  generateCreatePassword(): void {
+    const charset =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*()_+-=';
+    const length = 14;
+    let generated = '';
+    for (let i = 0; i < length; i += 1) {
+      const randomIndex = Math.floor(Math.random() * charset.length);
+      generated += charset.charAt(randomIndex);
+    }
+    this.createForm['password'] = generated;
+    this.createModalError.set('');
+  }
+
+  private loadCreateModalOptions(): void {
+    this.createOptionsLoading.set(true);
+    this.createRoleOptions.set([]);
+    this.createOrganizationOptions.set([]);
+
+    const rolesRequest = this.api.list<RoleOption>('/api/v1/roles?limit=500&isActive=true');
+    const organizationsRequest = this.isSuperuser
+      ? this.api.list<OrganizationOption>('/api/v1/organizations?limit=500')
+      : of({ ok: true, data: [] } as ApiResponse<OrganizationOption[]>);
+
+    forkJoin([rolesRequest, organizationsRequest]).subscribe({
+      next: ([rolesResponse, organizationsResponse]: [ApiResponse<RoleOption[]>, ApiResponse<OrganizationOption[]>]) => {
+        this.createOptionsLoading.set(false);
+        const roleRows = (rolesResponse.data || []).filter(
+          (role: RoleOption) =>
+            this.isSuperuser || String(role.code || '').toLowerCase() !== 'superuser'
+        );
+        this.createRoleOptions.set(roleRows);
+        this.createOrganizationOptions.set(organizationsResponse.data || []);
+      },
+      error: () => {
+        this.createOptionsLoading.set(false);
+        this.createModalError.set('Unable to load create-user options.');
+      },
+    });
+  }
+
   private newUserForm(includePassword: boolean): Record<string, unknown> {
     return {
       organizationId: '',
       firstName: '',
       lastName: '',
       email: '',
-      password: includePassword ? 'Default123!' : '',
+      password: includePassword ? '' : '',
       phone: '',
       addressLine1: '',
       addressLine2: '',
@@ -349,7 +450,7 @@ export class UsersPageComponent {
       state: '',
       postalCode: '',
       country: 'United States',
-      role: '',
+      role: undefined,
       status: 'pending_verification',
       isEmailVerified: false,
       isActive: true,

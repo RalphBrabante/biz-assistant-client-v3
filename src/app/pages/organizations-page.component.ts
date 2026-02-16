@@ -62,6 +62,7 @@ export class OrganizationsPageComponent {
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
   readonly taxTypes = signal<TaxTypeOption[]>([]);
+  readonly createModalError = signal('');
 
   readonly message = signal('');
   readonly error = signal('');
@@ -137,24 +138,25 @@ export class OrganizationsPageComponent {
   openCreateModal(): void {
     this.createForm = this.newOrgForm();
     this.loadTaxTypes();
-    this.error.set('');
+    this.createModalError.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
   }
 
   closeCreateModal(): void {
     this.isCreateModalOpen.set(false);
+    this.createModalError.set('');
   }
 
   createOrganization(): void {
     const createValidationError = this.validateRequiredFields(this.createForm);
     if (createValidationError) {
-      this.error.set(createValidationError);
+      this.createModalError.set(createValidationError);
       return;
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.createModalError.set('');
     this.message.set('');
 
     const payload = this.buildPayload(this.createForm);
@@ -168,7 +170,7 @@ export class OrganizationsPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to create organization.');
+        this.createModalError.set(err?.error?.message || 'Unable to create organization.');
       },
     });
   }

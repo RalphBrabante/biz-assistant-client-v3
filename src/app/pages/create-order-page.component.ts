@@ -111,6 +111,21 @@ export class CreateOrderPageComponent {
     return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
+  formatMoney(value: unknown, currency?: string): string {
+    const amount = Number(value ?? 0);
+    const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number.isFinite(amount) ? amount : 0);
+    } catch (_err) {
+      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+    }
+  }
+
   get taxableAmount(): number {
     const rate = this.organizationVatRate / 100;
     if (rate <= 0) {

@@ -154,7 +154,7 @@
             <td class="fw-semibold">{{ row.name }}</td>
             <td>{{ row.percentage }}%</td>
             <td>{{ row.appliesTo }}</td>
-            <td>{{ row.minimumBaseAmount ?? 0 }}</td>
+            <td>{{ formatMoney(row.minimumBaseAmount ?? 0, currentOrganizationCurrency) }}</td>
             <td>{{ row.isActive ? 'Yes' : 'No' }}</td>
             <td class="text-end">
               <div class="d-inline-flex gap-2">
@@ -319,4 +319,3 @@
     </div>
   </div>
 </div>
-

@@ -50,43 +50,6 @@
     <div class="alert alert-danger mb-3">{{ salesError() }}</div>
   </div>
 
-  <section class="row g-3 px-4 pb-4" *ngIf="latestSalesReport() as report">
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Invoice Count</div>
-          <div class="display-6 fw-semibold">{{ report.invoiceCount }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Subtotal</div>
-          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.subtotalAmount, report.currency) }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Tax</div>
-          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.taxAmount, report.currency) }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Total</div>
-          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.totalAmount, report.currency) }}</div>
-        </div>
-      </div>
-    </div>
-  </section>
-  <div class="px-4 pb-4 text-secondary small" *ngIf="!latestSalesReport()">
-    No saved sales report for Year {{ selectedYear() }}, {{ quarterLabel(selectedQuarter()) }}.
-  </div>
 
   <div class="px-4 pb-3">
     <div class="row g-3 align-items-end">
@@ -144,14 +107,23 @@
           <td class="fw-semibold">{{ toCurrency(row.totalAmount, row.currency) }}</td>
           <td>{{ row.generatedAt | date : 'medium' }}</td>
           <td class="text-end">
-            <button
-              class="btn btn-sm btn-outline-danger"
-              type="button"
-              [disabled]="deletingSalesReportId() === row.id"
-              (click)="deleteSalesReport(row.id)"
-            >
-              <i class="bi bi-trash3"></i>
-            </button>
+            <div class="d-inline-flex gap-2">
+              <a
+                class="btn btn-sm btn-outline-primary"
+                [routerLink]="['/reports/sales', row.id]"
+                title="Open Preview"
+              >
+                <i class="bi bi-eye"></i>
+              </a>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                type="button"
+                [disabled]="deletingSalesReportId() === row.id"
+                (click)="deleteSalesReport(row.id)"
+              >
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -187,43 +159,6 @@
     <div class="alert alert-danger mb-3">{{ expenseError() }}</div>
   </div>
 
-  <section class="row g-3 px-4 pb-4" *ngIf="latestExpenseReport() as report">
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Expense Count</div>
-          <div class="display-6 fw-semibold">{{ report.expenseCount }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Amount</div>
-          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.amount, report.currency) }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Tax</div>
-          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.taxAmount, report.currency) }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-3">
-      <div class="card border-0 bg-light rounded-4 h-100">
-        <div class="card-body">
-          <div class="text-secondary small">Total</div>
-          <div class="h5 fw-semibold mb-0">{{ toCurrency(report.totalAmount, report.currency) }}</div>
-        </div>
-      </div>
-    </div>
-  </section>
-  <div class="px-4 pb-4 text-secondary small" *ngIf="!latestExpenseReport()">
-    No saved expense report for Year {{ selectedYear() }}, {{ quarterLabel(selectedQuarter()) }}.
-  </div>
 
   <div class="px-4 pb-3">
     <div class="row g-3 align-items-end">
@@ -281,14 +216,23 @@
           <td class="fw-semibold">{{ toCurrency(row.totalAmount, row.currency) }}</td>
           <td>{{ row.generatedAt | date : 'medium' }}</td>
           <td class="text-end">
-            <button
-              class="btn btn-sm btn-outline-danger"
-              type="button"
-              [disabled]="deletingExpenseReportId() === row.id"
-              (click)="deleteExpenseReport(row.id)"
-            >
-              <i class="bi bi-trash3"></i>
-            </button>
+            <div class="d-inline-flex gap-2">
+              <a
+                class="btn btn-sm btn-outline-primary"
+                [routerLink]="['/reports', row.id]"
+                title="Open Preview"
+              >
+                <i class="bi bi-eye"></i>
+              </a>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                type="button"
+                [disabled]="deletingExpenseReportId() === row.id"
+                (click)="deleteExpenseReport(row.id)"
+              >
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>

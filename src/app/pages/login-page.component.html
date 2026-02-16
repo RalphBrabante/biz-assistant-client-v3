@@ -63,7 +63,7 @@
 
             <div *ngIf="error" class="alert alert-danger mt-4 mb-0" role="alert">
               <div>{{ error }}</div>
-              <div class="mt-2" *ngIf="error.toLowerCase().includes('not verified')">
+              <div class="mt-2" *ngIf="canResendVerification">
                 <button class="btn btn-outline-danger btn-sm" type="button" (click)="resendVerificationEmail()" [disabled]="verificationLoading">
                   {{ verificationLoading ? 'Sending verification...' : 'Send verification email' }}
                 </button>

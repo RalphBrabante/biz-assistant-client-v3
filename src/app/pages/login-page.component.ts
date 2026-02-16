@@ -46,6 +46,10 @@ export class LoginPageComponent {
   verificationLoading = false;
   verificationMessage = '';
 
+  get canResendVerification(): boolean {
+    return String(this.error || '').toLowerCase().includes('not verified');
+  }
+
   toggleTheme(): void {
     this.theme.toggle();
   }
@@ -66,7 +70,7 @@ export class LoginPageComponent {
           const token = response.data?.accessToken;
 
           if (!token) {
-            this.error = response.message || 'Login failed.';
+            this.error = this.toErrorMessage(response?.message, 'Login failed.');
             return;
           }
 
@@ -75,7 +79,7 @@ export class LoginPageComponent {
         },
         error: (errorResponse) => {
           this.loading = false;
-          this.error = errorResponse?.error?.message || 'Unable to log in.';
+          this.error = this.toErrorMessage(errorResponse?.error?.message, 'Unable to log in.');
         },
       });
   }
@@ -117,8 +121,10 @@ export class LoginPageComponent {
         },
         error: (errorResponse) => {
           this.forgotLoading = false;
-          this.forgotError =
-            errorResponse?.error?.message || 'Unable to process password reset request.';
+          this.forgotError = this.toErrorMessage(
+            errorResponse?.error?.message,
+            'Unable to process password reset request.'
+          );
         },
       });
   }
@@ -146,9 +152,29 @@ export class LoginPageComponent {
         },
         error: (errorResponse) => {
           this.verificationLoading = false;
-          this.verificationMessage =
-            errorResponse?.error?.message || 'Unable to send verification email.';
+          this.verificationMessage = this.toErrorMessage(
+            errorResponse?.error?.message,
+            'Unable to send verification email.'
+          );
         },
       });
+  }
+
+  private toErrorMessage(value: unknown, fallback: string): string {
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+    if (value && typeof value === 'object') {
+      const fromMessage = (value as { message?: unknown }).message;
+      if (typeof fromMessage === 'string' && fromMessage.trim()) {
+        return fromMessage;
+      }
+      try {
+        return JSON.stringify(value);
+      } catch (_err) {
+        return fallback;
+      }
+    }
+    return fallback;
   }
 }
