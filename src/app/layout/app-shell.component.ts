@@ -51,7 +51,6 @@ export class AppShellComponent {
     { label: 'Orders', path: '/orders', icon: 'bi-receipt', permissions: ['orders.read'] },
     { label: 'Licenses', path: '/licenses', icon: 'bi-patch-check', permissions: ['licenses.read'] },
     { label: 'Sales Invoices', path: '/sales-invoices', icon: 'bi-file-earmark-text', permissions: ['sales_invoices.read'] },
-    { label: 'Dev User', path: '/dev-user', icon: 'bi-person-plus', permissions: ['users.create'] },
   ];
   sidebarOpen = false;
   sidebarCollapsed = false;

@@ -7,7 +7,6 @@ import { CreateOrderPageComponent } from './pages/create-order-page.component';
 import { CustomersPageComponent } from './pages/customers-page.component';
 import { ExpenseDetailPageComponent } from './pages/expense-detail-page.component';
 import { ExpensesPageComponent } from './pages/expenses-page.component';
-import { DevUserPageComponent } from './pages/dev-user-page.component';
 import { ItemsPageComponent } from './pages/items-page.component';
 import { LicensesPageComponent } from './pages/licenses-page.component';
 import { LicenseEditPageComponent } from './pages/license-edit-page.component';
@@ -62,7 +61,6 @@ export const routes: Routes = [
       { path: 'license/:id', component: LicenseEditPageComponent, canActivate: [permissionGuard], data: { permissions: ['licenses.read'] } },
       { path: 'sales-invoices', component: SalesInvoicesPageComponent, canActivate: [permissionGuard], data: { permissions: ['sales_invoices.read'] } },
       { path: 'sales-invoices/:id', component: SalesInvoiceDetailPageComponent, canActivate: [permissionGuard], data: { permissions: ['sales_invoices.read'] } },
-      { path: 'dev-user', component: DevUserPageComponent, canActivate: [permissionGuard], data: { permissions: ['users.create'] } },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },
