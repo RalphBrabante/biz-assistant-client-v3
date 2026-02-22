@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -63,7 +64,7 @@ interface ItemImportSummary {
 @Component({
   selector: 'app-items-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './items-page.component.html',
 })
 export class ItemsPageComponent {
@@ -71,6 +72,7 @@ export class ItemsPageComponent {
   private readonly auth = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   readonly rows = signal<ItemRow[]>([]);
   readonly loading = signal(false);
@@ -104,7 +106,7 @@ export class ItemsPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'items-page';
 
-  createForm: Record<string, unknown> = this.newItemForm();
+  createItemForm: FormGroup = this.newCreateItemForm();
 
   editingId = '';
   editForm: Record<string, unknown> = this.newItemForm();
@@ -272,7 +274,7 @@ export class ItemsPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newItemForm();
+    this.createItemForm = this.newCreateItemForm();
     this.error.set('');
     this.createModalError.set('');
     this.message.set('');
@@ -294,12 +296,18 @@ export class ItemsPageComponent {
       return;
     }
 
+    if (this.createItemForm.invalid) {
+      this.createItemForm.markAllAsTouched();
+      this.createModalError.set('Please complete all required item fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.createModalError.set('');
     this.message.set('');
 
     const payload = {
-      ...this.buildPayload(this.createForm),
+      ...this.buildPayload(this.createItemForm.getRawValue()),
       organizationId: this.currentOrganizationId.trim(),
     };
 
@@ -690,6 +698,26 @@ export class ItemsPageComponent {
       reorderLevel: 0,
       isActive: true,
     };
+  }
+
+  private newCreateItemForm(): FormGroup {
+    const defaults = this.newItemForm();
+    return this.fb.group({
+      vendorId: [defaults['vendorId']],
+      type: [defaults['type'], [Validators.required, Validators.maxLength(30)]],
+      sku: [defaults['sku'], [Validators.required, Validators.maxLength(120)]],
+      name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
+      description: [defaults['description'], [Validators.maxLength(2000)]],
+      category: [defaults['category'], [Validators.required, Validators.maxLength(120)]],
+      unit: [defaults['unit'], [Validators.required, Validators.maxLength(40)]],
+      price: [defaults['price'], [Validators.required, Validators.min(0)]],
+      cost: [defaults['cost'], [Validators.required, Validators.min(0)]],
+      discountedPrice: [defaults['discountedPrice'], [Validators.min(0)]],
+      currency: [defaults['currency']],
+      stock: [defaults['stock'], [Validators.required, Validators.min(0)]],
+      reorderLevel: [defaults['reorderLevel'], [Validators.min(0)]],
+      isActive: [defaults['isActive']],
+    });
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

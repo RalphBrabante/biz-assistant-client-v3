@@ -6,6 +6,7 @@ interface CurrentUser {
   firstName?: string;
   lastName?: string;
   profileImageUrl?: string;
+  profileImageCdnUrl?: string;
   phone?: string;
   addressLine1?: string;
   addressLine2?: string;

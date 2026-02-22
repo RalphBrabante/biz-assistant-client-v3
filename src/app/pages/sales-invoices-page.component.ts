@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -49,7 +50,7 @@ interface SalesInvoiceImportSummary {
 @Component({
   selector: 'app-sales-invoices-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './sales-invoices-page.component.html',
 })
 export class SalesInvoicesPageComponent {
@@ -57,6 +58,7 @@ export class SalesInvoicesPageComponent {
   private readonly auth = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   readonly rows = signal<SalesInvoiceRow[]>([]);
   readonly loading = signal(false);
@@ -85,7 +87,7 @@ export class SalesInvoicesPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'sales-invoices-page';
 
-  createForm: Record<string, unknown> = this.newInvoiceForm();
+  createInvoiceForm: FormGroup = this.newCreateInvoiceForm();
   private importFile: File | null = null;
   forceImport = false;
 
@@ -161,7 +163,7 @@ export class SalesInvoicesPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newInvoiceForm();
+    this.createInvoiceForm = this.newCreateInvoiceForm();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -197,12 +199,18 @@ export class SalesInvoicesPageComponent {
       return;
     }
 
+    if (this.createInvoiceForm.invalid) {
+      this.createInvoiceForm.markAllAsTouched();
+      this.error.set('Please complete all required sales invoice fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
 
     const payload = this.buildPayload({
-      ...this.createForm,
+      ...this.createInvoiceForm.getRawValue(),
       organizationId: this.currentOrganizationId,
     });
 
@@ -510,6 +518,41 @@ export class SalesInvoicesPageComponent {
       createdBy: '',
       updatedBy: '',
     };
+  }
+
+  private newCreateInvoiceForm(): FormGroup {
+    const defaults = this.newInvoiceForm();
+    return this.fb.group(
+      {
+        orderId: [defaults['orderId']],
+        invoiceNumber: [defaults['invoiceNumber'], [Validators.required, Validators.maxLength(120)]],
+        issueDate: [defaults['issueDate'], [Validators.required]],
+        dueDate: [defaults['dueDate']],
+        status: [defaults['status'], [Validators.required]],
+        paymentStatus: [defaults['paymentStatus'], [Validators.required]],
+        amount: [defaults['amount'], [Validators.required, Validators.min(0)]],
+        taxAmount: [defaults['taxAmount'], [Validators.min(0)]],
+        taxableAmount: [defaults['taxableAmount'], [Validators.min(0)]],
+        withHoldingTaxAmount: [defaults['withHoldingTaxAmount'], [Validators.min(0)]],
+        discountAmount: [defaults['discountAmount'], [Validators.min(0)]],
+        totalAmount: [defaults['totalAmount'], [Validators.required, Validators.min(0)]],
+        paidAt: [defaults['paidAt']],
+        notes: [defaults['notes'], [Validators.maxLength(2000)]],
+      },
+      { validators: [this.invoiceDateRangeValidator] }
+    );
+  }
+
+  private invoiceDateRangeValidator(control: AbstractControl): ValidationErrors | null {
+    const issueDate = String(control.get('issueDate')?.value || '').trim();
+    const dueDate = String(control.get('dueDate')?.value || '').trim();
+    if (!issueDate || !dueDate) {
+      return null;
+    }
+    if (new Date(dueDate).getTime() < new Date(issueDate).getTime()) {
+      return { invalidDateRange: true };
+    }
+    return null;
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

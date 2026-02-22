@@ -149,10 +149,10 @@
       </div>
       <div class="modal-body pt-3">
         <div *ngIf="createModalError()" class="alert alert-danger">{{ createModalError() }}</div>
-        <div class="row g-3">
+        <form class="row g-3" [formGroup]="createLicenseForm" (ngSubmit)="createLicense()">
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Assign Organization</label>
-            <select class="form-select" [(ngModel)]="createForm['organizationId']">
+            <select class="form-select" formControlName="organizationId">
               <option value="">Unassigned</option>
               <option *ngFor="let org of organizations()" [value]="org.id">{{ organizationOptionLabel(org) }}</option>
             </select>
@@ -160,7 +160,7 @@
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">License Key</label>
             <div class="input-group">
-              <input class="form-control" [ngModel]="createForm['key']" readonly />
+              <input class="form-control" formControlName="key" readonly />
               <button class="btn btn-outline-secondary" type="button" (click)="generateKey()">
                 <i class="bi bi-arrow-clockwise me-1"></i>Generate UUID
               </button>
@@ -168,35 +168,39 @@
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Plan</label>
-            <input class="form-control" [(ngModel)]="createForm['planName']" />
+            <input class="form-control" formControlName="planName" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('planName', 'required')">Plan is required.</div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Status</label>
-            <input class="form-control" [(ngModel)]="createForm['status']" />
+            <input class="form-control" formControlName="status" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('status', 'required')">Status is required.</div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Max Users</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['maxUsers']" />
+            <input type="number" class="form-control" formControlName="maxUsers" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('maxUsers', 'min')">Max users cannot be negative.</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Starts At</label>
-            <input type="datetime-local" class="form-control" [(ngModel)]="createForm['startsAt']" />
+            <input type="datetime-local" class="form-control" formControlName="startsAt" />
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Expires At</label>
-            <input type="datetime-local" class="form-control" [(ngModel)]="createForm['expiresAt']" />
+            <input type="datetime-local" class="form-control" formControlName="expiresAt" />
+            <div class="text-danger small mt-1" *ngIf="hasCreateFormError('invalidDateRange')">Expires At must be after Starts At.</div>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold">Notes</label>
-            <textarea rows="2" class="form-control" [(ngModel)]="createForm['notes']"></textarea>
+            <textarea rows="2" class="form-control" formControlName="notes"></textarea>
           </div>
           <div class="col-12 col-md-4 d-flex align-items-end">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isActive']" />
+              <input class="form-check-input" type="checkbox" formControlName="isActive" />
               <label class="form-check-label">Active</label>
             </div>
           </div>
-        </div>
+        </form>
       </div>
       <div class="modal-footer border-0 pt-0">
         <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>

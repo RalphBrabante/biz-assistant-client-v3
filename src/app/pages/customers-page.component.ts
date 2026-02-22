@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -42,7 +43,7 @@ interface CustomerRow {
 @Component({
   selector: 'app-customers-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './customers-page.component.html',
 })
 export class CustomersPageComponent {
@@ -50,6 +51,7 @@ export class CustomersPageComponent {
   private readonly auth: AuthService;
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   constructor(api: ApiService, auth: AuthService) {
     this.api = api;
@@ -78,7 +80,7 @@ export class CustomersPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'customers-page';
 
-  createForm: Record<string, unknown> = this.newCustomerForm();
+  createCustomerForm: FormGroup = this.newCreateCustomerForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newCustomerForm();
   private importFile: File | null = null;
@@ -148,7 +150,7 @@ export class CustomersPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newCustomerForm();
+    this.createCustomerForm = this.newCreateCustomerForm();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -187,13 +189,19 @@ export class CustomersPageComponent {
       return;
     }
 
+    if (this.createCustomerForm.invalid) {
+      this.createCustomerForm.markAllAsTouched();
+      this.error.set('Please complete all required customer fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
 
     const currentUser = this.auth.currentUser();
     const payload = this.buildPayload({
-      ...this.createForm,
+      ...this.createCustomerForm.getRawValue(),
       organizationId: this.currentOrganizationId,
       createdBy: currentUser?.id || '',
       updatedBy: currentUser?.id || '',
@@ -481,6 +489,32 @@ export class CustomersPageComponent {
       createdBy: '',
       updatedBy: '',
     };
+  }
+
+  private newCreateCustomerForm(): FormGroup {
+    const defaults = this.newCustomerForm();
+    return this.fb.group({
+      customerCode: [defaults['customerCode'], [Validators.maxLength(120)]],
+      type: [defaults['type'], [Validators.required]],
+      name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
+      legalName: [defaults['legalName'], [Validators.maxLength(180)]],
+      taxId: [defaults['taxId'], [Validators.required, Validators.maxLength(120)]],
+      contactPerson: [defaults['contactPerson'], [Validators.maxLength(120)]],
+      email: [defaults['email'], [Validators.email]],
+      phone: [defaults['phone'], [Validators.maxLength(40)]],
+      mobile: [defaults['mobile'], [Validators.maxLength(40)]],
+      addressLine1: [defaults['addressLine1'], [Validators.maxLength(255)]],
+      addressLine2: [defaults['addressLine2'], [Validators.maxLength(255)]],
+      city: [defaults['city'], [Validators.maxLength(120)]],
+      state: [defaults['state'], [Validators.maxLength(120)]],
+      postalCode: [defaults['postalCode'], [Validators.maxLength(20)]],
+      country: [defaults['country']],
+      creditLimit: [defaults['creditLimit'], [Validators.min(0)]],
+      paymentTermsDays: [defaults['paymentTermsDays'], [Validators.min(0)]],
+      status: [defaults['status'], [Validators.required]],
+      notes: [defaults['notes'], [Validators.maxLength(2000)]],
+      isActive: [defaults['isActive']],
+    });
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

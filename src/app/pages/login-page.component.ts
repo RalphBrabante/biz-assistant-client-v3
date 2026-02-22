@@ -17,6 +17,8 @@ interface LoginPayload {
     email?: string;
     firstName?: string;
     lastName?: string;
+    profileImageCdnUrl?: string;
+    profileImageUrl?: string;
     status?: string;
     organizationId?: string;
     organizationName?: string;

@@ -62,10 +62,24 @@
       <div class="col-12 col-md-3"><strong>Currency:</strong> {{ row.currency || '-' }}</div>
     </div>
 
-    <div class="mt-3 no-print" *ngIf="row.file">
-      <a [href]="row.file" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-file-earmark-image me-1"></i>View Attachment
-      </a>
+    <div class="mt-3" *ngIf="attachmentUrl() as fileUrl">
+      <div class="fw-semibold small text-uppercase text-secondary mb-2">Attachment</div>
+      <button
+        type="button"
+        class="btn p-0 border rounded-3 overflow-hidden d-inline-block text-start bg-transparent"
+        style="width: 220px; max-width: 100%;"
+        (click)="openImagePreview(fileUrl)"
+      >
+        <img
+          [src]="fileUrl"
+          alt="Expense attachment thumbnail"
+          class="w-100 d-block"
+          style="height: 140px; object-fit: cover;"
+        />
+        <div class="px-2 py-1 small bg-body-tertiary no-print">
+          <i class="bi bi-arrows-fullscreen me-1"></i>Click to view full image
+        </div>
+      </button>
     </div>
   </div>
 </section>
@@ -79,3 +93,35 @@
     <div class="alert alert-danger mb-0">{{ error() }}</div>
   </div>
 </section>
+
+<div class="modal-backdrop fade show" *ngIf="previewImageUrl()" (click)="closeImagePreview()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="previewImageUrl() ? 'block' : 'none'"
+  [attr.aria-hidden]="!previewImageUrl()"
+  *ngIf="previewImageUrl() as imageUrl"
+>
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Expense Attachment Preview</h5>
+        <button type="button" class="btn-close" (click)="closeImagePreview()"></button>
+      </div>
+      <div class="modal-body pt-2 text-center">
+        <img
+          [src]="imageUrl"
+          alt="Expense attachment"
+          class="img-fluid rounded border"
+          style="max-height: 75vh; object-fit: contain;"
+        />
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <a class="btn btn-outline-secondary" [href]="imageUrl" target="_blank" rel="noopener noreferrer">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open in New Tab
+        </a>
+        <button class="btn btn-primary" type="button" (click)="closeImagePreview()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

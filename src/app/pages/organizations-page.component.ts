@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -54,13 +55,14 @@ interface CurrencyOption {
 @Component({
   selector: 'app-organizations-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './organizations-page.component.html',
 })
 export class OrganizationsPageComponent {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly fb = inject(FormBuilder);
 
   readonly rows = signal<OrganizationRow[]>([]);
   readonly loading = signal(false);
@@ -83,7 +85,7 @@ export class OrganizationsPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'organizations-page';
 
-  createForm: Record<string, unknown> = this.newOrgForm();
+  createOrganizationForm: FormGroup = this.newCreateOrganizationForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newOrgForm();
 
@@ -147,7 +149,7 @@ export class OrganizationsPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newOrgForm();
+    this.createOrganizationForm = this.newCreateOrganizationForm();
     this.loadTaxTypes();
     this.createModalError.set('');
     this.message.set('');
@@ -160,9 +162,9 @@ export class OrganizationsPageComponent {
   }
 
   createOrganization(): void {
-    const createValidationError = this.validateRequiredFields(this.createForm);
-    if (createValidationError) {
-      this.createModalError.set(createValidationError);
+    if (this.createOrganizationForm.invalid) {
+      this.createOrganizationForm.markAllAsTouched();
+      this.createModalError.set('Please complete all required organization fields.');
       return;
     }
 
@@ -170,7 +172,7 @@ export class OrganizationsPageComponent {
     this.createModalError.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(this.createForm);
+    const payload = this.buildPayload(this.createOrganizationForm.getRawValue());
 
     this.api.create<OrganizationRow>('/api/v1/organizations', payload).subscribe({
       next: (response) => {
@@ -383,6 +385,31 @@ export class OrganizationsPageComponent {
       notes: '',
       isActive: true,
     };
+  }
+
+  private newCreateOrganizationForm(): FormGroup {
+    const defaults = this.newOrgForm();
+    return this.fb.group({
+      name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
+      legalName: [defaults['legalName'], [Validators.maxLength(180)]],
+      taxId: [defaults['taxId'], [Validators.maxLength(120)]],
+      addressLine1: [defaults['addressLine1'], [Validators.required, Validators.maxLength(255)]],
+      addressLine2: [defaults['addressLine2'], [Validators.maxLength(255)]],
+      city: [defaults['city'], [Validators.required, Validators.maxLength(120)]],
+      state: [defaults['state'], [Validators.maxLength(120)]],
+      postalCode: [defaults['postalCode'], [Validators.maxLength(20)]],
+      country: [defaults['country'], [Validators.required]],
+      currency: [defaults['currency'], [Validators.required]],
+      taxTypeId: [defaults['taxTypeId'], [Validators.required]],
+      contactName: [defaults['contactName'], [Validators.maxLength(120)]],
+      contactEmail: [defaults['contactEmail'], [Validators.required, Validators.email]],
+      phone: [defaults['phone'], [Validators.required, Validators.maxLength(40)]],
+      website: [defaults['website'], [Validators.maxLength(255)]],
+      industry: [defaults['industry'], [Validators.maxLength(120)]],
+      employeeCount: [defaults['employeeCount'], [Validators.min(0)]],
+      notes: [defaults['notes'], [Validators.maxLength(2000)]],
+      isActive: [defaults['isActive']],
+    });
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

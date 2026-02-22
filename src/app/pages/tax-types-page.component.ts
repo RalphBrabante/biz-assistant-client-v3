@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -32,7 +33,7 @@ interface WithholdingTaxTypeRow {
 @Component({
   selector: 'app-tax-types-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './tax-types-page.component.html',
 })
 export class TaxTypesPageComponent {
@@ -40,6 +41,7 @@ export class TaxTypesPageComponent {
   private readonly auth = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   readonly taxRows = signal<TaxTypeRow[]>([]);
   readonly withholdingRows = signal<WithholdingTaxTypeRow[]>([]);
@@ -54,8 +56,8 @@ export class TaxTypesPageComponent {
   viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'tax-types-page';
 
-  taxCreateForm: Record<string, unknown> = this.newTaxForm();
-  withholdingCreateForm: Record<string, unknown> = this.newWithholdingForm();
+  taxCreateForm: FormGroup = this.newTaxCreateForm();
+  withholdingCreateForm: FormGroup = this.newWithholdingCreateForm();
   editingTaxId = '';
   editingWithholdingId = '';
   taxEditForm: Record<string, unknown> = this.newTaxForm();
@@ -168,7 +170,7 @@ export class TaxTypesPageComponent {
   }
 
   openTaxCreateModal(): void {
-    this.taxCreateForm = this.newTaxForm();
+    this.taxCreateForm = this.newTaxCreateForm();
     this.isTaxCreateModalOpen.set(true);
     this.error.set('');
   }
@@ -178,9 +180,15 @@ export class TaxTypesPageComponent {
   }
 
   createTaxType(): void {
+    if (this.taxCreateForm.invalid) {
+      this.taxCreateForm.markAllAsTouched();
+      this.error.set('Please complete all required tax type fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
-    this.api.create<TaxTypeRow>('/api/v1/tax-types', this.buildTaxPayload(this.taxCreateForm)).subscribe({
+    this.api.create<TaxTypeRow>('/api/v1/tax-types', this.buildTaxPayload(this.taxCreateForm.getRawValue())).subscribe({
       next: (response) => {
         this.submitting.set(false);
         this.isTaxCreateModalOpen.set(false);
@@ -264,7 +272,7 @@ export class TaxTypesPageComponent {
   }
 
   openWithholdingCreateModal(): void {
-    this.withholdingCreateForm = this.newWithholdingForm();
+    this.withholdingCreateForm = this.newWithholdingCreateForm();
     this.isWithholdingCreateModalOpen.set(true);
     this.error.set('');
   }
@@ -278,10 +286,15 @@ export class TaxTypesPageComponent {
       this.error.set('Select a specific organization first.');
       return;
     }
+    if (this.withholdingCreateForm.invalid) {
+      this.withholdingCreateForm.markAllAsTouched();
+      this.error.set('Please complete all required withholding tax fields.');
+      return;
+    }
     this.submitting.set(true);
     this.error.set('');
     const payload = {
-      ...this.buildWithholdingPayload(this.withholdingCreateForm),
+      ...this.buildWithholdingPayload(this.withholdingCreateForm.getRawValue()),
       organizationId: this.activeOrganizationId,
     };
     this.api.create<WithholdingTaxTypeRow>('/api/v1/withholding-tax-types', payload).subscribe({
@@ -407,6 +420,41 @@ export class TaxTypesPageComponent {
       minimumBaseAmount: 0,
       isActive: true,
     };
+  }
+
+  controlHasError(form: FormGroup, controlName: string, errorCode?: string): boolean {
+    const control = form.get(controlName);
+    if (!control || !(control.touched || control.dirty)) {
+      return false;
+    }
+    if (!errorCode) {
+      return control.invalid;
+    }
+    return !!control.errors?.[errorCode];
+  }
+
+  private newTaxCreateForm(): FormGroup {
+    const defaults = this.newTaxForm();
+    return this.fb.group({
+      code: [defaults['code'], [Validators.required, Validators.maxLength(30)]],
+      name: [defaults['name'], [Validators.required, Validators.maxLength(120)]],
+      description: [defaults['description'], [Validators.maxLength(500)]],
+      percentage: [defaults['percentage'], [Validators.required, Validators.min(0)]],
+      isActive: [defaults['isActive']],
+    });
+  }
+
+  private newWithholdingCreateForm(): FormGroup {
+    const defaults = this.newWithholdingForm();
+    return this.fb.group({
+      code: [defaults['code'], [Validators.required, Validators.maxLength(40)]],
+      name: [defaults['name'], [Validators.required, Validators.maxLength(120)]],
+      description: [defaults['description'], [Validators.maxLength(500)]],
+      percentage: [defaults['percentage'], [Validators.required, Validators.min(0)]],
+      appliesTo: [defaults['appliesTo'], [Validators.required]],
+      minimumBaseAmount: [defaults['minimumBaseAmount'], [Validators.required, Validators.min(0)]],
+      isActive: [defaults['isActive']],
+    });
   }
 
   private buildTaxPayload(form: Record<string, unknown>): Record<string, unknown> {

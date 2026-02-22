@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -39,7 +40,7 @@ interface VendorRow {
 @Component({
   selector: 'app-vendors-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './vendors-page.component.html',
 })
 export class VendorsPageComponent {
@@ -47,6 +48,7 @@ export class VendorsPageComponent {
   private readonly auth: AuthService;
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   constructor(api: ApiService, auth: AuthService) {
     this.api = api;
@@ -76,7 +78,7 @@ export class VendorsPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'vendors-page';
 
-  createForm: Record<string, unknown> = this.newVendorForm();
+  createVendorForm: FormGroup = this.newCreateVendorForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newVendorForm();
   private importFile: File | null = null;
@@ -134,7 +136,7 @@ export class VendorsPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newVendorForm();
+    this.createVendorForm = this.newCreateVendorForm();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -169,12 +171,18 @@ export class VendorsPageComponent {
       return;
     }
 
+    if (this.createVendorForm.invalid) {
+      this.createVendorForm.markAllAsTouched();
+      this.error.set('Please complete all required vendor fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
 
     const payload = this.buildPayload({
-      ...this.createForm,
+      ...this.createVendorForm.getRawValue(),
       createdBy: this.currentUserId,
       updatedBy: this.currentUserId,
     });
@@ -450,6 +458,29 @@ export class VendorsPageComponent {
       createdBy: '',
       updatedBy: '',
     };
+  }
+
+  private newCreateVendorForm(): FormGroup {
+    const defaults = this.newVendorForm();
+    return this.fb.group({
+      name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
+      legalName: [defaults['legalName'], [Validators.maxLength(180)]],
+      taxId: [defaults['taxId'], [Validators.maxLength(120)]],
+      contactPerson: [defaults['contactPerson'], [Validators.maxLength(120)]],
+      contactEmail: [defaults['contactEmail'], [Validators.email]],
+      phone: [defaults['phone'], [Validators.maxLength(40)]],
+      addressLine1: [defaults['addressLine1'], [Validators.maxLength(255)]],
+      addressLine2: [defaults['addressLine2'], [Validators.maxLength(255)]],
+      city: [defaults['city'], [Validators.maxLength(120)]],
+      state: [defaults['state'], [Validators.maxLength(120)]],
+      barangay: [defaults['barangay'], [Validators.maxLength(120)]],
+      province: [defaults['province'], [Validators.maxLength(120)]],
+      postalCode: [defaults['postalCode'], [Validators.maxLength(20)]],
+      country: [defaults['country']],
+      paymentTerms: [defaults['paymentTerms'], [Validators.maxLength(120)]],
+      notes: [defaults['notes'], [Validators.maxLength(2000)]],
+      status: [defaults['status'], [Validators.required]],
+    });
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

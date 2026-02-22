@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
@@ -21,12 +22,13 @@ interface PermissionRow {
 @Component({
   selector: 'app-permissions-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './permissions-page.component.html',
 })
 export class PermissionsPageComponent {
   private readonly api: ApiService;
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly fb = inject(FormBuilder);
 
   constructor(api: ApiService) {
     this.api = api;
@@ -49,15 +51,7 @@ export class PermissionsPageComponent {
   viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'permissions-page';
 
-  createForm: Record<string, unknown> = {
-    name: '',
-    code: '',
-    resource: '',
-    action: '',
-    description: '',
-    isSystem: false,
-    isActive: true,
-  };
+  createPermissionForm: FormGroup = this.newCreatePermissionForm();
 
   editingId = '';
   editForm: Record<string, unknown> = {
@@ -126,15 +120,7 @@ export class PermissionsPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = {
-      name: '',
-      code: '',
-      resource: '',
-      action: '',
-      description: '',
-      isSystem: false,
-      isActive: true,
-    };
+    this.createPermissionForm = this.newCreatePermissionForm();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -145,18 +131,25 @@ export class PermissionsPageComponent {
   }
 
   createPermission(): void {
+    if (this.createPermissionForm.invalid) {
+      this.createPermissionForm.markAllAsTouched();
+      this.error.set('Please complete all required permission fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
+    const value = this.createPermissionForm.getRawValue();
 
     const payload = {
-      name: String(this.createForm['name'] || '').trim(),
-      code: String(this.createForm['code'] || '').trim().toLowerCase(),
-      resource: String(this.createForm['resource'] || '').trim().toLowerCase(),
-      action: String(this.createForm['action'] || '').trim().toLowerCase(),
-      description: String(this.createForm['description'] || '').trim() || undefined,
-      isSystem: Boolean(this.createForm['isSystem']),
-      isActive: Boolean(this.createForm['isActive']),
+      name: String(value['name'] || '').trim(),
+      code: String(value['code'] || '').trim().toLowerCase(),
+      resource: String(value['resource'] || '').trim().toLowerCase(),
+      action: String(value['action'] || '').trim().toLowerCase(),
+      description: String(value['description'] || '').trim() || undefined,
+      isSystem: Boolean(value['isSystem']),
+      isActive: Boolean(value['isActive']),
     };
 
     this.api.create<PermissionRow>('/api/v1/permissions', payload).subscribe({
@@ -306,6 +299,29 @@ export class PermissionsPageComponent {
       page: this.page,
       pageSize: this.pageSize,
       viewMode: this.viewMode,
+    });
+  }
+
+  controlHasError(controlName: string, errorCode?: string): boolean {
+    const control = this.createPermissionForm.get(controlName);
+    if (!control || !(control.touched || control.dirty)) {
+      return false;
+    }
+    if (!errorCode) {
+      return control.invalid;
+    }
+    return !!control.errors?.[errorCode];
+  }
+
+  private newCreatePermissionForm(): FormGroup {
+    return this.fb.group({
+      name: ['', [Validators.required, Validators.maxLength(120)]],
+      code: ['', [Validators.required, Validators.pattern(/^[a-z0-9._]+$/)]],
+      resource: ['', [Validators.required, Validators.pattern(/^[a-z0-9_]+$/)]],
+      action: ['', [Validators.required, Validators.pattern(/^[a-z0-9_]+$/)]],
+      description: ['', [Validators.maxLength(500)]],
+      isSystem: [false],
+      isActive: [true],
     });
   }
 }

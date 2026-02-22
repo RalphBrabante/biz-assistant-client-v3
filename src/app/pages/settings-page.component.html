@@ -14,6 +14,7 @@
     <div *ngIf="error()" class="alert alert-danger">{{ error() }}</div>
 
     <div *ngIf="isSuperuser; else notAllowed">
+      <h5 class="mb-3">Cache Settings</h5>
       <div class="form-check form-switch mb-3">
         <input
           class="form-check-input"
@@ -30,6 +31,59 @@
       <p class="text-secondary small mb-4">
         Applies to API read endpoints. Write operations clear cache automatically.
       </p>
+
+      <hr class="my-4" />
+      <h5 class="mb-3">File Storage Settings</h5>
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold">Storage Provider</label>
+          <select class="form-select" [ngModel]="storageProvider()" (ngModelChange)="storageProvider.set($event)">
+            <option value="local">Local Storage</option>
+            <option value="do_spaces">DigitalOcean Spaces</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="alert alert-info mt-3 mb-0" *ngIf="storageProvider() === 'do_spaces' && !doSpacesConfigured()">
+        DigitalOcean Spaces is selected but not fully configured yet.
+      </div>
+
+      <div class="row g-3 mt-1" *ngIf="storageProvider() === 'do_spaces'">
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Spaces Endpoint</label>
+          <input class="form-control" [ngModel]="doSpacesEndpoint()" (ngModelChange)="doSpacesEndpoint.set($event)" placeholder="nyc3.digitaloceanspaces.com" />
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label fw-semibold">Region</label>
+          <input class="form-control" [ngModel]="doSpacesRegion()" (ngModelChange)="doSpacesRegion.set($event)" placeholder="nyc3" />
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label fw-semibold">Bucket Name</label>
+          <input class="form-control" [ngModel]="doSpacesBucket()" (ngModelChange)="doSpacesBucket.set($event)" placeholder="my-bucket" />
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Access Key</label>
+          <input class="form-control" [ngModel]="doSpacesAccessKey()" (ngModelChange)="doSpacesAccessKey.set($event)" />
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Secret Key</label>
+          <input
+            type="password"
+            class="form-control"
+            [ngModel]="doSpacesSecretKey()"
+            (ngModelChange)="doSpacesSecretKey.set($event)"
+            [placeholder]="doSpacesHasSecretKey() ? 'Leave blank to keep existing secret key' : ''"
+          />
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">CDN/Base URL (Optional)</label>
+          <input class="form-control" [ngModel]="doSpacesCdnBaseUrl()" (ngModelChange)="doSpacesCdnBaseUrl.set($event)" placeholder="https://my-cdn.domain.com" />
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Directory Prefix (Optional)</label>
+          <input class="form-control" [ngModel]="doSpacesDirectory()" (ngModelChange)="doSpacesDirectory.set($event)" placeholder="biz-assistant" />
+        </div>
+      </div>
 
       <button class="btn btn-primary" [disabled]="submitting() || loading()" (click)="save()">
         {{ submitting() ? 'Saving...' : 'Save Settings' }}

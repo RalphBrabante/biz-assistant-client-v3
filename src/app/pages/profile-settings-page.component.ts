@@ -18,6 +18,7 @@ interface ProfileResponse {
   postalCode?: string;
   country?: string;
   profileImageUrl?: string;
+  profileImageCdnUrl?: string;
 }
 
 @Component({
@@ -91,7 +92,7 @@ export class ProfileSettingsPageComponent {
           password: '',
           confirmPassword: '',
         };
-        this.previewUrl = String(profile.profileImageUrl || '').trim();
+        this.previewUrl = String(profile.profileImageCdnUrl || profile.profileImageUrl || '').trim();
 
         this.auth.updateCurrentUser({
           firstName: profile.firstName,
@@ -104,6 +105,7 @@ export class ProfileSettingsPageComponent {
           state: profile.state,
           postalCode: profile.postalCode,
           country: profile.country,
+          profileImageCdnUrl: profile.profileImageCdnUrl,
           profileImageUrl: profile.profileImageUrl,
         });
       },
@@ -184,7 +186,7 @@ export class ProfileSettingsPageComponent {
         this.form['password'] = '';
         this.form['confirmPassword'] = '';
         this.selectedFile = null;
-        this.previewUrl = String(updated.profileImageUrl || this.previewUrl || '');
+        this.previewUrl = String(updated.profileImageCdnUrl || updated.profileImageUrl || this.previewUrl || '');
 
         this.auth.updateCurrentUser({
           firstName: updated.firstName,
@@ -197,6 +199,7 @@ export class ProfileSettingsPageComponent {
           state: updated.state,
           postalCode: updated.postalCode,
           country: updated.country,
+          profileImageCdnUrl: updated.profileImageCdnUrl,
           profileImageUrl: updated.profileImageUrl,
         });
       },

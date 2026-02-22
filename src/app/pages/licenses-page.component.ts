@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -36,13 +37,14 @@ interface OrganizationOption {
 @Component({
   selector: 'app-licenses-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './licenses-page.component.html',
 })
 export class LicensesPageComponent {
   private readonly api: ApiService;
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   constructor(api: ApiService) {
     this.api = api;
@@ -67,7 +69,7 @@ export class LicensesPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'licenses-page';
 
-  createForm: Record<string, unknown> = this.newLicenseForm();
+  createLicenseForm: FormGroup = this.newCreateLicenseForm();
 
   readonly filteredRows = computed(() => {
     const q = this.filter().trim().toLowerCase();
@@ -141,7 +143,7 @@ export class LicensesPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newLicenseForm();
+    this.createLicenseForm = this.newCreateLicenseForm();
     this.createModalError.set('');
     this.error.set('');
     this.message.set('');
@@ -153,12 +155,18 @@ export class LicensesPageComponent {
   }
 
   createLicense(): void {
+    if (this.createLicenseForm.invalid) {
+      this.createLicenseForm.markAllAsTouched();
+      this.createModalError.set('Please complete all required license fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.createModalError.set('');
     this.error.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(this.createForm, true);
+    const payload = this.buildPayload(this.createLicenseForm.getRawValue(), true);
 
     this.api.create<LicenseRow>('/api/v1/licenses', payload).subscribe({
       next: (response) => {
@@ -264,6 +272,24 @@ export class LicensesPageComponent {
     };
   }
 
+  private newCreateLicenseForm(): FormGroup {
+    const defaults = this.newLicenseForm();
+    return this.fb.group(
+      {
+        organizationId: [defaults['organizationId']],
+        key: [defaults['key'], [Validators.required]],
+        planName: [defaults['planName'], [Validators.required, Validators.maxLength(120)]],
+        status: [defaults['status'], [Validators.required, Validators.maxLength(50)]],
+        startsAt: [defaults['startsAt']],
+        expiresAt: [defaults['expiresAt']],
+        maxUsers: [defaults['maxUsers'], [Validators.required, Validators.min(0)]],
+        isActive: [defaults['isActive']],
+        notes: [defaults['notes'], [Validators.maxLength(1000)]],
+      },
+      { validators: [this.licenseDateRangeValidator] }
+    );
+  }
+
   private buildPayload(form: Record<string, unknown>, includeKey: boolean): Record<string, unknown> {
     const organizationId = this.optionalString(form['organizationId']);
     const payload: Record<string, unknown> = {
@@ -285,7 +311,34 @@ export class LicensesPageComponent {
   }
 
   generateKey(): void {
-    this.createForm['key'] = this.generateUuid();
+    this.createLicenseForm.patchValue({ key: this.generateUuid() });
+  }
+
+  controlHasError(controlName: string, errorCode?: string): boolean {
+    const control = this.createLicenseForm.get(controlName);
+    if (!control || !(control.touched || control.dirty)) {
+      return false;
+    }
+    if (!errorCode) {
+      return control.invalid;
+    }
+    return !!control.errors?.[errorCode];
+  }
+
+  hasCreateFormError(errorCode: string): boolean {
+    return !!this.createLicenseForm.errors?.[errorCode];
+  }
+
+  private licenseDateRangeValidator(control: AbstractControl): ValidationErrors | null {
+    const startsAt = String(control.get('startsAt')?.value || '').trim();
+    const expiresAt = String(control.get('expiresAt')?.value || '').trim();
+    if (!startsAt || !expiresAt) {
+      return null;
+    }
+    if (new Date(expiresAt).getTime() < new Date(startsAt).getTime()) {
+      return { invalidDateRange: true };
+    }
+    return null;
   }
 
   organizationLabel(row: LicenseRow): string {

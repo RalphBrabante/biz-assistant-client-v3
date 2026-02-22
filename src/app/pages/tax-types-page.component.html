@@ -233,30 +233,33 @@
         <button type="button" class="btn-close" (click)="closeTaxCreateModal()"></button>
       </div>
       <div class="modal-body pt-3">
-        <div class="row g-3">
+        <form class="row g-3" [formGroup]="taxCreateForm" (ngSubmit)="createTaxType()">
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Code</label>
-            <input class="form-control" [(ngModel)]="taxCreateForm['code']" placeholder="VAT" />
+            <input class="form-control" formControlName="code" placeholder="VAT" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError(taxCreateForm, 'code', 'required')">Code is required.</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Name</label>
-            <input class="form-control" [(ngModel)]="taxCreateForm['name']" placeholder="Value Added Tax" />
+            <input class="form-control" formControlName="name" placeholder="Value Added Tax" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError(taxCreateForm, 'name', 'required')">Name is required.</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Percentage</label>
-            <input type="number" step="0.01" class="form-control" [(ngModel)]="taxCreateForm['percentage']" />
+            <input type="number" step="0.01" class="form-control" formControlName="percentage" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError(taxCreateForm, 'percentage', 'min')">Percentage cannot be negative.</div>
           </div>
           <div class="col-12 col-md-6">
             <div class="form-check mt-4">
-              <input class="form-check-input" type="checkbox" [(ngModel)]="taxCreateForm['isActive']" />
+              <input class="form-check-input" type="checkbox" formControlName="isActive" />
               <label class="form-check-label">Active</label>
             </div>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold">Description</label>
-            <textarea class="form-control" rows="2" [(ngModel)]="taxCreateForm['description']"></textarea>
+            <textarea class="form-control" rows="2" formControlName="description"></textarea>
           </div>
-        </div>
+        </form>
       </div>
       <div class="modal-footer border-0 pt-0">
         <button class="btn btn-outline-secondary" (click)="closeTaxCreateModal()">Cancel</button>
@@ -283,22 +286,25 @@
         <button type="button" class="btn-close" (click)="closeWithholdingCreateModal()"></button>
       </div>
       <div class="modal-body pt-3">
-        <div class="row g-3">
+        <form class="row g-3" [formGroup]="withholdingCreateForm" (ngSubmit)="createWithholdingTaxType()">
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Code</label>
-            <input class="form-control" [(ngModel)]="withholdingCreateForm['code']" placeholder="WHT_GOODS_1" />
+            <input class="form-control" formControlName="code" placeholder="WHT_GOODS_1" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError(withholdingCreateForm, 'code', 'required')">Code is required.</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Name</label>
-            <input class="form-control" [(ngModel)]="withholdingCreateForm['name']" placeholder="Supplier of goods" />
+            <input class="form-control" formControlName="name" placeholder="Supplier of goods" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError(withholdingCreateForm, 'name', 'required')">Name is required.</div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Percentage</label>
-            <input type="number" step="0.01" class="form-control" [(ngModel)]="withholdingCreateForm['percentage']" />
+            <input type="number" step="0.01" class="form-control" formControlName="percentage" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError(withholdingCreateForm, 'percentage', 'min')">Percentage cannot be negative.</div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Applies To</label>
-            <select class="form-select" [(ngModel)]="withholdingCreateForm['appliesTo']">
+            <select class="form-select" formControlName="appliesTo">
               <option value="expense">expense</option>
               <option value="invoice">invoice</option>
               <option value="both">both</option>
@@ -306,19 +312,20 @@
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Minimum Base Amount</label>
-            <input type="number" step="0.01" class="form-control" [(ngModel)]="withholdingCreateForm['minimumBaseAmount']" />
+            <input type="number" step="0.01" class="form-control" formControlName="minimumBaseAmount" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError(withholdingCreateForm, 'minimumBaseAmount', 'min')">Minimum base cannot be negative.</div>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold">Description</label>
-            <textarea class="form-control" rows="2" [(ngModel)]="withholdingCreateForm['description']"></textarea>
+            <textarea class="form-control" rows="2" formControlName="description"></textarea>
           </div>
           <div class="col-12">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" [(ngModel)]="withholdingCreateForm['isActive']" />
+              <input class="form-check-input" type="checkbox" formControlName="isActive" />
               <label class="form-check-label">Active</label>
             </div>
           </div>
-        </div>
+        </form>
       </div>
       <div class="modal-footer border-0 pt-0">
         <button class="btn btn-outline-secondary" (click)="closeWithholdingCreateModal()">Cancel</button>

@@ -24,6 +24,7 @@ interface ExpenseDetail {
   discountAmount?: number;
   totalAmount?: number;
   file?: string;
+  fileCdnUrl?: string;
   notes?: string;
   vendor?: {
     id: string;
@@ -76,6 +77,7 @@ export class ExpenseDetailPageComponent {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly expense = signal<ExpenseDetail | null>(null);
+  readonly previewImageUrl = signal('');
 
   ngOnInit(): void {
     const id = String(this.route.snapshot.paramMap.get('id') || '').trim();
@@ -146,5 +148,25 @@ export class ExpenseDetailPageComponent {
 
   printPage(): void {
     window.print();
+  }
+
+  attachmentUrl(): string {
+    const row = this.expense();
+    if (!row) {
+      return '';
+    }
+    return String(row.fileCdnUrl || row.file || '').trim();
+  }
+
+  openImagePreview(url: string): void {
+    const cleaned = String(url || '').trim();
+    if (!cleaned) {
+      return;
+    }
+    this.previewImageUrl.set(cleaned);
+  }
+
+  closeImagePreview(): void {
+    this.previewImageUrl.set('');
   }
 }

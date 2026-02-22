@@ -178,34 +178,34 @@
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
       <div class="modal-body pt-3">
-        <div class="row g-3">
+        <form class="row g-3" [formGroup]="createCustomerForm" (ngSubmit)="createCustomer()">
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Name</label>
-            <input class="form-control" [(ngModel)]="createForm['name']" />
+            <input class="form-control" formControlName="name" />
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Legal Name</label>
-            <input class="form-control" [(ngModel)]="createForm['legalName']" />
+            <input class="form-control" formControlName="legalName" />
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Tax ID</label>
-            <input class="form-control" [(ngModel)]="createForm['taxId']" />
+            <input class="form-control" formControlName="taxId" />
           </div>
 
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Customer Code</label>
-            <input class="form-control" [(ngModel)]="createForm['customerCode']" />
+            <input class="form-control" formControlName="customerCode" />
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Type</label>
-            <select class="form-select" [(ngModel)]="createForm['type']">
+            <select class="form-select" formControlName="type">
               <option value="business">business</option>
               <option value="individual">individual</option>
             </select>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Status</label>
-            <select class="form-select" [(ngModel)]="createForm['status']">
+            <select class="form-select" formControlName="status">
               <option value="active">active</option>
               <option value="inactive">inactive</option>
               <option value="blocked">blocked</option>
@@ -214,65 +214,65 @@
 
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Contact Person</label>
-            <input class="form-control" [(ngModel)]="createForm['contactPerson']" />
+            <input class="form-control" formControlName="contactPerson" />
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Email</label>
-            <input class="form-control" [(ngModel)]="createForm['email']" />
+            <input class="form-control" formControlName="email" />
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Phone</label>
-            <input class="form-control" [(ngModel)]="createForm['phone']" />
+            <input class="form-control" formControlName="phone" />
           </div>
 
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Address Line 1</label>
-            <input class="form-control" [(ngModel)]="createForm['addressLine1']" />
+            <input class="form-control" formControlName="addressLine1" />
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Address Line 2</label>
-            <input class="form-control" [(ngModel)]="createForm['addressLine2']" />
+            <input class="form-control" formControlName="addressLine2" />
           </div>
 
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">City</label>
-            <input class="form-control" [(ngModel)]="createForm['city']" />
+            <input class="form-control" formControlName="city" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">State</label>
-            <input class="form-control" [(ngModel)]="createForm['state']" />
+            <input class="form-control" formControlName="state" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Postal Code</label>
-            <input class="form-control" [(ngModel)]="createForm['postalCode']" />
+            <input class="form-control" formControlName="postalCode" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Country</label>
-            <select class="form-select" [(ngModel)]="createForm['country']">
+            <select class="form-select" formControlName="country">
               <option *ngFor="let country of countryOptions" [value]="country">{{ country }}</option>
             </select>
           </div>
 
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Credit Limit</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['creditLimit']" />
+            <input type="number" class="form-control" formControlName="creditLimit" />
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Payment Terms (days)</label>
-            <input type="number" class="form-control" [(ngModel)]="createForm['paymentTermsDays']" />
+            <input type="number" class="form-control" formControlName="paymentTermsDays" />
           </div>
           <div class="col-12 col-md-4 d-flex align-items-end">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isActive']" />
+              <input class="form-check-input" type="checkbox" formControlName="isActive" />
               <label class="form-check-label">Active</label>
             </div>
           </div>
 
           <div class="col-12">
             <label class="form-label fw-semibold">Notes</label>
-            <textarea rows="2" class="form-control" [(ngModel)]="createForm['notes']"></textarea>
+            <textarea rows="2" class="form-control" formControlName="notes"></textarea>
           </div>
-        </div>
+        </form>
       </div>
       <div class="modal-footer border-0 pt-0">
         <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>

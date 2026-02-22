@@ -140,7 +140,8 @@ export class AppShellComponent {
   }
 
   get userProfileImageUrl(): string {
-    return String(this.auth.currentUser()?.profileImageUrl || '').trim();
+    const user = this.auth.currentUser();
+    return String(user?.profileImageCdnUrl || user?.profileImageUrl || '').trim();
   }
 
   logout(): void {

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Subject, Subscription, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs/operators';
@@ -38,6 +39,7 @@ interface ExpenseRow {
   discountAmount?: number;
   totalAmount?: number;
   file?: string;
+  fileCdnUrl?: string;
   notes?: string;
   vendor?: {
     id: string;
@@ -88,7 +90,7 @@ interface ExpenseImportSummary {
 @Component({
   selector: 'app-expenses-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './expenses-page.component.html',
 })
 export class ExpensesPageComponent {
@@ -96,6 +98,7 @@ export class ExpensesPageComponent {
   private readonly auth = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   readonly rows = signal<ExpenseRow[]>([]);
   readonly loading = signal(false);
@@ -134,7 +137,7 @@ export class ExpensesPageComponent {
   totalPages = 1;
   readonly pageSizeOptions = [10, 20, 50, 100];
 
-  createForm: Record<string, unknown> = this.newExpenseForm();
+  createExpenseForm: FormGroup = this.newCreateExpenseForm();
   vendorCreateForm: Record<string, unknown> = this.newVendorForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newExpenseForm();
@@ -283,7 +286,7 @@ export class ExpensesPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newExpenseForm();
+    this.createExpenseForm = this.newCreateExpenseForm();
     this.loadWithholdingTaxTypes();
     this.vendorSearch.set('');
     this.selectedCreateVendor.set(null);
@@ -336,7 +339,15 @@ export class ExpensesPageComponent {
       this.createModalError.set('Logged in user has no organization assigned.');
       return;
     }
-    if (!String(this.createForm['vendorId'] || '').trim()) {
+    if (this.createExpenseForm.invalid) {
+      this.createExpenseForm.markAllAsTouched();
+      this.createModalError.set('Please complete all required fields.');
+      return;
+    }
+
+    const vendorId = String(this.createExpenseForm.value['vendorId'] || '').trim();
+    if (!vendorId) {
+      this.createExpenseForm.get('vendorId')?.markAsTouched();
       this.createModalError.set('Please select a vendor from search results.');
       return;
     }
@@ -347,7 +358,7 @@ export class ExpensesPageComponent {
     this.message.set('');
 
     const payload = this.buildPayload({
-      ...this.createForm,
+      ...this.createExpenseForm.getRawValue(),
       organizationId: this.currentOrganizationId,
       createdBy: this.currentUserId,
       updatedBy: this.currentUserId,
@@ -558,16 +569,24 @@ export class ExpensesPageComponent {
 
   selectVendor(vendor: VendorOption): void {
     this.selectedCreateVendor.set(vendor);
-    this.createForm['vendorId'] = vendor.id;
-    this.createForm['vendorTaxId'] = vendor.taxId || '';
+    this.createExpenseForm.patchValue({
+      vendorId: vendor.id,
+      vendorTaxId: vendor.taxId || '',
+    });
+    this.createExpenseForm.get('vendorId')?.markAsTouched();
+    this.createExpenseForm.get('vendorId')?.updateValueAndValidity();
     this.vendors.set([]);
     this.vendorSearch.set(vendor.name || vendor.legalName || vendor.id);
   }
 
   clearSelectedVendor(): void {
     this.selectedCreateVendor.set(null);
-    this.createForm['vendorId'] = '';
-    this.createForm['vendorTaxId'] = '';
+    this.createExpenseForm.patchValue({
+      vendorId: '',
+      vendorTaxId: '',
+    });
+    this.createExpenseForm.get('vendorId')?.markAsTouched();
+    this.createExpenseForm.get('vendorId')?.updateValueAndValidity();
     this.vendorSearch.set('');
     this.vendors.set([]);
   }
@@ -625,6 +644,23 @@ export class ExpensesPageComponent {
     const target = event.target as HTMLInputElement | null;
     this.createFile = target?.files && target.files.length > 0 ? target.files[0] : null;
     this.createFileName.set(this.createFile?.name || '');
+    const fileControl = this.createExpenseForm.get('file');
+    if (this.createFile) {
+      fileControl?.setValue(this.createFile.name);
+      const isImage = this.createFile.type.startsWith('image/');
+      const maxBytes = 5 * 1024 * 1024;
+      if (!isImage) {
+        fileControl?.setErrors({ invalidType: true });
+      } else if (this.createFile.size > maxBytes) {
+        fileControl?.setErrors({ tooLarge: true });
+      } else {
+        fileControl?.setErrors(null);
+      }
+    } else {
+      fileControl?.setValue('');
+      fileControl?.setErrors(null);
+    }
+    fileControl?.markAsTouched();
   }
 
   onImportFileChange(event: Event): void {
@@ -732,6 +768,21 @@ export class ExpensesPageComponent {
     return row.id;
   }
 
+  controlHasError(controlName: string, errorCode?: string): boolean {
+    const control = this.createExpenseForm.get(controlName);
+    if (!control || !(control.touched || control.dirty)) {
+      return false;
+    }
+    if (!errorCode) {
+      return control.invalid;
+    }
+    return !!control.errors?.[errorCode];
+  }
+
+  hasCreateFormError(errorCode: string): boolean {
+    return !!this.createExpenseForm.errors?.[errorCode];
+  }
+
   private newExpenseForm(): Record<string, unknown> {
     return {
       organizationId: '',
@@ -753,6 +804,55 @@ export class ExpensesPageComponent {
       createdBy: '',
       updatedBy: '',
     };
+  }
+
+  private newCreateExpenseForm(): FormGroup {
+    return this.fb.group(
+      {
+        vendorId: ['', [Validators.required]],
+        vendorTaxId: [''],
+        expenseNumber: [''],
+        vatExemptAmount: [0, [Validators.required, Validators.min(0)]],
+        withholdingTaxTypeId: [''],
+        category: ['', [Validators.required, Validators.maxLength(120)]],
+        description: ['', [Validators.maxLength(2000)]],
+        expenseDate: ['', [Validators.required]],
+        dueDate: [''],
+        status: ['draft', [Validators.required]],
+        paymentMethod: ['bank_transfer', [Validators.required]],
+        amount: [0, [Validators.required, Validators.min(0.01)]],
+        discountAmount: [0, [Validators.required, Validators.min(0)]],
+        notes: ['', [Validators.maxLength(2000)]],
+        file: [''],
+      },
+      {
+        validators: [this.expenseDateRangeValidator, this.vatExemptNotGreaterThanAmountValidator],
+      }
+    );
+  }
+
+  private expenseDateRangeValidator(control: AbstractControl): ValidationErrors | null {
+    const expenseDate = String(control.get('expenseDate')?.value || '').trim();
+    const dueDate = String(control.get('dueDate')?.value || '').trim();
+    if (!expenseDate || !dueDate) {
+      return null;
+    }
+    if (new Date(dueDate).getTime() < new Date(expenseDate).getTime()) {
+      return { invalidDateRange: true };
+    }
+    return null;
+  }
+
+  private vatExemptNotGreaterThanAmountValidator(control: AbstractControl): ValidationErrors | null {
+    const amount = Number(control.get('amount')?.value ?? 0);
+    const vatExemptAmount = Number(control.get('vatExemptAmount')?.value ?? 0);
+    if (!Number.isFinite(amount) || !Number.isFinite(vatExemptAmount)) {
+      return null;
+    }
+    if (vatExemptAmount > amount) {
+      return { vatExemptTooHigh: true };
+    }
+    return null;
   }
 
   private newVendorForm(): Record<string, unknown> {

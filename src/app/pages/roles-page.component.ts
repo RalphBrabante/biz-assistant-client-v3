@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -21,12 +22,13 @@ interface RoleRow {
 @Component({
   selector: 'app-roles-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './roles-page.component.html',
 })
 export class RolesPageComponent {
   private readonly api: ApiService;
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly fb = inject(FormBuilder);
 
   constructor(api: ApiService) {
     this.api = api;
@@ -44,13 +46,7 @@ export class RolesPageComponent {
   viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'roles-page';
 
-  createForm: Record<string, unknown> = {
-    name: '',
-    code: '',
-    description: '',
-    isSystem: false,
-    isActive: true,
-  };
+  createRoleForm: FormGroup = this.newCreateRoleForm();
 
   editingId = '';
   editForm: Record<string, unknown> = {
@@ -98,13 +94,7 @@ export class RolesPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = {
-      name: '',
-      code: '',
-      description: '',
-      isSystem: false,
-      isActive: true,
-    };
+    this.createRoleForm = this.newCreateRoleForm();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -115,16 +105,23 @@ export class RolesPageComponent {
   }
 
   createRole(): void {
+    if (this.createRoleForm.invalid) {
+      this.createRoleForm.markAllAsTouched();
+      this.error.set('Please complete all required role fields.');
+      return;
+    }
+
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
+    const value = this.createRoleForm.getRawValue();
 
     const payload = {
-      name: String(this.createForm['name'] || '').trim(),
-      code: String(this.createForm['code'] || '').trim().toLowerCase(),
-      description: String(this.createForm['description'] || '').trim() || undefined,
-      isSystem: Boolean(this.createForm['isSystem']),
-      isActive: Boolean(this.createForm['isActive']),
+      name: String(value['name'] || '').trim(),
+      code: String(value['code'] || '').trim().toLowerCase(),
+      description: String(value['description'] || '').trim() || undefined,
+      isSystem: Boolean(value['isSystem']),
+      isActive: Boolean(value['isActive']),
     };
 
     this.api.create<RoleRow>('/api/v1/roles', payload).subscribe({
@@ -242,6 +239,27 @@ export class RolesPageComponent {
   private persistTablePreferences(): void {
     saveTablePreferences(this.tablePrefsKey, {
       viewMode: this.viewMode,
+    });
+  }
+
+  controlHasError(controlName: string, errorCode?: string): boolean {
+    const control = this.createRoleForm.get(controlName);
+    if (!control || !(control.touched || control.dirty)) {
+      return false;
+    }
+    if (!errorCode) {
+      return control.invalid;
+    }
+    return !!control.errors?.[errorCode];
+  }
+
+  private newCreateRoleForm(): FormGroup {
+    return this.fb.group({
+      name: ['', [Validators.required, Validators.maxLength(120)]],
+      code: ['', [Validators.required, Validators.pattern(/^[a-z0-9_]+$/)]],
+      description: ['', [Validators.maxLength(500)]],
+      isSystem: [false],
+      isActive: [true],
     });
   }
 }

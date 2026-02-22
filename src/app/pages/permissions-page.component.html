@@ -166,40 +166,45 @@
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
       <div class="modal-body pt-3">
-        <div class="row g-3">
+        <form class="row g-3" [formGroup]="createPermissionForm" (ngSubmit)="createPermission()">
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Permission Name</label>
-            <input class="form-control" [(ngModel)]="createForm['name']" placeholder="e.g. Manage Users" />
+            <input class="form-control" formControlName="name" placeholder="e.g. Manage Users" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('name', 'required')">Permission name is required.</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Permission Code</label>
-            <input class="form-control" [(ngModel)]="createForm['code']" placeholder="e.g. users.manage" />
+            <input class="form-control" formControlName="code" placeholder="e.g. users.manage" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('code', 'required')">Permission code is required.</div>
+            <div class="text-danger small mt-1" *ngIf="controlHasError('code', 'pattern')">Use lowercase letters, numbers, dot, and underscore only.</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Resource</label>
-            <input class="form-control" [(ngModel)]="createForm['resource']" placeholder="e.g. users" />
+            <input class="form-control" formControlName="resource" placeholder="e.g. users" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('resource', 'required')">Resource is required.</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Action</label>
-            <input class="form-control" [(ngModel)]="createForm['action']" placeholder="e.g. create" />
+            <input class="form-control" formControlName="action" placeholder="e.g. create" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('action', 'required')">Action is required.</div>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold">Description</label>
-            <textarea class="form-control" rows="3" [(ngModel)]="createForm['description']"></textarea>
+            <textarea class="form-control" rows="3" formControlName="description"></textarea>
           </div>
           <div class="col-12 col-md-6">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isSystem']" />
+              <input class="form-check-input" type="checkbox" formControlName="isSystem" />
               <label class="form-check-label">System Permission</label>
             </div>
           </div>
           <div class="col-12 col-md-6">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" [(ngModel)]="createForm['isActive']" />
+              <input class="form-check-input" type="checkbox" formControlName="isActive" />
               <label class="form-check-label">Active</label>
             </div>
           </div>
-        </div>
+        </form>
       </div>
       <div class="modal-footer border-0 pt-0">
         <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>

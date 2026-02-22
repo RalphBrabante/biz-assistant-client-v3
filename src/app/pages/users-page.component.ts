@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { ApiService } from '../core/api.service';
@@ -60,7 +61,7 @@ interface OrganizationOption {
 @Component({
   selector: 'app-users-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TooltipDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './users-page.component.html',
 })
 export class UsersPageComponent {
@@ -68,6 +69,7 @@ export class UsersPageComponent {
   private readonly auth: AuthService;
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly organizationContext = inject(OrganizationContextService);
+  private readonly fb = inject(FormBuilder);
 
   constructor(api: ApiService, auth: AuthService) {
     this.api = api;
@@ -96,7 +98,7 @@ export class UsersPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'users-page';
 
-  createForm: Record<string, unknown> = this.newUserForm(true);
+  createUserForm: FormGroup = this.newCreateUserForm();
   createSelectedRoleIds: string[] = [];
 
   readonly filteredRows = computed(() => {
@@ -163,9 +165,11 @@ export class UsersPageComponent {
   }
 
   openCreateModal(): void {
-    this.createForm = this.newUserForm(true);
+    this.createUserForm = this.newCreateUserForm();
     this.createSelectedRoleIds = [];
-    this.createForm['organizationId'] = this.isSuperuser ? '' : this.currentOrganizationId;
+    this.createUserForm.patchValue({
+      organizationId: this.isSuperuser ? '' : this.currentOrganizationId,
+    });
     this.createModalError.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -178,11 +182,17 @@ export class UsersPageComponent {
   }
 
   createUser(): void {
+    if (this.createUserForm.invalid) {
+      this.createUserForm.markAllAsTouched();
+      this.createModalError.set('Please complete all required user fields.');
+      return;
+    }
+
     if (!this.isSuperuser && !this.currentOrganizationId.trim()) {
       this.createModalError.set('Logged in user has no organization assigned.');
       return;
     }
-    if (this.isSuperuser && !this.optionalString(this.createForm['organizationId'])) {
+    if (this.isSuperuser && !this.optionalString(this.createUserForm.getRawValue()['organizationId'])) {
       this.createModalError.set('Please select an organization.');
       return;
     }
@@ -190,18 +200,14 @@ export class UsersPageComponent {
       this.createModalError.set('Please select at least one role.');
       return;
     }
-    if (!this.asString(this.createForm['password'])) {
-      this.createModalError.set('Password is required.');
-      return;
-    }
 
     this.submitting.set(true);
     this.createModalError.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(this.createForm, true);
+    const payload = this.buildPayload(this.createUserForm.getRawValue(), true);
     payload['organizationId'] = this.isSuperuser
-      ? this.optionalString(this.createForm['organizationId'])
+      ? this.optionalString(this.createUserForm.getRawValue()['organizationId'])
       : this.currentOrganizationId;
     payload['roleIds'] = [...this.createSelectedRoleIds];
     delete payload['role'];
@@ -381,7 +387,7 @@ export class UsersPageComponent {
     for (let i = 0; i < 12; i += 1) {
       generated += chars[Math.floor(Math.random() * chars.length)];
     }
-    this.createForm['password'] = generated;
+    this.createUserForm.patchValue({ password: generated });
   }
 
   organizationOptionLabel(org: OrganizationOption): string {
@@ -425,6 +431,28 @@ export class UsersPageComponent {
       isEmailVerified: false,
       isActive: true,
     };
+  }
+
+  private newCreateUserForm(): FormGroup {
+    const defaults = this.newUserForm(true);
+    return this.fb.group({
+      organizationId: [defaults['organizationId']],
+      firstName: [defaults['firstName'], [Validators.required, Validators.maxLength(120)]],
+      lastName: [defaults['lastName'], [Validators.required, Validators.maxLength(120)]],
+      email: [defaults['email'], [Validators.required, Validators.email]],
+      password: [defaults['password'], [Validators.required, Validators.minLength(8)]],
+      phone: [defaults['phone'], [Validators.maxLength(40)]],
+      addressLine1: [defaults['addressLine1'], [Validators.maxLength(255)]],
+      addressLine2: [defaults['addressLine2'], [Validators.maxLength(255)]],
+      city: [defaults['city'], [Validators.maxLength(120)]],
+      state: [defaults['state'], [Validators.maxLength(120)]],
+      postalCode: [defaults['postalCode'], [Validators.maxLength(20)]],
+      country: [defaults['country']],
+      role: [defaults['role']],
+      status: [defaults['status'], [Validators.required]],
+      isEmailVerified: [defaults['isEmailVerified']],
+      isActive: [defaults['isActive']],
+    });
   }
 
   private buildPayload(form: Record<string, unknown>, includePassword: boolean): Record<string, unknown> {
