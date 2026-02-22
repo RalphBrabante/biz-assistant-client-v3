@@ -6,6 +6,7 @@ import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface LicenseRow {
@@ -58,12 +59,13 @@ export class LicensesPageComponent {
   readonly error = signal('');
   readonly createModalError = signal('');
   readonly filter = signal('');
+  readonly pageSizeOptions = [10, 20, 50, 100];
   page = 1;
   pageSize = 20;
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+    viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'licenses-page';
 
   createForm: Record<string, unknown> = this.newLicenseForm();
 
@@ -89,6 +91,7 @@ export class LicensesPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
     this.loadOrganizations();
   }
@@ -113,7 +116,7 @@ export class LicensesPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+                this.persistTablePreferences();
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
           this.load();
@@ -199,13 +202,15 @@ export class LicensesPageComponent {
     });
   }
 
-  trackById(_index: number, row: LicenseRow): string {
-    return row.id;
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   onFilterChange(value: string): void {
     this.filter.set(value);
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -213,6 +218,7 @@ export class LicensesPageComponent {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -221,14 +227,27 @@ export class LicensesPageComponent {
       return;
     }
     this.page = page;
+    this.persistTablePreferences();
     this.load();
   }
 
-  isExpired(row: LicenseRow): boolean {
-    if (!row.expiresAt) {
-      return false;
-    }
-    return new Date(row.expiresAt).getTime() < Date.now();
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+    });
+  }
+
+  trackById(_index: number, row: LicenseRow): string {
+    return row.id;
   }
 
   private newLicenseForm(): Record<string, unknown> {
@@ -281,6 +300,14 @@ export class LicensesPageComponent {
 
   organizationOptionLabel(org: OrganizationOption): string {
     return org.name || org.legalName || org.id;
+  }
+
+  isExpired(row: LicenseRow): boolean {
+    const expiresAt = String(row.expiresAt || '').trim();
+    if (!expiresAt) return false;
+    const expiresTime = new Date(expiresAt).getTime();
+    if (Number.isNaN(expiresTime)) return false;
+    return expiresTime < Date.now();
   }
 
   private asString(value: unknown): string {

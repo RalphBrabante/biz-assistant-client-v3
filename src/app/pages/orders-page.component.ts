@@ -6,6 +6,7 @@ import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 @Component({
@@ -28,10 +29,11 @@ export class OrdersPageComponent {
   paymentFilter = '';
   page = 1;
   pageSize = 20;
+  readonly pageSizeOptions = [10, 20, 50, 100];
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+  viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'orders-page';
   private readonly currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
   get isSuperuser(): boolean {
@@ -39,6 +41,7 @@ export class OrdersPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
   }
 
@@ -67,7 +70,7 @@ export class OrdersPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+        this.persistTablePreferences();
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
           this.load();
@@ -193,6 +196,7 @@ export class OrdersPageComponent {
 
   applyFilters(): void {
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -200,7 +204,13 @@ export class OrdersPageComponent {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
+  }
+
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   goToPage(page: number): void {
@@ -208,6 +218,22 @@ export class OrdersPageComponent {
       return;
     }
     this.page = page;
+    this.persistTablePreferences();
     this.load();
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+    });
   }
 }

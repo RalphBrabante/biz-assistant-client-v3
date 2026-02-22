@@ -88,10 +88,10 @@
       </div>
       <div class="col-12 col-md-4">
         <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table view" aria-label="Table view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view">
             <i class="bi bi-table"></i>
           </button>
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="viewMode = 'card'" title="Card view" aria-label="Card view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view">
             <i class="bi bi-grid-3x2-gap"></i>
           </button>
         </div>

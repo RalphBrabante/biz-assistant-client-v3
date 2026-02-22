@@ -1,4 +1,4 @@
-<section class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+<section class="card border-0 shadow-sm rounded-4 mb-4">
   <div class="card-body p-4 p-lg-5 role-hero">
     <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
       <div>
@@ -7,15 +7,40 @@
         <p class="text-secondary mb-0">Track, review, and maintain expense records.</p>
       </div>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-dark" (click)="load()" [disabled]="loading()">
-          {{ loading() ? 'Refreshing...' : 'Refresh' }}
-        </button>
-        <button class="btn btn-outline-success" (click)="exportExpensesCsv()" [disabled]="exporting()">
-          <i class="bi bi-download me-1"></i>{{ exporting() ? 'Exporting...' : 'Export CSV' }}
-        </button>
-        <button class="btn btn-outline-primary" (click)="openImportModal()">
-          <i class="bi bi-upload me-1"></i>Import CSV
-        </button>
+        <div class="btn-group table-actions-menu">
+          <button
+            class="btn btn-outline-dark dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            appTooltip
+            title="Table actions"
+          >
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="load()" [disabled]="loading()">
+                <i class="bi bi-arrow-clockwise"></i>
+                <span>{{ loading() ? 'Refreshing...' : 'Refresh' }}</span>
+              </button>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li class="dropdown-header text-uppercase small">CSV</li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="exportExpensesCsv()" [disabled]="exporting()">
+                <i class="bi bi-download"></i>
+                <span>{{ exporting() ? 'Exporting...' : 'Export CSV' }}</span>
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="openImportModal()">
+                <i class="bi bi-upload"></i>
+                <span>Import CSV</span>
+              </button>
+            </li>
+          </ul>
+        </div>
         <button class="btn btn-primary" (click)="openCreateModal()"><i class="bi bi-plus-lg me-1"></i>Create Expense</button>
       </div>
     </div>
@@ -73,20 +98,34 @@
       </div>
       <div class="col-6 col-md-2">
         <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table view" aria-label="Table view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view">
             <i class="bi bi-table"></i>
           </button>
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="viewMode = 'card'" title="Card view" aria-label="Card view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view">
             <i class="bi bi-grid-3x2-gap"></i>
           </button>
         </div>
       </div>
-      <div class="col-12 col-lg-4 d-flex gap-2">
-        <button class="btn btn-outline-primary" type="button" (click)="applyFilters()">
-          <i class="bi bi-funnel me-1"></i>Apply
+      <div class="col-6 col-md-2 d-flex align-items-end gap-2">
+        <button
+          class="btn btn-outline-primary table-tool-icon-btn"
+          type="button"
+          (click)="applyFilters()"
+          appTooltip
+          title="Apply filters"
+          aria-label="Apply filters"
+        >
+          <i class="bi bi-funnel"></i>
         </button>
-        <button class="btn btn-outline-secondary" type="button" (click)="clearFilters()">
-          <i class="bi bi-arrow-counterclockwise me-1"></i>Clear
+        <button
+          class="btn btn-outline-secondary table-tool-icon-btn"
+          type="button"
+          (click)="clearFilters()"
+          appTooltip
+          title="Clear filters"
+          aria-label="Clear filters"
+        >
+          <i class="bi bi-arrow-counterclockwise"></i>
         </button>
       </div>
       <div class="col-6 col-md-3 col-lg-2">

@@ -1,16 +1,25 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface ItemRow {
   id: string;
   organizationId: string;
+  vendorId?: string | null;
+  vendor?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+    taxId?: string;
+  };
   organization?: {
     id: string;
     name?: string;
@@ -35,6 +44,13 @@ interface OrganizationOption {
   id: string;
   name?: string;
   legalName?: string;
+}
+
+interface VendorOption {
+  id: string;
+  name?: string;
+  legalName?: string;
+  taxId?: string;
 }
 
 interface ItemImportSummary {
@@ -65,24 +81,39 @@ export class ItemsPageComponent {
   readonly isImportModalOpen = signal(false);
   readonly exporting = signal(false);
   readonly organizations = signal<OrganizationOption[]>([]);
+  readonly vendorFilterResults = signal<VendorOption[]>([]);
+  readonly loadingVendorFilter = signal(false);
+  readonly selectedVendorFilter = signal<VendorOption | null>(null);
+  readonly editVendors = signal<VendorOption[]>([]);
+  readonly loadingEditVendors = signal(false);
+  readonly selectedEditVendor = signal<VendorOption | null>(null);
 
   readonly message = signal('');
   readonly error = signal('');
   readonly importModalError = signal('');
   readonly importSummary = signal<ItemImportSummary | null>(null);
   readonly filter = signal('');
+  vendorFilter = '';
+  vendorFilterSearch = '';
+  readonly pageSizeOptions = [10, 20, 50, 100];
   page = 1;
   pageSize = 20;
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+    viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'items-page';
 
   createForm: Record<string, unknown> = this.newItemForm();
 
   editingId = '';
   editForm: Record<string, unknown> = this.newItemForm();
   private importFile: File | null = null;
+  private readonly vendorFilterSearchInput$ = new Subject<string>();
+  private vendorFilterSearchSub?: Subscription;
+  private readonly editVendorSearchInput$ = new Subject<string>();
+  private editVendorSearchSub?: Subscription;
+  editVendorSearch = '';
+  private lastVendorScope = '';
 
   get currentOrganizationId(): string {
     return this.organizationContext.getActiveOrganizationId();
@@ -100,25 +131,110 @@ export class ItemsPageComponent {
     return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
+  get currentOrganizationName(): string {
+    const orgId = this.currentOrganizationId;
+    if (!orgId) {
+      return 'No organization selected';
+    }
+    return this.organizationOptionLabelById(orgId) || orgId;
+  }
+
   ngOnInit(): void {
-    this.load();
+    this.restoreTablePreferences();
     if (this.canReadOrganizations) {
       this.loadOrganizations();
     } else {
       this.organizations.set([]);
     }
+
+    this.vendorFilterSearchSub = this.vendorFilterSearchInput$
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          const trimmed = query.trim();
+          const organizationId = this.currentOrganizationId;
+          if (!trimmed || trimmed.length < 2) {
+            this.loadingVendorFilter.set(false);
+            return of([] as VendorOption[]);
+          }
+          const params = new URLSearchParams({
+            q: trimmed,
+            limit: '10',
+          });
+          if (organizationId) {
+            params.set('organizationId', organizationId);
+          }
+          this.loadingVendorFilter.set(true);
+          return this.api.list<VendorOption>(`/api/v1/vendors?${params.toString()}`).pipe(
+            switchMap((response) => of(response.data || [])),
+            catchError(() => of([] as VendorOption[]))
+          );
+        })
+      )
+      .subscribe((vendors) => {
+        this.loadingVendorFilter.set(false);
+        this.vendorFilterResults.set(vendors);
+      });
+
+    this.editVendorSearchSub = this.editVendorSearchInput$
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          const trimmed = query.trim();
+          const organizationId = String(this.editForm['organizationId'] || '').trim() || this.currentOrganizationId;
+          if (!trimmed || trimmed.length < 2 || !organizationId) {
+            this.loadingEditVendors.set(false);
+            return of([] as VendorOption[]);
+          }
+          const params = new URLSearchParams({
+            q: trimmed,
+            limit: '10',
+            organizationId,
+          });
+          this.loadingEditVendors.set(true);
+          return this.api.list<VendorOption>(`/api/v1/vendors?${params.toString()}`).pipe(
+            switchMap((response) => of(response.data || [])),
+            catchError(() => of([] as VendorOption[]))
+          );
+        })
+      )
+      .subscribe((vendors) => {
+        this.loadingEditVendors.set(false);
+        this.editVendors.set(vendors);
+      });
+
+    this.load();
+  }
+
+  ngOnDestroy(): void {
+    this.vendorFilterSearchSub?.unsubscribe();
+    this.editVendorSearchSub?.unsubscribe();
   }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
     const q = this.filter().trim();
+    const currentScope = this.currentOrganizationId || (this.isSuperuser ? '__all__' : '');
+    if (currentScope !== this.lastVendorScope) {
+      this.lastVendorScope = currentScope;
+      this.vendorFilter = '';
+      this.vendorFilterSearch = '';
+      this.vendorFilterResults.set([]);
+      this.selectedVendorFilter.set(null);
+      this.loadingVendorFilter.set(false);
+    }
     const params = new URLSearchParams({
       page: String(this.page),
       limit: String(this.pageSize),
     });
     if (q) {
       params.set('q', q);
+    }
+    if (this.vendorFilter) {
+      params.set('vendorId', this.vendorFilter);
     }
 
     this.api.list<ItemRow>(`/api/v1/items?${params.toString()}`).subscribe({
@@ -129,7 +245,7 @@ export class ItemsPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+                this.persistTablePreferences();
 
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
@@ -199,6 +315,7 @@ export class ItemsPageComponent {
     this.editingId = row.id;
     this.editForm = {
       organizationId: row.organizationId || '',
+      vendorId: row.vendorId || '',
       type: row.type || '',
       sku: row.sku || '',
       name: row.name || '',
@@ -213,6 +330,10 @@ export class ItemsPageComponent {
       reorderLevel: row.reorderLevel ?? 0,
       isActive: row.isActive !== false,
     };
+    this.selectedEditVendor.set(row.vendor || null);
+    this.editVendorSearch = row.vendor?.name || row.vendor?.legalName || '';
+    this.editVendors.set([]);
+    this.loadingEditVendors.set(false);
     this.error.set('');
     this.message.set('');
     this.isEditModalOpen.set(true);
@@ -221,6 +342,10 @@ export class ItemsPageComponent {
   closeEditModal(): void {
     this.editingId = '';
     this.editForm = this.newItemForm();
+    this.editVendorSearch = '';
+    this.editVendors.set([]);
+    this.selectedEditVendor.set(null);
+    this.loadingEditVendors.set(false);
     this.isEditModalOpen.set(false);
   }
 
@@ -309,6 +434,9 @@ export class ItemsPageComponent {
     if (this.currentOrganizationId) {
       params.set('organizationId', this.currentOrganizationId);
     }
+    if (this.vendorFilter) {
+      params.set('vendorId', this.vendorFilter);
+    }
 
     this.api.download(`/api/v1/items/export?${params.toString()}`).subscribe({
       next: (blob) => {
@@ -393,13 +521,15 @@ export class ItemsPageComponent {
     });
   }
 
-  trackById(_index: number, row: ItemRow): string {
-    return row.id;
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   onFilterChange(value: string): void {
     this.filter.set(value);
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -407,6 +537,52 @@ export class ItemsPageComponent {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  onVendorFilterSearchChange(value: string): void {
+    const query = String(value || '');
+    this.vendorFilterSearch = query;
+    if (this.selectedVendorFilter()) {
+      this.selectedVendorFilter.set(null);
+      this.vendorFilter = '';
+    }
+    if (!query.trim()) {
+      this.loadingVendorFilter.set(false);
+      this.vendorFilterResults.set([]);
+      this.page = 1;
+      this.persistTablePreferences();
+      this.load();
+      return;
+    }
+    if (query.trim().length < 2) {
+      this.loadingVendorFilter.set(false);
+      this.vendorFilterResults.set([]);
+      return;
+    }
+    this.vendorFilterSearchInput$.next(query);
+  }
+
+  selectVendorFilter(vendor: VendorOption): void {
+    this.selectedVendorFilter.set(vendor);
+    this.vendorFilter = vendor.id;
+    this.vendorFilterSearch = this.vendorOptionLabel(vendor);
+    this.vendorFilterResults.set([]);
+    this.loadingVendorFilter.set(false);
+    this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  clearVendorFilter(): void {
+    this.selectedVendorFilter.set(null);
+    this.vendorFilter = '';
+    this.vendorFilterSearch = '';
+    this.vendorFilterResults.set([]);
+    this.loadingVendorFilter.set(false);
+    this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -415,54 +591,40 @@ export class ItemsPageComponent {
       return;
     }
     this.page = page;
+    this.persistTablePreferences();
     this.load();
   }
 
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+    this.vendorFilter = String(prefs['vendorFilter'] || '').trim();
+    this.vendorFilterSearch = String(prefs['vendorFilterSearch'] || '').trim();
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+      vendorFilter: this.vendorFilter,
+      vendorFilterSearch: this.vendorFilterSearch,
+    });
+  }
+
+  trackById(_index: number, row: ItemRow): string {
+    return row.id;
+  }
+
   organizationLabel(row: ItemRow): string {
-    if (row.organization?.name) {
-      return row.organization.name;
-    }
-    if (row.organization?.legalName) {
-      return row.organization.legalName;
-    }
-    return this.organizationOptionLabelById(row.organizationId) || row.organizationId || '-';
+    return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
   }
 
-  itemTypeBadgeClass(type: string | undefined): string {
-    switch (String(type || '').toLowerCase()) {
-      case 'product':
-        return 'text-bg-primary';
-      case 'service':
-        return 'text-bg-info';
-      default:
-        return 'text-bg-secondary';
-    }
-  }
-
-  itemActiveBadgeClass(isActive: boolean | undefined): string {
-    return isActive ? 'text-bg-success' : 'text-bg-secondary';
-  }
-
-  itemStockBadgeClass(row: ItemRow): string {
-    const stock = Math.max(0, Number(row.stock ?? 0));
-    const reorderLevel = Math.max(0, Number(row.reorderLevel ?? 0));
-    const lowStockThreshold = reorderLevel > 0 ? reorderLevel : 5;
-
-    if (stock === 0) {
-      return 'text-bg-danger';
-    }
-    if (stock <= lowStockThreshold) {
-      return 'text-bg-warning';
-    }
-    return 'text-bg-success';
-  }
-
-  organizationOptionLabel(org: OrganizationOption): string {
-    return org.name || org.legalName || org.id;
-  }
-
-  formatMoney(value: unknown, currency?: string): string {
+  formatMoney(value: unknown, currency: string): string {
     const amount = Number(value ?? 0);
+    const normalized = Number.isFinite(amount) ? amount : 0;
     const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
     try {
       return new Intl.NumberFormat('en-US', {
@@ -470,23 +632,44 @@ export class ItemsPageComponent {
         currency: code,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(Number.isFinite(amount) ? amount : 0);
+      }).format(normalized);
     } catch (_err) {
-      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+      return `${code} ${normalized.toFixed(2)}`;
     }
   }
 
-  get currentOrganizationName(): string {
-    return (
-      this.organizationOptionLabelById(this.currentOrganizationId) ||
-      this.auth.currentUser()?.organizationId ||
-      'Current organization'
-    );
+  itemTypeBadgeClass(type: unknown): string {
+    const normalized = String(type || '').toLowerCase();
+    if (normalized === 'service') return 'text-bg-info';
+    if (normalized === 'product') return 'text-bg-primary';
+    return 'text-bg-secondary';
+  }
+
+  itemStockBadgeClass(row: ItemRow): string {
+    const stock = Number(row.stock ?? 0);
+    const reorderLevel = Number(row.reorderLevel ?? 0);
+    if (stock <= 0) return 'text-bg-danger';
+    if (reorderLevel > 0 && stock <= reorderLevel) return 'text-bg-warning';
+    return 'text-bg-success';
+  }
+
+  itemActiveBadgeClass(isActive: unknown): string {
+    return isActive === false ? 'text-bg-secondary' : 'text-bg-success';
+  }
+
+  organizationOptionLabel(org: OrganizationOption): string {
+    return org.name || org.legalName || org.id;
+  }
+
+  vendorOptionLabel(vendor: VendorOption): string {
+    const base = vendor.name || vendor.legalName || vendor.id;
+    return vendor.taxId ? `${base} (${vendor.taxId})` : base;
   }
 
   private newItemForm(): Record<string, unknown> {
     return {
       organizationId: '',
+      vendorId: '',
       type: 'product',
       sku: '',
       name: '',
@@ -514,6 +697,7 @@ export class ItemsPageComponent {
       price: this.optionalNumber(form['price']),
       cost: this.optionalNumber(form['cost']),
       discountedPrice: this.optionalNumber(form['discountedPrice']),
+      vendorId: this.optionalString(form['vendorId']) || null,
       stock: this.optionalNumber(form['stock']),
       reorderLevel: this.optionalNumber(form['reorderLevel']),
       isActive: Boolean(form['isActive']),
@@ -551,5 +735,35 @@ export class ItemsPageComponent {
 
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : undefined;
+  }
+
+  onEditVendorSearchChange(query: string): void {
+    this.editVendorSearch = query;
+    if (this.selectedEditVendor()) {
+      this.selectedEditVendor.set(null);
+      this.editForm['vendorId'] = '';
+    }
+    if (!query.trim() || query.trim().length < 2) {
+      this.editVendors.set([]);
+      this.loadingEditVendors.set(false);
+      return;
+    }
+    this.editVendorSearchInput$.next(query);
+  }
+
+  selectEditVendor(vendor: VendorOption): void {
+    this.selectedEditVendor.set(vendor);
+    this.editForm['vendorId'] = vendor.id;
+    this.editVendorSearch = vendor.name || vendor.legalName || '';
+    this.editVendors.set([]);
+    this.loadingEditVendors.set(false);
+  }
+
+  clearEditVendorSelection(): void {
+    this.selectedEditVendor.set(null);
+    this.editForm['vendorId'] = '';
+    this.editVendorSearch = '';
+    this.editVendors.set([]);
+    this.loadingEditVendors.set(false);
   }
 }

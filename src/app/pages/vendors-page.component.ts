@@ -6,6 +6,7 @@ import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface VendorRow {
@@ -66,13 +67,14 @@ export class VendorsPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
+  readonly pageSizeOptions = [10, 20, 50, 100];
 
   page = 1;
   pageSize = 20;
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+    viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'vendors-page';
 
   createForm: Record<string, unknown> = this.newVendorForm();
   editingId = '';
@@ -92,6 +94,7 @@ export class VendorsPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
   }
 
@@ -117,7 +120,7 @@ export class VendorsPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+                this.persistTablePreferences();
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
           this.load();
@@ -153,6 +156,11 @@ export class VendorsPageComponent {
     this.isImportModalOpen.set(false);
     this.importFile = null;
     this.importModalError.set('');
+  }
+
+  onImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.importFile = target?.files && target.files.length > 0 ? target.files[0] : null;
   }
 
   createVendor(): void {
@@ -285,75 +293,6 @@ export class VendorsPageComponent {
     });
   }
 
-  trackById(_index: number, row: VendorRow): string {
-    return row.id;
-  }
-
-  onFilterChange(value: string): void {
-    this.filter.set(value);
-    this.page = 1;
-    this.load();
-  }
-
-  onPageSizeChange(value: string): void {
-    const parsed = Number(value);
-    this.pageSize = Number.isFinite(parsed) ? parsed : 20;
-    this.page = 1;
-    this.load();
-  }
-
-  goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
-      return;
-    }
-    this.page = page;
-    this.load();
-  }
-
-  onImportFileChange(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    this.importFile = target?.files && target.files.length > 0 ? target.files[0] : null;
-  }
-
-  importVendorsCsv(): void {
-    if (!this.importFile) {
-      this.importModalError.set('Please select a CSV file to import.');
-      return;
-    }
-    if (this.organizationContext.isAllOrganizationsSelected()) {
-      this.importModalError.set('Select a specific organization before importing vendors.');
-      return;
-    }
-
-    this.submitting.set(true);
-    this.importModalError.set('');
-    this.error.set('');
-    this.message.set('');
-
-    const formData = new FormData();
-    formData.append('file', this.importFile);
-    if (this.currentOrganizationId.trim()) {
-      formData.append('organizationId', this.currentOrganizationId.trim());
-    }
-
-    this.api.createFormData<Record<string, unknown>>('/api/v1/vendors/import', formData).subscribe({
-      next: (response) => {
-        this.submitting.set(false);
-        this.closeImportModal();
-        const data = (response.data || {}) as Record<string, unknown>;
-        const imported = Number(data['imported'] || 0);
-        const skipped = Number(data['skipped'] || 0);
-        this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
-        this.page = 1;
-        this.load();
-      },
-      error: (err) => {
-        this.submitting.set(false);
-        this.importModalError.set(err?.error?.message || 'Unable to import vendors.');
-      },
-    });
-  }
-
   exportVendorsCsv(): void {
     this.exporting.set(true);
     this.error.set('');
@@ -363,6 +302,9 @@ export class VendorsPageComponent {
     const q = this.filter().trim();
     if (q) {
       params.set('q', q);
+    }
+    if (this.currentOrganizationId) {
+      params.set('organizationId', this.currentOrganizationId);
     }
 
     this.api.download(`/api/v1/vendors/export?${params.toString()}`).subscribe({
@@ -385,21 +327,105 @@ export class VendorsPageComponent {
     });
   }
 
-  statusBadgeClass(status: string | undefined): string {
-    switch (String(status || '').toLowerCase()) {
-      case 'active':
-        return 'text-bg-success';
-      case 'inactive':
-        return 'text-bg-secondary';
-      case 'blocked':
-        return 'text-bg-danger';
-      default:
-        return 'text-bg-light';
+  importVendorsCsv(): void {
+    if (!this.importFile) {
+      this.importModalError.set('Please select a CSV file to import.');
+      return;
     }
+    if (this.organizationContext.isAllOrganizationsSelected()) {
+      this.importModalError.set('Select a specific organization before importing vendors.');
+      return;
+    }
+
+    this.submitting.set(true);
+    this.importModalError.set('');
+    this.error.set('');
+    this.message.set('');
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+    if (this.currentOrganizationId) {
+      formData.append('organizationId', this.currentOrganizationId);
+    }
+
+    this.api.createFormData('/api/v1/vendors/import', formData).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.closeImportModal();
+        this.message.set(response.message || 'Vendors imported successfully.');
+        this.load();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.importModalError.set(err?.error?.message || 'Unable to import vendors.');
+      },
+    });
+  }
+
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
+  }
+
+  onFilterChange(value: string): void {
+    this.filter.set(value);
+    this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  onPageSizeChange(value: string): void {
+    const parsed = Number(value);
+    this.pageSize = Number.isFinite(parsed) ? parsed : 20;
+    this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+      return;
+    }
+    this.page = page;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+    });
+  }
+
+  trackById(_index: number, row: VendorRow): string {
+    return row.id;
   }
 
   organizationLabel(row: VendorRow): string {
     return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
+  }
+
+  statusBadgeClass(status: unknown): string {
+    switch (String(status || '').toLowerCase()) {
+      case 'active':
+        return 'text-bg-success';
+      case 'inactive':
+      case 'suspended':
+        return 'text-bg-secondary';
+      case 'blacklisted':
+        return 'text-bg-danger';
+      default:
+        return 'text-bg-secondary';
+    }
   }
 
   private newVendorForm(): Record<string, unknown> {

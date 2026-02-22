@@ -6,6 +6,7 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface OrganizationRow {
@@ -74,12 +75,13 @@ export class OrganizationsPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
+  readonly pageSizeOptions = [10, 20, 50, 100];
   page = 1;
   pageSize = 20;
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+    viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'organizations-page';
 
   createForm: Record<string, unknown> = this.newOrgForm();
   editingId = '';
@@ -102,6 +104,7 @@ export class OrganizationsPageComponent {
   });
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.loadTaxTypes();
     this.load();
   }
@@ -130,7 +133,7 @@ export class OrganizationsPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+                this.persistTablePreferences();
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
           this.load();
@@ -282,13 +285,15 @@ export class OrganizationsPageComponent {
     });
   }
 
-  trackById(_index: number, row: OrganizationRow): string {
-    return row.id;
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   onFilterChange(value: string): void {
     this.filter.set(value);
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -296,6 +301,7 @@ export class OrganizationsPageComponent {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -304,19 +310,47 @@ export class OrganizationsPageComponent {
       return;
     }
     this.page = page;
+    this.persistTablePreferences();
     this.load();
   }
 
-  taxTypeLabel(row: OrganizationRow): string {
-    const code = String(row.taxType?.code || '').trim();
-    const name = String(row.taxType?.name || '').trim();
-    if (code && name) {
-      return `${code} - ${name}`;
-    }
-    return code || name || row.taxTypeId || '-';
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
   }
 
-  private loadTaxTypes(): void {
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+    });
+  }
+
+  trackById(_index: number, row: OrganizationRow): string {
+    return row.id;
+  }
+
+  taxTypeLabel(row: OrganizationRow): string {
+    if (row.taxType?.name) {
+      return row.taxType.name;
+    }
+    if (row.taxType?.code) {
+      return row.taxType.code;
+    }
+    if (!row.taxTypeId) {
+      return '-';
+    }
+    const match = this.taxTypes().find((taxType) => taxType.id === row.taxTypeId);
+    if (!match) {
+      return row.taxTypeId;
+    }
+    return `${match.code} - ${match.name}`;
+  }
+
+  loadTaxTypes(): void {
     this.api.list<TaxTypeOption>('/api/v1/tax-types?activeOnly=true').subscribe({
       next: (response) => {
         this.taxTypes.set(response.data || []);

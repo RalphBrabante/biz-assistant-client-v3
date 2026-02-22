@@ -23,4 +23,64 @@ if (isDevMode() && typeof window !== 'undefined') {
   }
 }
 
-bootstrapApplication(AppComponent, appConfig).catch((err) => console.error(err));
+function normalizeHeader(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function syncCardTableLabels(): void {
+  const tables = document.querySelectorAll<HTMLTableElement>('.table-view-wrapper table');
+  tables.forEach((table) => {
+    const headers = Array.from(table.querySelectorAll('thead th')).map((th) =>
+      normalizeHeader(th.textContent || '')
+    );
+
+    if (!headers.length) {
+      return;
+    }
+
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach((row) => {
+      const cells = Array.from(row.querySelectorAll<HTMLTableCellElement>('td'));
+      cells.forEach((cell, index) => {
+        const label = headers[index] || `Field ${index + 1}`;
+        cell.setAttribute('data-label', label);
+        if (label.toLowerCase() === 'actions') {
+          cell.classList.add('card-actions-cell');
+        } else {
+          cell.classList.remove('card-actions-cell');
+        }
+      });
+    });
+  });
+}
+
+function installCardTableLabelSync(): void {
+  let rafId = 0;
+  const queueSync = () => {
+    if (rafId) {
+      return;
+    }
+    rafId = window.requestAnimationFrame(() => {
+      rafId = 0;
+      syncCardTableLabels();
+    });
+  };
+
+  queueSync();
+  const observer = new MutationObserver(() => queueSync());
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+}
+
+bootstrapApplication(AppComponent, appConfig)
+  .then(() => {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      installCardTableLabelSync();
+    }
+  })
+  .catch((err) => console.error(err));

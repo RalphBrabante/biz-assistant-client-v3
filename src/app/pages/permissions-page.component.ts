@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface PermissionRow {
@@ -42,10 +43,11 @@ export class PermissionsPageComponent {
   readonly filter = signal('');
   page = 1;
   pageSize = 20;
+  readonly pageSizeOptions = [10, 20, 50, 100];
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+  viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'permissions-page';
 
   createForm: Record<string, unknown> = {
     name: '',
@@ -86,6 +88,7 @@ export class PermissionsPageComponent {
   });
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
   }
 
@@ -109,7 +112,7 @@ export class PermissionsPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+        this.persistTablePreferences();
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
           this.load();
@@ -265,6 +268,7 @@ export class PermissionsPageComponent {
   onFilterChange(value: string): void {
     this.filter.set(value);
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -272,7 +276,13 @@ export class PermissionsPageComponent {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
+  }
+
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   goToPage(page: number): void {
@@ -280,6 +290,22 @@ export class PermissionsPageComponent {
       return;
     }
     this.page = page;
+    this.persistTablePreferences();
     this.load();
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+    });
   }
 }

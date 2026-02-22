@@ -9,6 +9,7 @@ import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface ExpenseRow {
@@ -120,7 +121,8 @@ export class ExpensesPageComponent {
   readonly editModalError = signal('');
   readonly importModalError = signal('');
   readonly importSummary = signal<ExpenseImportSummary | null>(null);
-        viewMode: 'table' | 'card' = 'table';
+  viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'expenses-page';
   searchQuery = '';
   statusFilter = '';
   paymentMethodFilter = '';
@@ -158,6 +160,7 @@ export class ExpensesPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.loadWithholdingTaxTypes();
     this.load();
     this.vendorSearchSub = this.vendorSearchInput$
@@ -245,7 +248,7 @@ export class ExpensesPageComponent {
           this.total = Number(meta.total || 0);
           this.totalPages = Math.max(1, Number(meta.totalPages || 1));
           this.page = Math.max(1, Number(meta.page || this.page));
-          this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+                  this.persistTablePreferences();
           if (this.page > this.totalPages) {
             this.page = this.totalPages;
             this.load();
@@ -467,15 +470,161 @@ export class ExpensesPageComponent {
     });
   }
 
-  trackById(_index: number, row: ExpenseRow): string {
-    return row.id;
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
+  }
+
+  applyFilters(): void {
+    this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  clearFilters(): void {
+    this.searchQuery = '';
+    this.statusFilter = '';
+    this.paymentMethodFilter = '';
+    this.expenseDateFrom = '';
+    this.expenseDateTo = '';
+    this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  onPageSizeChange(value: string): void {
+    const parsed = Number(value);
+    this.pageSize = Number.isFinite(parsed) ? parsed : 20;
+    this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+      return;
+    }
+    this.page = page;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  organizationLabel(row: ExpenseRow): string {
+    return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
+  }
+
+  vendorLabel(row: ExpenseRow): string {
+    return row.vendor?.name || row.vendorTaxId || row.vendorId || '-';
+  }
+
+  taxTypeLabel(row: ExpenseRow): string {
+    if (row.taxType?.name) return row.taxType.name;
+    if (row.taxType?.code) return row.taxType.code;
+    return '-';
+  }
+
+  withholdingTaxTypeLabel(row: ExpenseRow): string {
+    if (row.withholdingTaxType?.name) return row.withholdingTaxType.name;
+    if (row.withholdingTaxType?.code) return row.withholdingTaxType.code;
+    return '-';
+  }
+
+  formatMoney(value: unknown, currency: string): string {
+    const amount = Number(value ?? 0);
+    const normalized = Number.isFinite(amount) ? amount : 0;
+    const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(normalized);
+    } catch (_err) {
+      return `${code} ${normalized.toFixed(2)}`;
+    }
+  }
+
+  onVendorSearchChange(value: string): void {
+    const query = String(value || '');
+    this.vendorSearch.set(query);
+    if (!query.trim()) {
+      this.vendors.set([]);
+      this.loadingVendors.set(false);
+      return;
+    }
+    this.vendorSearchInput$.next(query);
+  }
+
+  selectVendor(vendor: VendorOption): void {
+    this.selectedCreateVendor.set(vendor);
+    this.createForm['vendorId'] = vendor.id;
+    this.createForm['vendorTaxId'] = vendor.taxId || '';
+    this.vendors.set([]);
+    this.vendorSearch.set(vendor.name || vendor.legalName || vendor.id);
+  }
+
+  clearSelectedVendor(): void {
+    this.selectedCreateVendor.set(null);
+    this.createForm['vendorId'] = '';
+    this.createForm['vendorTaxId'] = '';
+    this.vendorSearch.set('');
+    this.vendors.set([]);
+  }
+
+  openInlineVendorCreate(): void {
+    this.showInlineVendorCreate.set(true);
+    this.vendorCreateError.set('');
+    this.vendorCreateForm = this.newVendorForm();
+  }
+
+  cancelInlineVendorCreate(): void {
+    this.showInlineVendorCreate.set(false);
+    this.vendorCreateError.set('');
+  }
+
+  createVendorFromInline(): void {
+    if (!this.currentOrganizationId) {
+      this.vendorCreateError.set('Select a specific organization first.');
+      return;
+    }
+
+    this.creatingVendor.set(true);
+    this.vendorCreateError.set('');
+
+    const payload = {
+      ...this.vendorCreateForm,
+      organizationId: this.currentOrganizationId,
+      createdBy: this.currentUserId,
+      updatedBy: this.currentUserId,
+    };
+
+    this.api.create<VendorOption>('/api/v1/vendors', payload).subscribe({
+      next: (response) => {
+        this.creatingVendor.set(false);
+        const created = response.data;
+        if (created?.id) {
+          this.selectVendor({
+            id: created.id,
+            name: created.name || '',
+            legalName: created.legalName,
+            taxId: created.taxId,
+            status: created.status,
+          });
+          this.showInlineVendorCreate.set(false);
+        }
+      },
+      error: (err) => {
+        this.creatingVendor.set(false);
+        this.vendorCreateError.set(err?.error?.message || 'Unable to create vendor.');
+      },
+    });
   }
 
   onCreateFileChange(event: Event): void {
     const target = event.target as HTMLInputElement | null;
-    const file = target?.files && target.files.length > 0 ? target.files[0] : null;
-    this.createFile = file;
-    this.createFileName.set(file ? file.name : '');
+    this.createFile = target?.files && target.files.length > 0 ? target.files[0] : null;
+    this.createFileName.set(this.createFile?.name || '');
   }
 
   onImportFileChange(event: Event): void {
@@ -501,8 +650,8 @@ export class ExpensesPageComponent {
 
     const formData = new FormData();
     formData.append('file', this.importFile);
-    if (this.currentOrganizationId.trim()) {
-      formData.append('organizationId', this.currentOrganizationId.trim());
+    if (this.currentOrganizationId) {
+      formData.append('organizationId', this.currentOrganizationId);
     }
 
     this.api.createFormData<Record<string, unknown>>('/api/v1/expenses/import', formData).subscribe({
@@ -516,12 +665,7 @@ export class ExpensesPageComponent {
         const errors = Array.isArray(data['errors'])
           ? data['errors'].map((row) => String(row || '').trim()).filter((row) => row.length > 0)
           : [];
-        this.importSummary.set({
-          imported,
-          skipped,
-          totalRows,
-          errors,
-        });
+        this.importSummary.set({ imported, skipped, totalRows, errors });
         this.message.set(response.message || `Imported ${imported}, skipped ${skipped}.`);
         this.load();
       },
@@ -532,35 +676,18 @@ export class ExpensesPageComponent {
     });
   }
 
-  clearImportSummary(): void {
-    this.importSummary.set(null);
-  }
-
   exportExpensesCsv(): void {
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');
 
     const params = new URLSearchParams();
-    const q = this.searchQuery.trim();
-    if (q) {
-      params.set('q', q);
-    }
-    if (this.statusFilter) {
-      params.set('status', this.statusFilter);
-    }
-    if (this.paymentMethodFilter) {
-      params.set('paymentMethod', this.paymentMethodFilter);
-    }
-    if (this.expenseDateFrom) {
-      params.set('expenseDateFrom', this.expenseDateFrom);
-    }
-    if (this.expenseDateTo) {
-      params.set('expenseDateTo', this.expenseDateTo);
-    }
-    if (this.currentOrganizationId) {
-      params.set('organizationId', this.currentOrganizationId);
-    }
+    if (this.searchQuery.trim()) params.set('q', this.searchQuery.trim());
+    if (this.statusFilter) params.set('status', this.statusFilter);
+    if (this.paymentMethodFilter) params.set('paymentMethod', this.paymentMethodFilter);
+    if (this.expenseDateFrom) params.set('expenseDateFrom', this.expenseDateFrom);
+    if (this.expenseDateTo) params.set('expenseDateTo', this.expenseDateTo);
+    if (this.currentOrganizationId) params.set('organizationId', this.currentOrganizationId);
 
     this.api.download(`/api/v1/expenses/export?${params.toString()}`).subscribe({
       next: (blob) => {
@@ -582,188 +709,27 @@ export class ExpensesPageComponent {
     });
   }
 
-  applyFilters(): void {
-    this.load(true);
+  clearImportSummary(): void {
+    this.importSummary.set(null);
   }
 
-  clearFilters(): void {
-    this.searchQuery = '';
-    this.statusFilter = '';
-    this.paymentMethodFilter = '';
-    this.expenseDateFrom = '';
-    this.expenseDateTo = '';
-    this.load(true);
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
   }
 
-  onPageSizeChange(value: string): void {
-    const parsed = Number(value);
-    this.pageSize = Number.isFinite(parsed) ? parsed : 20;
-    this.load(true);
-  }
-
-  goToPage(page: number): void {
-    if (this.loading() || page < 1 || page > this.totalPages || page === this.page) {
-      return;
-    }
-    this.page = page;
-    this.load();
-  }
-
-  vendorLabel(row: ExpenseRow): string {
-    return row.vendor?.name || row.vendorId || '-';
-  }
-
-  taxTypeLabel(row: ExpenseRow): string {
-    if (!row.taxType) {
-      return '-';
-    }
-    const code = String(row.taxType.code || '').trim();
-    const name = String(row.taxType.name || '').trim();
-    const pct = row.taxType.percentage;
-    const pctLabel = typeof pct === 'number' && Number.isFinite(pct) ? ` (${pct}%)` : '';
-    if (code && name) {
-      return `${code} - ${name}${pctLabel}`;
-    }
-    return code || name || '-';
-  }
-
-  withholdingTaxTypeLabel(row: ExpenseRow): string {
-    if (!row.withholdingTaxType) {
-      return '-';
-    }
-    const code = String(row.withholdingTaxType.code || '').trim();
-    const name = String(row.withholdingTaxType.name || '').trim();
-    const pct = row.withholdingTaxType.percentage;
-    const pctLabel = typeof pct === 'number' && Number.isFinite(pct) ? ` (${pct}%)` : '';
-    if (code && name) {
-      return `${code} - ${name}${pctLabel}`;
-    }
-    return code || name || '-';
-  }
-
-  organizationLabel(row: ExpenseRow): string {
-    return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
-  }
-
-  formatMoney(value: unknown, currency?: string): string {
-    const amount = Number(value ?? 0);
-    const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: code,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(Number.isFinite(amount) ? amount : 0);
-    } catch (_err) {
-      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
-    }
-  }
-
-  onVendorSearchChange(value: string): void {
-    this.vendorSearch.set(value);
-    this.selectedCreateVendor.set(null);
-    this.showInlineVendorCreate.set(false);
-    this.vendorCreateError.set('');
-    this.createForm['vendorId'] = '';
-    this.createForm['vendorTaxId'] = '';
-    const cleaned = String(value || '').trim();
-    if (!cleaned) {
-      this.loadingVendors.set(false);
-      this.vendors.set([]);
-      return;
-    }
-    this.vendorSearchInput$.next(value);
-  }
-
-  selectVendor(vendor: VendorOption): void {
-    this.selectedCreateVendor.set(vendor);
-    this.vendorSearch.set(vendor.name || vendor.legalName || '');
-    this.showInlineVendorCreate.set(false);
-    this.vendorCreateError.set('');
-    this.createForm['vendorId'] = vendor.id;
-    this.createForm['vendorTaxId'] = vendor.taxId || '';
-    this.vendors.set([]);
-  }
-
-  clearSelectedVendor(): void {
-    this.selectedCreateVendor.set(null);
-    this.vendorSearch.set('');
-    this.createForm['vendorId'] = '';
-    this.createForm['vendorTaxId'] = '';
-    this.vendors.set([]);
-    this.showInlineVendorCreate.set(false);
-    this.vendorCreateError.set('');
-  }
-
-  openInlineVendorCreate(): void {
-    this.showInlineVendorCreate.set(true);
-    this.vendorCreateError.set('');
-    this.vendorCreateForm = {
-      ...this.newVendorForm(),
-      name: this.vendorSearch().trim(),
-    };
-  }
-
-  cancelInlineVendorCreate(): void {
-    this.showInlineVendorCreate.set(false);
-    this.vendorCreateError.set('');
-    this.vendorCreateForm = this.newVendorForm();
-  }
-
-  createVendorFromInline(): void {
-    const name = String(this.vendorCreateForm['name'] || '').trim();
-    if (!name) {
-      this.vendorCreateError.set('Vendor name is required.');
-      return;
-    }
-
-    this.creatingVendor.set(true);
-    this.vendorCreateError.set('');
-
-    const payload = {
-      name,
-      legalName: this.optionalString(this.vendorCreateForm['legalName']),
-      taxId: this.optionalString(this.vendorCreateForm['taxId']),
-      contactPerson: this.optionalString(this.vendorCreateForm['contactPerson']),
-      contactEmail: this.optionalString(this.vendorCreateForm['contactEmail']),
-      phone: this.optionalString(this.vendorCreateForm['phone']),
-      addressLine1: this.optionalString(this.vendorCreateForm['addressLine1']),
-      addressLine2: this.optionalString(this.vendorCreateForm['addressLine2']),
-      city: this.optionalString(this.vendorCreateForm['city']),
-      state: this.optionalString(this.vendorCreateForm['state']),
-      barangay: this.optionalString(this.vendorCreateForm['barangay']),
-      province: this.optionalString(this.vendorCreateForm['province']),
-      postalCode: this.optionalString(this.vendorCreateForm['postalCode']),
-      country: this.optionalString(this.vendorCreateForm['country']),
-      paymentTerms: this.optionalString(this.vendorCreateForm['paymentTerms']),
-      notes: this.optionalString(this.vendorCreateForm['notes']),
-      status: this.optionalString(this.vendorCreateForm['status']) || 'active',
-      createdBy: this.currentUserId || undefined,
-      updatedBy: this.currentUserId || undefined,
-    };
-
-    this.api.create<VendorOption>('/api/v1/vendors', payload).subscribe({
-      next: (response) => {
-        this.creatingVendor.set(false);
-        const createdVendor = response.data;
-        if (!createdVendor) {
-          this.vendorCreateError.set('Vendor was created but no record was returned.');
-          return;
-        }
-
-        this.selectVendor(createdVendor);
-        this.vendorSearch.set(createdVendor.name || createdVendor.legalName || '');
-        this.createForm['vendorId'] = createdVendor.id;
-        this.createForm['vendorTaxId'] = createdVendor.taxId || '';
-        this.showInlineVendorCreate.set(false);
-        this.vendorCreateForm = this.newVendorForm();
-      },
-      error: (err) => {
-        this.creatingVendor.set(false);
-        this.vendorCreateError.set(err?.error?.message || 'Unable to create vendor.');
-      },
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
     });
+  }
+
+  trackById(_index: number, row: ExpenseRow): string {
+    return row.id;
   }
 
   private newExpenseForm(): Record<string, unknown> {

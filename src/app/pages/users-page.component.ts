@@ -8,6 +8,7 @@ import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface UserRow {
@@ -87,12 +88,13 @@ export class UsersPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
+  readonly pageSizeOptions = [10, 20, 50, 100];
   page = 1;
   pageSize = 20;
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+    viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'users-page';
 
   createForm: Record<string, unknown> = this.newUserForm(true);
   createSelectedRoleIds: string[] = [];
@@ -126,6 +128,7 @@ export class UsersPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
   }
 
@@ -149,7 +152,7 @@ export class UsersPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+                this.persistTablePreferences();
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
           this.load();
@@ -322,13 +325,15 @@ export class UsersPageComponent {
     });
   }
 
-  trackById(_index: number, row: UserRow): string {
-    return row.id;
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   onFilterChange(value: string): void {
     this.filter.set(value);
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -336,6 +341,7 @@ export class UsersPageComponent {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -344,93 +350,30 @@ export class UsersPageComponent {
       return;
     }
     this.page = page;
+    this.persistTablePreferences();
     this.load();
   }
 
-  userRoleBadgeClass(role: string | undefined): string {
-    switch (String(role || '').toLowerCase()) {
-      case 'administrator':
-      case 'superuser':
-        return 'text-bg-danger';
-      case 'accountant':
-      case 'inventorymanager':
-        return 'text-bg-primary';
-      case 'enduser':
-        return 'text-bg-secondary';
-      default:
-        return 'text-bg-light border border-secondary-subtle text-secondary';
-    }
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
   }
 
-  userStatusBadgeClass(status: string | undefined): string {
-    switch (String(status || '').toLowerCase()) {
-      case 'active':
-        return 'text-bg-success';
-      case 'pending_verification':
-        return 'text-bg-warning';
-      case 'inactive':
-        return 'text-bg-secondary';
-      case 'blocked':
-      case 'suspended':
-        return 'text-bg-danger';
-      default:
-        return 'text-bg-light border border-secondary-subtle text-secondary';
-    }
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+    });
   }
 
-  verificationBadgeClass(isEmailVerified: boolean | undefined): string {
-    return isEmailVerified ? 'text-bg-success' : 'text-bg-warning';
+  trackById(_index: number, row: UserRow): string {
+    return row.id;
   }
 
-  activeBadgeClass(isActive: boolean | undefined): string {
-    return isActive ? 'text-bg-success' : 'text-bg-secondary';
-  }
-
-  organizationLabel(row: UserRow): string {
-    return row.primaryOrganization?.name || row.primaryOrganization?.legalName || row.organizationId || '-';
-  }
-
-  roleOptionLabel(role: RoleOption): string {
-    const name = String(role.name || '').trim();
-    const code = String(role.code || '').trim();
-    if (name && code) {
-      return `${name} (${code.toUpperCase()})`;
-    }
-    return name || code || role.id;
-  }
-
-  organizationOptionLabel(organization: OrganizationOption): string {
-    return organization.name || organization.legalName || organization.id;
-  }
-
-  isCreateRoleSelected(roleId: string): boolean {
-    return this.createSelectedRoleIds.includes(roleId);
-  }
-
-  toggleCreateRoleSelection(roleId: string, checked: boolean): void {
-    if (!checked) {
-      this.createSelectedRoleIds = this.createSelectedRoleIds.filter((id) => id !== roleId);
-      return;
-    }
-    if (!this.createSelectedRoleIds.includes(roleId)) {
-      this.createSelectedRoleIds = [...this.createSelectedRoleIds, roleId];
-    }
-  }
-
-  generateCreatePassword(): void {
-    const charset =
-      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*()_+-=';
-    const length = 14;
-    let generated = '';
-    for (let i = 0; i < length; i += 1) {
-      const randomIndex = Math.floor(Math.random() * charset.length);
-      generated += charset.charAt(randomIndex);
-    }
-    this.createForm['password'] = generated;
-    this.createModalError.set('');
-  }
-
-  private loadCreateModalOptions(): void {
+  loadCreateModalOptions(): void {
     this.createOptionsLoading.set(true);
     this.createRoleOptions.set([]);
     this.createOrganizationOptions.set([]);
@@ -455,6 +398,77 @@ export class UsersPageComponent {
         this.createModalError.set('Unable to load create-user options.');
       },
     });
+  }
+
+  organizationLabel(row: UserRow): string {
+    if (row.primaryOrganization?.name) return row.primaryOrganization.name;
+    if (row.primaryOrganization?.legalName) return row.primaryOrganization.legalName;
+    return row.organizationId || '-';
+  }
+
+  userRoleBadgeClass(role: unknown): string {
+    const normalized = String(role || '').toLowerCase();
+    if (normalized.includes('superuser')) return 'text-bg-dark';
+    if (normalized.includes('administrator')) return 'text-bg-primary';
+    if (normalized.includes('accountant')) return 'text-bg-info';
+    if (normalized.includes('inventory')) return 'text-bg-warning';
+    return 'text-bg-secondary';
+  }
+
+  userStatusBadgeClass(status: unknown): string {
+    switch (String(status || '').toLowerCase()) {
+      case 'active':
+      case 'verified':
+        return 'text-bg-success';
+      case 'pending_verification':
+      case 'pending':
+        return 'text-bg-warning';
+      case 'suspended':
+      case 'disabled':
+      case 'blocked':
+        return 'text-bg-danger';
+      default:
+        return 'text-bg-secondary';
+    }
+  }
+
+  verificationBadgeClass(isVerified: unknown): string {
+    return isVerified ? 'text-bg-success' : 'text-bg-warning';
+  }
+
+  activeBadgeClass(isActive: unknown): string {
+    return isActive === false ? 'text-bg-secondary' : 'text-bg-success';
+  }
+
+  generateCreatePassword(): void {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+    let generated = '';
+    for (let i = 0; i < 12; i += 1) {
+      generated += chars[Math.floor(Math.random() * chars.length)];
+    }
+    this.createForm['password'] = generated;
+  }
+
+  organizationOptionLabel(org: OrganizationOption): string {
+    return org.name || org.legalName || org.id;
+  }
+
+  roleOptionLabel(role: RoleOption): string {
+    return role.name || role.code || role.id;
+  }
+
+  isCreateRoleSelected(roleId: string): boolean {
+    return this.createSelectedRoleIds.includes(roleId);
+  }
+
+  toggleCreateRoleSelection(roleId: string, checked: boolean): void {
+    if (checked) {
+      if (!this.createSelectedRoleIds.includes(roleId)) {
+        this.createSelectedRoleIds = [...this.createSelectedRoleIds, roleId];
+      }
+      return;
+    }
+    this.createSelectedRoleIds = this.createSelectedRoleIds.filter((id) => id !== roleId);
   }
 
   private newUserForm(includePassword: boolean): Record<string, unknown> {

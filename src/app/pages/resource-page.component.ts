@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse, CrudResourceConfig, FieldConfig } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 import { RESOURCE_CONFIGS } from '../shared/resource-configs';
 
@@ -33,9 +34,11 @@ export class ResourcePageComponent {
   error = '';
   searchQuery = '';
   activeFilter = '';
-  viewMode: 'table' | 'card' = 'table';
+  viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'resource-page';
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
   }
 
@@ -175,6 +178,11 @@ export class ResourcePageComponent {
     return row['id'] || _index;
   }
 
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
+  }
+
   prettyValue(row: Record<string, unknown>, key: string): string {
     const value = row[key];
     if (typeof value === 'boolean') {
@@ -290,5 +298,16 @@ export class ResourcePageComponent {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      viewMode: this.viewMode,
+    });
   }
 }

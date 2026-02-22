@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface RoleRow {
@@ -40,7 +41,8 @@ export class RolesPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
-  viewMode: 'table' | 'card' = 'table';
+  viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'roles-page';
 
   createForm: Record<string, unknown> = {
     name: '',
@@ -75,6 +77,7 @@ export class RolesPageComponent {
   });
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
   }
 
@@ -224,5 +227,21 @@ export class RolesPageComponent {
 
   trackById(_index: number, row: RoleRow): string {
     return row.id;
+  }
+
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      viewMode: this.viewMode,
+    });
   }
 }

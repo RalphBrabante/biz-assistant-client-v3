@@ -7,6 +7,7 @@ import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface SalesInvoiceRow {
@@ -78,10 +79,11 @@ export class SalesInvoicesPageComponent {
   sortDirection: 'asc' | 'desc' = 'desc';
   page = 1;
   pageSize = 20;
+  readonly pageSizeOptions = [10, 20, 50, 100];
   total = 0;
   totalPages = 1;
-  readonly pageSizeOptions = [10, 20, 50, 100];
-        viewMode: 'table' | 'card' = 'table';
+    viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'sales-invoices-page';
 
   createForm: Record<string, unknown> = this.newInvoiceForm();
   private importFile: File | null = null;
@@ -104,6 +106,7 @@ export class SalesInvoicesPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.load();
   }
 
@@ -144,7 +147,7 @@ export class SalesInvoicesPageComponent {
         this.total = Number(meta.total || 0);
         this.totalPages = Math.max(1, Number(meta.totalPages || 1));
         this.page = Math.max(1, Number(meta.page || this.page));
-        this.pageSize = Math.max(1, Number(meta.limit || this.pageSize));
+                this.persistTablePreferences();
         if (this.page > this.totalPages) {
           this.page = this.totalPages;
           this.load();
@@ -356,12 +359,28 @@ export class SalesInvoicesPageComponent {
     });
   }
 
-  trackById(_index: number, row: SalesInvoiceRow): string {
-    return row.id;
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   onFilterChange(): void {
     this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  setSort(value: string): void {
+    this.sortBy = String(value || 'createdAt');
+    this.page = 1;
+    this.persistTablePreferences();
+    this.load();
+  }
+
+  toggleSortDirection(): void {
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -374,23 +393,7 @@ export class SalesInvoicesPageComponent {
     this.sortBy = 'createdAt';
     this.sortDirection = 'desc';
     this.page = 1;
-    this.load();
-  }
-
-  setSort(sortBy: string): void {
-    if (this.sortBy === sortBy) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortBy = sortBy;
-      this.sortDirection = 'desc';
-    }
-    this.page = 1;
-    this.load();
-  }
-
-  toggleSortDirection(): void {
-    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -398,6 +401,7 @@ export class SalesInvoicesPageComponent {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
+    this.persistTablePreferences();
     this.load();
   }
 
@@ -406,37 +410,42 @@ export class SalesInvoicesPageComponent {
       return;
     }
     this.page = page;
+    this.persistTablePreferences();
     this.load();
   }
 
-  invoiceStatusBadgeClass(status: string | undefined): string {
+  organizationLabel(row: SalesInvoiceRow): string {
+    if (row.organization?.name) return row.organization.name;
+    if (row.organization?.legalName) return row.organization.legalName;
+    return row.organizationId || '-';
+  }
+
+  invoiceStatusBadgeClass(status: unknown): string {
     switch (String(status || '').toLowerCase()) {
       case 'paid':
-        return 'text-bg-success';
       case 'issued':
       case 'sent':
-        return 'text-bg-primary';
+        return 'text-bg-success';
       case 'partially_paid':
-        return 'text-bg-info';
       case 'overdue':
         return 'text-bg-warning';
       case 'void':
       case 'cancelled':
         return 'text-bg-danger';
+      case 'draft':
       default:
         return 'text-bg-secondary';
     }
   }
 
-  paymentStatusBadgeClass(status: string | undefined): string {
+  paymentStatusBadgeClass(status: unknown): string {
     switch (String(status || '').toLowerCase()) {
       case 'paid':
         return 'text-bg-success';
       case 'partially_paid':
-        return 'text-bg-info';
-      case 'refunded':
         return 'text-bg-warning';
       case 'failed':
+      case 'refunded':
         return 'text-bg-danger';
       case 'unpaid':
       default:
@@ -444,12 +453,9 @@ export class SalesInvoicesPageComponent {
     }
   }
 
-  organizationLabel(row: SalesInvoiceRow): string {
-    return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
-  }
-
-  formatMoney(value: unknown, currency?: string): string {
+  formatMoney(value: unknown, currency: string): string {
     const amount = Number(value ?? 0);
+    const normalized = Number.isFinite(amount) ? amount : 0;
     const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
     try {
       return new Intl.NumberFormat('en-US', {
@@ -457,10 +463,29 @@ export class SalesInvoicesPageComponent {
         currency: code,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(Number.isFinite(amount) ? amount : 0);
+      }).format(normalized);
     } catch (_err) {
-      return `${code} ${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+      return `${code} ${normalized.toFixed(2)}`;
     }
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.page = toPositiveInt(prefs['page'], this.page);
+    this.pageSize = toPositiveInt(prefs['pageSize'], this.pageSize);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      page: this.page,
+      pageSize: this.pageSize,
+      viewMode: this.viewMode,
+    });
+  }
+
+  trackById(_index: number, row: SalesInvoiceRow): string {
+    return row.id;
   }
 
   private newInvoiceForm(): Record<string, unknown> {

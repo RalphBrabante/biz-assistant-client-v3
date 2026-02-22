@@ -7,6 +7,7 @@ import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
 import { ApiResponse } from '../core/types';
+import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../core/table-preferences';
 
 interface QuarterlySalesReportRow {
   id: string;
@@ -99,7 +100,8 @@ export class ReportsPageComponent {
   expenseTotalPages = 1;
 
   readonly pageSizeOptions = [10, 20, 50, 100];
-  viewMode: 'table' | 'card' = 'table';
+  viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'reports-page';
   private readonly organizationNameMap = signal<Record<string, string>>({});
 
   readonly availableYears = computed(() => {
@@ -138,6 +140,7 @@ export class ReportsPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     if (this.isSuperuser) {
       this.loadOrganizations();
     }
@@ -196,6 +199,7 @@ export class ReportsPageComponent {
         this.salesTotalPages = Math.max(1, Number(meta.totalPages || 1));
         this.salesPage = Math.max(1, Number(meta.page || this.salesPage));
         this.salesPageSize = Math.max(1, Number(meta.limit || this.salesPageSize));
+        this.persistTablePreferences();
       },
       error: (err) => {
         this.loadingSales.set(false);
@@ -230,6 +234,7 @@ export class ReportsPageComponent {
         this.expenseTotalPages = Math.max(1, Number(meta.totalPages || 1));
         this.expensePage = Math.max(1, Number(meta.page || this.expensePage));
         this.expensePageSize = Math.max(1, Number(meta.limit || this.expensePageSize));
+        this.persistTablePreferences();
       },
       error: (err) => {
         this.loadingExpenses.set(false);
@@ -299,6 +304,7 @@ export class ReportsPageComponent {
   onFilterChange(): void {
     this.salesPage = 1;
     this.expensePage = 1;
+    this.persistTablePreferences();
     this.loadSalesReports();
     this.loadExpenseReports();
   }
@@ -307,6 +313,7 @@ export class ReportsPageComponent {
     const parsed = Number(value);
     this.salesPageSize = Number.isFinite(parsed) ? parsed : 20;
     this.salesPage = 1;
+    this.persistTablePreferences();
     this.loadSalesReports();
   }
 
@@ -314,7 +321,13 @@ export class ReportsPageComponent {
     const parsed = Number(value);
     this.expensePageSize = Number.isFinite(parsed) ? parsed : 20;
     this.expensePage = 1;
+    this.persistTablePreferences();
     this.loadExpenseReports();
+  }
+
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
   }
 
   goToSalesPage(page: number): void {
@@ -322,6 +335,7 @@ export class ReportsPageComponent {
       return;
     }
     this.salesPage = page;
+    this.persistTablePreferences();
     this.loadSalesReports();
   }
 
@@ -330,6 +344,7 @@ export class ReportsPageComponent {
       return;
     }
     this.expensePage = page;
+    this.persistTablePreferences();
     this.loadExpenseReports();
   }
 
@@ -433,5 +448,24 @@ export class ReportsPageComponent {
         (row) => Number(row.year) === this.selectedYear() && Number(row.quarter) === this.selectedQuarter()
       ) || null
     );
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+    this.salesPage = toPositiveInt(prefs['salesPage'], this.salesPage);
+    this.salesPageSize = toPositiveInt(prefs['salesPageSize'], this.salesPageSize);
+    this.expensePage = toPositiveInt(prefs['expensePage'], this.expensePage);
+    this.expensePageSize = toPositiveInt(prefs['expensePageSize'], this.expensePageSize);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      viewMode: this.viewMode,
+      salesPage: this.salesPage,
+      salesPageSize: this.salesPageSize,
+      expensePage: this.expensePage,
+      expensePageSize: this.expensePageSize,
+    });
   }
 }

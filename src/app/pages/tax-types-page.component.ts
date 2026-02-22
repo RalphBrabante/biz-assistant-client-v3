@@ -5,6 +5,7 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
+import { loadTablePreferences, saveTablePreferences, toTableViewMode, TableViewMode } from '../core/table-preferences';
 import { TooltipDirective } from '../shared/tooltip.directive';
 
 interface TaxTypeRow {
@@ -50,7 +51,8 @@ export class TaxTypesPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly filter = signal('');
-  viewMode: 'table' | 'card' = 'table';
+  viewMode: TableViewMode = 'table';
+  private readonly tablePrefsKey = 'tax-types-page';
 
   taxCreateForm: Record<string, unknown> = this.newTaxForm();
   withholdingCreateForm: Record<string, unknown> = this.newWithholdingForm();
@@ -117,6 +119,7 @@ export class TaxTypesPageComponent {
   }
 
   ngOnInit(): void {
+    this.restoreTablePreferences();
     this.loadAll();
   }
 
@@ -379,6 +382,11 @@ export class TaxTypesPageComponent {
     this.loadAll();
   }
 
+  setViewMode(mode: TableViewMode): void {
+    this.viewMode = mode;
+    this.persistTablePreferences();
+  }
+
   private newTaxForm(): Record<string, unknown> {
     return {
       code: '',
@@ -421,5 +429,16 @@ export class TaxTypesPageComponent {
       minimumBaseAmount: Number(form['minimumBaseAmount'] || 0),
       isActive: Boolean(form['isActive']),
     };
+  }
+
+  private restoreTablePreferences(): void {
+    const prefs = loadTablePreferences(this.tablePrefsKey);
+    this.viewMode = toTableViewMode(prefs['viewMode'], this.viewMode);
+  }
+
+  private persistTablePreferences(): void {
+    saveTablePreferences(this.tablePrefsKey, {
+      viewMode: this.viewMode,
+    });
   }
 }
