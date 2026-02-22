@@ -90,6 +90,7 @@ export class ItemsPageComponent {
 
   readonly message = signal('');
   readonly error = signal('');
+  readonly createModalError = signal('');
   readonly importModalError = signal('');
   readonly importSummary = signal<ItemImportSummary | null>(null);
   readonly filter = signal('');
@@ -273,29 +274,34 @@ export class ItemsPageComponent {
   openCreateModal(): void {
     this.createForm = this.newItemForm();
     this.error.set('');
+    this.createModalError.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
   }
 
   closeCreateModal(): void {
+    this.createModalError.set('');
     this.isCreateModalOpen.set(false);
   }
 
   createItem(): void {
     if (!this.currentOrganizationId.trim()) {
       if (this.organizationContext.isAllOrganizationsSelected()) {
-        this.error.set('Select a specific organization before creating an item.');
+        this.createModalError.set('Select a specific organization before creating an item.');
         return;
       }
-      this.error.set('Logged in user has no organization assigned.');
+      this.createModalError.set('Logged in user has no organization assigned.');
       return;
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.createModalError.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(this.createForm);
+    const payload = {
+      ...this.buildPayload(this.createForm),
+      organizationId: this.currentOrganizationId.trim(),
+    };
 
     this.api.create<ItemRow>('/api/v1/items', payload).subscribe({
       next: (response) => {
@@ -306,7 +312,7 @@ export class ItemsPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to create item.');
+        this.createModalError.set(err?.error?.message || 'Unable to create item.');
       },
     });
   }

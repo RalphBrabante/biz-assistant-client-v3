@@ -5,6 +5,16 @@
       <div class="small text-secondary">Biz Assistant</div>
     </div>
     <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm position-relative" type="button" (click)="toggleNotifications()" title="Notifications">
+        <i class="bi bi-bell"></i>
+        <span
+          *ngIf="unreadMessageCount > 0"
+          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+          style="font-size: 0.6rem;"
+        >
+          {{ unreadMessageCount > 99 ? '99+' : unreadMessageCount }}
+        </span>
+      </button>
       <button class="btn btn-outline-primary btn-sm" type="button" (click)="openSidebar()">
         <i class="bi bi-list fs-5"></i>
       </button>
@@ -20,7 +30,17 @@
           <div class="fw-bold fs-5">{{ organizationDisplayName }}</div>
           <div class="text-secondary small">Biz Assistant</div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
+          <button class="btn btn-outline-secondary btn-sm position-relative" type="button" (click)="toggleNotifications()" title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span
+              *ngIf="unreadMessageCount > 0"
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              style="font-size: 0.6rem;"
+            >
+              {{ unreadMessageCount > 99 ? '99+' : unreadMessageCount }}
+            </span>
+          </button>
           <button
             class="btn btn-outline-secondary btn-sm d-none d-lg-inline-flex"
             type="button"
@@ -114,6 +134,101 @@
 >
   <i class="bi fs-6" [class.bi-moon-stars]="!theme.isDark()" [class.bi-sun]="theme.isDark()"></i>
 </button>
+
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 3200;" *ngIf="realtimePopup as popup">
+  <div class="toast show border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <i class="bi bi-bell me-2"></i>
+      <strong class="me-auto">New Notification</strong>
+      <small class="text-secondary">{{ notificationTimestamp(popup.createdAt) }}</small>
+      <button type="button" class="btn-close ms-2 mb-1" (click)="closeRealtimePopup()"></button>
+    </div>
+    <button
+      type="button"
+      class="toast-body btn btn-link text-start text-decoration-none w-100 p-3"
+      style="color: inherit;"
+      (click)="openNotification(popup)"
+    >
+      <div class="fw-semibold">{{ popup.title }}</div>
+      <div class="small">{{ popup.message }}</div>
+      <div class="small text-primary mt-2">Open details</div>
+    </button>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="notificationsOpen" (click)="closeNotifications()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="notificationsOpen ? 'block' : 'none'"
+  [attr.aria-hidden]="!notificationsOpen"
+  *ngIf="notificationsOpen"
+>
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title d-flex align-items-center gap-2">
+          <i class="bi bi-bell"></i>
+          Notifications
+        </h5>
+        <button type="button" class="btn-close" (click)="closeNotifications()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="small text-secondary">
+            Unread: <span class="fw-semibold">{{ unreadMessageCount }}</span>
+          </div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-primary" routerLink="/messages" (click)="closeNotifications()">
+              <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+            <button class="btn btn-sm btn-outline-secondary" type="button" (click)="loadNotifications(1, false)" [disabled]="notificationsLoading">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="notificationsError" class="alert alert-danger py-2">{{ notificationsError }}</div>
+        <div *ngIf="notificationsLoading && notifications.length === 0" class="text-secondary small">Loading notifications...</div>
+        <div *ngIf="!notificationsLoading && notifications.length === 0 && !notificationsError" class="text-secondary small">
+          No notifications yet.
+        </div>
+
+        <div class="list-group" *ngIf="notifications.length > 0">
+          <button
+            *ngFor="let row of notifications; trackBy: trackByMessage"
+            class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2 text-start"
+            type="button"
+            (click)="openNotification(row)"
+          >
+            <div class="pe-2">
+              <div class="fw-semibold d-flex align-items-center gap-2">
+                <span>{{ row.title }}</span>
+                <span *ngIf="!row.isRead" class="badge text-bg-primary">Unread</span>
+              </div>
+              <div class="small mt-1">{{ row.message }}</div>
+              <div class="small text-secondary mt-1">{{ notificationTimestamp(row.createdAt) }}</div>
+            </div>
+            <button
+              *ngIf="!row.isRead"
+              class="btn btn-sm btn-outline-primary"
+              type="button"
+              (click)="markNotificationAsRead(row); $event.stopPropagation()"
+            >
+              Mark read
+            </button>
+          </button>
+        </div>
+
+        <div class="d-grid mt-3" *ngIf="notificationsPage < notificationsTotalPages">
+          <button class="btn btn-outline-secondary btn-sm" type="button" (click)="loadMoreNotifications()" [disabled]="notificationsLoading">
+            {{ notificationsLoading ? 'Loading...' : 'Load More' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="modal-backdrop fade show" *ngIf="auth.unauthorizedAccess().visible"></div>
 <div

@@ -33,6 +33,7 @@ import { TaxTypesPageComponent } from './pages/tax-types-page.component';
 import { ProfileSettingsPageComponent } from './pages/profile-settings-page.component';
 import { VerifyEmailPageComponent } from './pages/verify-email-page.component';
 import { HomeRedirectPageComponent } from './pages/home-redirect-page.component';
+import { MessagesPageComponent } from './pages/messages-page.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPageComponent },
@@ -53,6 +54,7 @@ export const routes: Routes = [
       { path: 'roles/:id', component: RoleDetailPageComponent, canActivate: [permissionGuard], data: { permissions: ['roles.manage'] } },
       { path: 'permissions', component: PermissionsPageComponent, canActivate: [permissionGuard], data: { permissions: ['permissions.manage'] } },
       { path: 'reports', component: ReportsPageComponent, canActivate: [permissionGuard], data: { permissions: ['reports.*'] } },
+      { path: 'messages', component: MessagesPageComponent, canActivate: [permissionGuard], data: { permissions: ['profile.manage'] } },
       { path: 'reports/:id', component: ReportPreviewPageComponent, canActivate: [permissionGuard], data: { permissions: ['reports.*'] } },
       { path: 'reports/sales/:id', component: SalesReportPreviewPageComponent, canActivate: [permissionGuard], data: { permissions: ['reports.*'] } },
       { path: 'settings', component: SettingsPageComponent, canActivate: [permissionGuard], data: { permissions: ['settings.update'] } },

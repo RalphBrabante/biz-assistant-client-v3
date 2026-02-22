@@ -99,9 +99,6 @@ export class UsersPageComponent {
   createForm: Record<string, unknown> = this.newUserForm(true);
   createSelectedRoleIds: string[] = [];
 
-  editingId = '';
-  editForm: Record<string, unknown> = this.newUserForm(false);
-
   readonly filteredRows = computed(() => {
     const q = this.filter().trim().toLowerCase();
     if (!q) {
@@ -231,68 +228,6 @@ export class UsersPageComponent {
       error: (err) => {
         this.submitting.set(false);
         this.createModalError.set(err?.error?.message || 'Unable to create user.');
-      },
-    });
-  }
-
-  startEdit(row: UserRow): void {
-    this.editingId = row.id;
-    this.editForm = {
-      organizationId: row.organizationId || '',
-      firstName: row.firstName || '',
-      lastName: row.lastName || '',
-      email: row.email || '',
-      password: '',
-      phone: row.phone || '',
-      addressLine1: row.addressLine1 || '',
-      addressLine2: row.addressLine2 || '',
-      city: row.city || '',
-      state: row.state || '',
-      postalCode: row.postalCode || '',
-      country: row.country || '',
-      role: row.role || '',
-      status: row.status || 'pending_verification',
-      isEmailVerified: row.isEmailVerified === true,
-      isActive: row.isActive !== false,
-    };
-  }
-
-  cancelEdit(): void {
-    this.editingId = '';
-    this.editForm = this.newUserForm(false);
-  }
-
-  async saveEdit(): Promise<void> {
-    if (!this.editingId) {
-      return;
-    }
-    const confirmed = await this.confirmDialog.confirm({
-      title: 'Update User',
-      message: 'Save changes to this user?',
-      confirmText: 'Update User',
-      confirmButtonClass: 'btn-primary',
-      iconClass: 'bi-pencil-square',
-    });
-    if (!confirmed) {
-      return;
-    }
-
-    this.submitting.set(true);
-    this.error.set('');
-    this.message.set('');
-
-    const payload = this.buildPayload(this.editForm, false);
-
-    this.api.update<UserRow>('/api/v1/users', this.editingId, payload).subscribe({
-      next: (response) => {
-        this.submitting.set(false);
-        this.message.set(response.message || 'User updated successfully.');
-        this.cancelEdit();
-        this.load();
-      },
-      error: (err) => {
-        this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to update user.');
       },
     });
   }

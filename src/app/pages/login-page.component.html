@@ -131,3 +131,61 @@
     </div>
   </div>
 </div>
+
+<div class="modal-backdrop fade show" *ngIf="organizationSelectionVisible"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="organizationSelectionVisible ? 'block' : 'none'"
+  [attr.aria-hidden]="!organizationSelectionVisible"
+  *ngIf="organizationSelectionVisible"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">
+          <i class="bi bi-buildings me-2 text-primary"></i>
+          Select Organization
+        </h5>
+        <button type="button" class="btn-close" (click)="closeOrganizationSelectionModal()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary mb-3">
+          Your account is assigned to multiple organizations. Select one to continue.
+        </p>
+        <label class="form-label fw-semibold" for="loginOrganization">Organization</label>
+        <select
+          id="loginOrganization"
+          class="form-select"
+          [(ngModel)]="selectedOrganizationId"
+          [disabled]="loading"
+        >
+          <option value="">Select organization</option>
+          <option
+            *ngFor="let organization of organizationOptions"
+            [value]="organization.id"
+            [disabled]="!isOrganizationSelectable(organization)"
+          >
+            {{ organizationLabel(organization) }}
+            {{ !isOrganizationSelectable(organization) ? ' (No active license)' : '' }}
+          </option>
+        </select>
+        <div class="form-text">
+          Organizations without active license cannot be used for login.
+        </div>
+
+        <div *ngIf="organizationSelectionError" class="alert alert-danger mt-3 mb-0">
+          {{ organizationSelectionError }}
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" type="button" (click)="closeOrganizationSelectionModal()" [disabled]="loading">
+          Cancel
+        </button>
+        <button class="btn btn-primary" type="button" (click)="submitWithSelectedOrganization()" [disabled]="loading">
+          {{ loading ? 'Signing in...' : 'Continue Login' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

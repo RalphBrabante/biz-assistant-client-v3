@@ -118,9 +118,6 @@
               >
                 <i class="bi bi-person-vcard"></i>
               </a>
-              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
-                <i class="bi bi-pencil-square"></i>
-              </button>
               <button
                 class="btn btn-sm btn-outline-danger"
                 type="button"
@@ -144,75 +141,6 @@
       <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading() || page <= 1">Prev</button>
       <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading() || page >= totalPages">Next</button>
       <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading() || page >= totalPages">Last</button>
-    </div>
-  </div>
-</section>
-
-<section class="card border-0 shadow-sm rounded-4" *ngIf="editingId">
-  <div class="card-body p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2 class="h5 mb-0">Edit User</h2>
-      <button class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
-    </div>
-
-    <div class="row g-3">
-      <div class="col-12 col-md-4">
-        <label class="form-label">First Name</label>
-        <input class="form-control" [(ngModel)]="editForm['firstName']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Last Name</label>
-        <input class="form-control" [(ngModel)]="editForm['lastName']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-control" [(ngModel)]="editForm['email']" />
-      </div>
-
-      <div class="col-12 col-md-4">
-        <label class="form-label">Organization ID</label>
-        <input class="form-control" [(ngModel)]="editForm['organizationId']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Role</label>
-        <input class="form-control" [(ngModel)]="editForm['role']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Status</label>
-        <input class="form-control" [(ngModel)]="editForm['status']" />
-      </div>
-
-      <div class="col-12 col-md-4">
-        <label class="form-label">Phone</label>
-        <input class="form-control" [(ngModel)]="editForm['phone']" />
-      </div>
-      <div class="col-12 col-md-8">
-        <label class="form-label">Address</label>
-        <input class="form-control" [(ngModel)]="editForm['addressLine1']" />
-      </div>
-
-      <div class="col-12 col-md-4 d-flex align-items-end">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" [(ngModel)]="editForm['isEmailVerified']" />
-          <label class="form-check-label">Email Verified</label>
-        </div>
-      </div>
-      <div class="col-12 col-md-4 d-flex align-items-end">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" [(ngModel)]="editForm['isActive']" />
-          <label class="form-check-label">Active</label>
-        </div>
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">New Password (optional)</label>
-        <input type="password" class="form-control" [(ngModel)]="editForm['password']" />
-      </div>
-
-      <div class="col-12 d-flex gap-2">
-        <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
-          {{ submitting() ? 'Saving...' : 'Save User' }}
-        </button>
-      </div>
     </div>
   </div>
 </section>

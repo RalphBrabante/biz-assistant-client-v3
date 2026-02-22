@@ -2,10 +2,12 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { OrganizationContextService } from '../core/organization-context.service';
+import { RealtimeMessageEvent, SocketNotificationsService } from '../core/socket-notifications.service';
 import { ThemeService } from '../core/theme.service';
 
 interface NavItem {
@@ -26,6 +28,24 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+interface SidebarMessage {
+  id: string;
+  title: string;
+  message: string;
+  organizationId?: string;
+  entityType?: string;
+  entityId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  isRead?: boolean;
+  readAt?: string | null;
+  createdAt?: string;
+  organization?: {
+    id?: string;
+    name?: string;
+    legalName?: string;
+  };
+}
+
 @Component({
   selector: 'app-shell',
   standalone: true,
@@ -37,6 +57,7 @@ export class AppShellComponent {
   readonly auth = inject(AuthService);
   readonly confirmDialog = inject(ConfirmDialogService);
   readonly organizationContext = inject(OrganizationContextService);
+  private readonly socketNotifications = inject(SocketNotificationsService);
   readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
 
@@ -45,6 +66,7 @@ export class AppShellComponent {
       title: 'Overview',
       items: [
         { label: 'Dashboard', path: '/dashboard', icon: 'bi-speedometer2', permissions: ['dashboard.read'] },
+        { label: 'Messages', path: '/messages', icon: 'bi-bell', permissions: ['profile.manage'] },
         { label: 'Reports', path: '/reports', icon: 'bi-bar-chart-line', permissions: ['reports.*'] },
       ],
     },
@@ -84,6 +106,19 @@ export class AppShellComponent {
   organizationDisplayName = 'Organization';
   canInstallApp = false;
   installingApp = false;
+  unreadMessageCount = 0;
+  notificationsOpen = false;
+  notificationsLoading = false;
+  notificationsError = '';
+  notifications: SidebarMessage[] = [];
+  notificationsPage = 1;
+  notificationsTotalPages = 1;
+  realtimePopup: SidebarMessage | null = null;
+  private unreadCountIntervalId: ReturnType<typeof setInterval> | null = null;
+  private realtimePopupTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private audioContext: AudioContext | null = null;
+  private allowNotificationSound = false;
+  private socketSub?: Subscription;
   private deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
 
   get userLabel(): string {
@@ -168,9 +203,14 @@ export class AppShellComponent {
   ngOnInit(): void {
     window.addEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', this.handleAppInstalled);
+    window.addEventListener('pointerdown', this.handleFirstUserInteraction, { passive: true });
+    window.addEventListener('keydown', this.handleFirstUserInteraction, { passive: true });
     this.resolveOrganizationDisplayName();
+    this.initializeRealtimeNotifications();
 
     if (!this.canSwitchOrganization) {
+      this.loadUnreadMessageCount();
+      this.startUnreadCountPolling();
       return;
     }
 
@@ -183,11 +223,30 @@ export class AppShellComponent {
         this.organizationOptions = [];
       },
     });
+
+    this.loadUnreadMessageCount();
+    this.startUnreadCountPolling();
   }
 
   ngOnDestroy(): void {
     window.removeEventListener('beforeinstallprompt', this.handleBeforeInstallPrompt);
     window.removeEventListener('appinstalled', this.handleAppInstalled);
+    window.removeEventListener('pointerdown', this.handleFirstUserInteraction);
+    window.removeEventListener('keydown', this.handleFirstUserInteraction);
+    if (this.unreadCountIntervalId) {
+      clearInterval(this.unreadCountIntervalId);
+      this.unreadCountIntervalId = null;
+    }
+    if (this.realtimePopupTimeoutId) {
+      clearTimeout(this.realtimePopupTimeoutId);
+      this.realtimePopupTimeoutId = null;
+    }
+    this.socketSub?.unsubscribe();
+    this.socketNotifications.disconnect();
+    if (this.audioContext) {
+      void this.audioContext.close().catch(() => undefined);
+      this.audioContext = null;
+    }
   }
 
   closeUnauthorizedModal(): void {
@@ -220,6 +279,11 @@ export class AppShellComponent {
     }
 
     this.organizationContext.setSelectedOrganizationId(nextOrganizationId);
+    this.loadUnreadMessageCount();
+    this.initializeRealtimeNotifications();
+    if (this.notificationsOpen) {
+      this.loadNotifications(1, false);
+    }
     this.updateDisplayNameFromOptions();
     this.switchingOrganization = true;
     setTimeout(() => {
@@ -330,6 +394,13 @@ export class AppShellComponent {
     this.canInstallApp = false;
   };
 
+  private readonly handleFirstUserInteraction = (): void => {
+    this.allowNotificationSound = true;
+    this.ensureAudioContext();
+    window.removeEventListener('pointerdown', this.handleFirstUserInteraction);
+    window.removeEventListener('keydown', this.handleFirstUserInteraction);
+  };
+
   trackByNavSection(_index: number, section: NavSection): string {
     return section.title;
   }
@@ -340,5 +411,280 @@ export class AppShellComponent {
 
   trackByOrganization(_index: number, org: { id: string }): string {
     return org.id;
+  }
+
+  private loadUnreadMessageCount(): void {
+    const params = new URLSearchParams();
+    const activeOrganizationId = String(this.organizationContext.getActiveOrganizationId() || '').trim();
+    if (activeOrganizationId) {
+      params.set('organizationId', activeOrganizationId);
+    }
+    const query = params.toString();
+    const endpoint = query ? `/api/v1/messages/unread-count?${query}` : '/api/v1/messages/unread-count';
+
+    this.api.get<{ unreadCount?: number }>(endpoint).subscribe({
+      next: (response) => {
+        this.unreadMessageCount = Number(response.data?.unreadCount || 0);
+      },
+      error: () => {
+        this.unreadMessageCount = 0;
+      },
+    });
+  }
+
+  private startUnreadCountPolling(): void {
+    if (this.unreadCountIntervalId) {
+      clearInterval(this.unreadCountIntervalId);
+    }
+    this.unreadCountIntervalId = setInterval(() => {
+      this.loadUnreadMessageCount();
+      if (this.notificationsOpen) {
+        this.loadNotifications(1, false);
+      }
+    }, 30000);
+  }
+
+  closeRealtimePopup(): void {
+    this.realtimePopup = null;
+    if (this.realtimePopupTimeoutId) {
+      clearTimeout(this.realtimePopupTimeoutId);
+      this.realtimePopupTimeoutId = null;
+    }
+  }
+
+  openNotification(row: SidebarMessage, markAsRead = true): void {
+    if (!row?.id) {
+      return;
+    }
+    if (markAsRead && !row.isRead) {
+      this.markNotificationAsRead(row);
+    }
+
+    const path = this.resolveNotificationPath(row);
+    this.closeRealtimePopup();
+    this.closeNotifications();
+    void this.router.navigateByUrl(path);
+  }
+
+  toggleNotifications(): void {
+    if (this.notificationsOpen) {
+      this.closeNotifications();
+      return;
+    }
+    this.notificationsOpen = true;
+    this.loadNotifications(1, false);
+  }
+
+  closeNotifications(): void {
+    this.notificationsOpen = false;
+  }
+
+  loadMoreNotifications(): void {
+    if (this.notificationsLoading || this.notificationsPage >= this.notificationsTotalPages) {
+      return;
+    }
+    this.loadNotifications(this.notificationsPage + 1, true);
+  }
+
+  markNotificationAsRead(row: SidebarMessage): void {
+    if (!row?.id || row.isRead) {
+      return;
+    }
+    this.api.put<SidebarMessage>(`/api/v1/messages/${row.id}/read`, {}).subscribe({
+      next: () => {
+        this.notifications = this.notifications.map((message) =>
+          message.id === row.id
+            ? { ...message, isRead: true, readAt: new Date().toISOString() }
+            : message
+        );
+        this.unreadMessageCount = Math.max(0, this.unreadMessageCount - 1);
+      },
+      error: () => {
+        // keep UI stable; count/list will resync on next poll
+      },
+    });
+  }
+
+  notificationTimestamp(value?: string): string {
+    if (!value) {
+      return '-';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '-';
+    }
+    return date.toLocaleString();
+  }
+
+  trackByMessage(_index: number, row: SidebarMessage): string {
+    return row.id;
+  }
+
+  loadNotifications(page = 1, append = false): void {
+    this.notificationsLoading = true;
+    this.notificationsError = '';
+
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: '10',
+    });
+    const activeOrganizationId = String(this.organizationContext.getActiveOrganizationId() || '').trim();
+    if (activeOrganizationId) {
+      params.set('organizationId', activeOrganizationId);
+    }
+
+    this.api.list<SidebarMessage>(`/api/v1/messages?${params.toString()}`).subscribe({
+      next: (response) => {
+        const rows = response.data || [];
+        this.notifications = append ? [...this.notifications, ...rows] : rows;
+        this.notificationsPage = Number(response.meta?.page || page);
+        this.notificationsTotalPages = Math.max(1, Number(response.meta?.totalPages || 1));
+        this.notificationsLoading = false;
+      },
+      error: (err) => {
+        this.notificationsLoading = false;
+        this.notificationsError = err?.error?.message || 'Unable to load notifications.';
+      },
+    });
+  }
+
+  private initializeRealtimeNotifications(): void {
+    const token = String(this.auth.token() || '').trim();
+    if (!token) {
+      return;
+    }
+    const organizationId = String(this.organizationContext.getActiveOrganizationId() || '').trim();
+    this.socketNotifications.connect(token, organizationId);
+
+    this.socketSub?.unsubscribe();
+    this.socketSub = this.socketNotifications.messageCreated$.subscribe((event) => {
+      this.handleRealtimeMessage(event);
+    });
+  }
+
+  private handleRealtimeMessage(event: RealtimeMessageEvent): void {
+    const row: SidebarMessage = {
+      id: event.id,
+      organizationId: event.organizationId,
+      entityType: event.entityType,
+      entityId: event.entityId || null,
+      title: event.title,
+      message: event.message,
+      metadata: event.metadata || null,
+      isRead: false,
+      readAt: null,
+      createdAt: event.createdAt,
+    };
+
+    this.unreadMessageCount += 1;
+    this.playNotificationChime();
+    this.realtimePopup = row;
+    if (this.realtimePopupTimeoutId) {
+      clearTimeout(this.realtimePopupTimeoutId);
+    }
+    this.realtimePopupTimeoutId = setTimeout(() => {
+      this.realtimePopup = null;
+      this.realtimePopupTimeoutId = null;
+    }, 5000);
+
+    if (this.notificationsOpen) {
+      const exists = this.notifications.some((message) => message.id === row.id);
+      if (!exists) {
+        this.notifications = [row, ...this.notifications];
+      }
+    }
+  }
+
+  private ensureAudioContext(): AudioContext | null {
+    const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) {
+      return null;
+    }
+    if (!this.audioContext) {
+      this.audioContext = new AudioContextCtor();
+    }
+    if (this.audioContext.state === 'suspended') {
+      void this.audioContext.resume().catch(() => undefined);
+    }
+    return this.audioContext;
+  }
+
+  private playNotificationChime(): void {
+    if (!this.allowNotificationSound) {
+      return;
+    }
+    const context = this.ensureAudioContext();
+    if (!context) {
+      return;
+    }
+
+    try {
+      const startAt = context.currentTime;
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.12, startAt + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.35);
+      gain.connect(context.destination);
+
+      const toneA = context.createOscillator();
+      toneA.type = 'sine';
+      toneA.frequency.setValueAtTime(740, startAt);
+      toneA.connect(gain);
+      toneA.start(startAt);
+      toneA.stop(startAt + 0.16);
+
+      const toneB = context.createOscillator();
+      toneB.type = 'sine';
+      toneB.frequency.setValueAtTime(988, startAt + 0.18);
+      toneB.connect(gain);
+      toneB.start(startAt + 0.18);
+      toneB.stop(startAt + 0.34);
+    } catch (_err) {
+      // Ignore audio playback failures to avoid breaking notification flow.
+    }
+  }
+
+  private resolveNotificationPath(row: SidebarMessage): string {
+    const entityType = String(row.entityType || '').trim().toLowerCase();
+    const entityId = String(row.entityId || '').trim();
+    const metadata = (row.metadata || {}) as Record<string, unknown>;
+
+    switch (entityType) {
+      case 'order':
+        return entityId ? `/orders/${entityId}` : '/orders';
+      case 'sales_invoice': {
+        const invoiceId = entityId || this.getStringMetadata(metadata, 'salesInvoiceId');
+        if (invoiceId) {
+          return `/sales-invoices/${invoiceId}`;
+        }
+        const orderId = this.getStringMetadata(metadata, 'orderId');
+        return orderId ? `/orders/${orderId}` : '/sales-invoices';
+      }
+      case 'expense':
+        return entityId ? `/expenses/${entityId}` : '/expenses';
+      case 'user':
+        return entityId ? `/users/${entityId}` : '/users';
+      case 'organization':
+        return entityId ? `/organizations/${entityId}` : '/organizations';
+      case 'license':
+        return entityId ? `/license/${entityId}` : '/licenses';
+      case 'vendor':
+        return '/vendors';
+      case 'customer':
+        return '/customers';
+      case 'item':
+        return '/items';
+      case 'report': {
+        const reportId = entityId || this.getStringMetadata(metadata, 'reportId');
+        return reportId ? `/reports/${reportId}` : '/reports';
+      }
+      default:
+        return '/messages';
+    }
+  }
+
+  private getStringMetadata(metadata: Record<string, unknown>, key: string): string {
+    const value = metadata[key];
+    return typeof value === 'string' ? value.trim() : '';
   }
 }

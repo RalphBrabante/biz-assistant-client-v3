@@ -51,6 +51,8 @@ interface UserOrganizationRow {
   id: string;
   name?: string;
   legalName?: string;
+  taxId?: string;
+  isActive?: boolean;
   OrganizationUser?: {
     id?: string;
     role?: string;
@@ -76,16 +78,21 @@ export class UserDetailPageComponent {
   readonly loading = signal(false);
   readonly submitting = signal(false);
   readonly assigning = signal(false);
+  readonly assigningOrganization = signal(false);
   readonly removingRoleId = signal('');
+  readonly removingOrganizationId = signal('');
 
   readonly message = signal('');
   readonly error = signal('');
 
   readonly user = signal<UserDetail | null>(null);
   readonly assignableRoles = signal<RoleRow[]>([]);
+  readonly assignableOrganizations = signal<UserOrganizationRow[]>([]);
 
   selectedRoleId = '';
   selectedPrimaryOrganizationId = '';
+  selectedOrganizationId = '';
+  addOrganizationAsPrimary = false;
   form: Record<string, unknown> = {};
 
   get isSuperuser(): boolean {
@@ -105,6 +112,7 @@ export class UserDetailPageComponent {
 
     this.loadUser();
     this.loadAssignableRoles();
+    this.loadAssignableOrganizations();
   }
 
   loadUser(): void {
@@ -155,6 +163,21 @@ export class UserDetailPageComponent {
       },
       error: () => {
         this.assignableRoles.set([]);
+      },
+    });
+  }
+
+  loadAssignableOrganizations(): void {
+    if (!this.isSuperuser) {
+      this.assignableOrganizations.set([]);
+      return;
+    }
+    this.api.list<UserOrganizationRow>(`/api/v1/users/${this.userId}/assignable-organizations`).subscribe({
+      next: (response: ApiResponse<UserOrganizationRow[]>) => {
+        this.assignableOrganizations.set(response.data || []);
+      },
+      error: () => {
+        this.assignableOrganizations.set([]);
       },
     });
   }
@@ -293,6 +316,7 @@ export class UserDetailPageComponent {
         this.submitting.set(false);
         this.message.set(response.message || 'Primary organization updated successfully.');
         this.loadUser();
+        this.loadAssignableOrganizations();
       },
       error: (err) => {
         this.submitting.set(false);
@@ -307,6 +331,88 @@ export class UserDetailPageComponent {
 
   trackByOrganizationId(_index: number, organization: UserOrganizationRow): string {
     return organization.id;
+  }
+
+  async addOrganizationMembership(): Promise<void> {
+    if (!this.isSuperuser) {
+      this.error.set('Only superusers can assign organizations.');
+      return;
+    }
+    const organizationId = String(this.selectedOrganizationId || '').trim();
+    if (!organizationId) {
+      this.error.set('Select an organization to assign.');
+      return;
+    }
+
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Assign Organization',
+      message: this.addOrganizationAsPrimary
+        ? 'Assign this organization and set it as primary?'
+        : 'Assign this organization to the user?',
+      confirmText: 'Assign',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-buildings',
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    this.assigningOrganization.set(true);
+    this.error.set('');
+    this.message.set('');
+    this.api
+      .create(`/api/v1/users/${this.userId}/organizations`, {
+        organizationId,
+        isPrimary: this.addOrganizationAsPrimary,
+      })
+      .subscribe({
+        next: (response) => {
+          this.assigningOrganization.set(false);
+          this.message.set(response.message || 'Organization assigned successfully.');
+          this.selectedOrganizationId = '';
+          this.addOrganizationAsPrimary = false;
+          this.loadUser();
+          this.loadAssignableOrganizations();
+        },
+        error: (err) => {
+          this.assigningOrganization.set(false);
+          this.error.set(err?.error?.message || 'Unable to assign organization.');
+        },
+      });
+  }
+
+  async removeOrganizationMembership(organizationId: string): Promise<void> {
+    const membershipOrganizationId = String(organizationId || '').trim();
+    if (!membershipOrganizationId) {
+      return;
+    }
+
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Remove Organization',
+      message: 'Remove this organization membership from the user?',
+      confirmText: 'Remove',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-building-dash',
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    this.removingOrganizationId.set(membershipOrganizationId);
+    this.error.set('');
+    this.message.set('');
+    this.api.remove(`/api/v1/users/${this.userId}/organizations`, membershipOrganizationId).subscribe({
+      next: (response) => {
+        this.removingOrganizationId.set('');
+        this.message.set(response.message || 'Organization removed successfully.');
+        this.loadUser();
+        this.loadAssignableOrganizations();
+      },
+      error: (err) => {
+        this.removingOrganizationId.set('');
+        this.error.set(err?.error?.message || 'Unable to remove organization.');
+      },
+    });
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

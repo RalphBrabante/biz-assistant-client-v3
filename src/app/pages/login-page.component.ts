@@ -9,6 +9,9 @@ import { ApiResponse } from '../core/types';
 
 interface LoginPayload {
   accessToken?: string;
+  requiresOrganizationSelection?: boolean;
+  suggestedOrganizationId?: string | null;
+  organizations?: LoginOrganizationOption[];
   user?: {
     id?: string;
     email?: string;
@@ -22,6 +25,15 @@ interface LoginPayload {
     roleCodes?: string[];
     permissionCodes?: string[];
   };
+}
+
+interface LoginOrganizationOption {
+  id: string;
+  name?: string;
+  legalName?: string;
+  currency?: string;
+  hasActiveLicense?: boolean;
+  licenseStatusReason?: string | null;
 }
 
 @Component({
@@ -47,6 +59,10 @@ export class LoginPageComponent {
   forgotModalVisible = false;
   verificationLoading = false;
   verificationMessage = '';
+  organizationSelectionVisible = false;
+  organizationOptions: LoginOrganizationOption[] = [];
+  selectedOrganizationId = '';
+  organizationSelectionError = '';
 
   get canResendVerification(): boolean {
     return String(this.error || '').toLowerCase().includes('not verified');
@@ -57,15 +73,59 @@ export class LoginPageComponent {
   }
 
   submit(): void {
+    this.organizationSelectionError = '';
+    this.organizationSelectionVisible = false;
+    this.organizationOptions = [];
+    this.selectedOrganizationId = '';
+    this.attemptLogin();
+  }
+
+  submitWithSelectedOrganization(): void {
+    const organizationId = String(this.selectedOrganizationId || '').trim();
+    if (!organizationId) {
+      this.organizationSelectionError = 'Select an organization to continue.';
+      return;
+    }
+    this.attemptLogin(organizationId);
+  }
+
+  closeOrganizationSelectionModal(): void {
+    this.organizationSelectionVisible = false;
+    this.organizationOptions = [];
+    this.selectedOrganizationId = '';
+    this.organizationSelectionError = '';
+  }
+
+  organizationLabel(organization: LoginOrganizationOption): string {
+    return (
+      String(organization?.name || '').trim() ||
+      String(organization?.legalName || '').trim() ||
+      String(organization?.id || '').trim() ||
+      '-'
+    );
+  }
+
+  isOrganizationSelectable(organization: LoginOrganizationOption): boolean {
+    return organization?.hasActiveLicense !== false;
+  }
+
+  private attemptLogin(organizationId?: string): void {
     this.loading = true;
     this.error = '';
     this.verificationMessage = '';
+    this.organizationSelectionError = '';
+
+    const payload: Record<string, unknown> = {
+      email: this.email,
+      password: this.password,
+    };
+    const selectedOrganizationId = String(organizationId || '').trim();
+    if (selectedOrganizationId) {
+      payload['organizationId'] = selectedOrganizationId;
+    }
 
     this.http
-      .post<ApiResponse<LoginPayload>>('/api/v1/auth/login', {
-        email: this.email,
-        password: this.password,
-      })
+      .post<ApiResponse<LoginPayload>>('/api/v1/auth/login', payload)
       .subscribe({
         next: (response) => {
           this.loading = false;
@@ -77,10 +137,41 @@ export class LoginPageComponent {
           }
 
           this.auth.setSession(token, response.data?.user);
+          this.closeOrganizationSelectionModal();
           void this.router.navigate(['/']);
         },
         error: (errorResponse) => {
           this.loading = false;
+          const errorCode = String(errorResponse?.error?.code || '').trim().toUpperCase();
+          const data = (errorResponse?.error?.data || {}) as LoginPayload;
+          if (errorCode === 'ORGANIZATION_SELECTION_REQUIRED' && Array.isArray(data.organizations)) {
+            this.organizationSelectionVisible = true;
+            this.organizationOptions = data.organizations || [];
+            const suggested = String(data.suggestedOrganizationId || '').trim();
+            const suggestedAllowed = this.organizationOptions.some(
+              (organization) =>
+                organization.id === suggested && this.isOrganizationSelectable(organization)
+            );
+            if (suggestedAllowed) {
+              this.selectedOrganizationId = suggested;
+            } else {
+              const firstEligible = this.organizationOptions.find((organization) =>
+                this.isOrganizationSelectable(organization)
+              );
+              this.selectedOrganizationId = firstEligible?.id || '';
+            }
+            this.organizationSelectionError = '';
+            return;
+          }
+
+          if (this.organizationSelectionVisible) {
+            this.organizationSelectionError = this.toErrorMessage(
+              errorResponse?.error?.message,
+              'Unable to continue login with selected organization.'
+            );
+            return;
+          }
+
           this.error = this.toErrorMessage(errorResponse?.error?.message, 'Unable to log in.');
         },
       });

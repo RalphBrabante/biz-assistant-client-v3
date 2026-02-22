@@ -48,12 +48,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (!token || request.url.includes('/api/v1/auth/login') || request.url.includes('/api/v1/dev/')) {
     return next(request).pipe(
       catchError((err) => {
-        if (isTokenExpiredError(err)) {
-          auth.clearSession();
-          organizationContext.clearSelectedOrganizationId();
-          if (!window.location.pathname.startsWith('/login')) {
-            void router.navigate(['/login']);
-          }
+        if (shouldForceLogout(err)) {
+          forceLogout(auth, organizationContext, router);
           return throwError(() => err);
         }
         if (err?.status === 403) {
@@ -74,12 +70,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     })
   ).pipe(
     catchError((err) => {
-      if (isTokenExpiredError(err)) {
-        auth.clearSession();
-        organizationContext.clearSelectedOrganizationId();
-        if (!window.location.pathname.startsWith('/login')) {
-          void router.navigate(['/login']);
-        }
+      if (shouldForceLogout(err)) {
+        forceLogout(auth, organizationContext, router);
         return throwError(() => err);
       }
       if (err?.status === 403) {
@@ -116,4 +108,32 @@ function isTokenExpiredError(err: any): boolean {
   const code = String(err?.error?.code || '').trim().toUpperCase();
   const message = String(err?.error?.message || '').trim().toLowerCase();
   return code === 'TOKEN_EXPIRED' || message.includes('token has expired');
+}
+
+function isLicenseInactiveError(err: any): boolean {
+  if (!err || err.status !== 403) {
+    return false;
+  }
+  const code = String(err?.error?.code || '').trim().toUpperCase();
+  const message = String(err?.error?.message || '').trim().toLowerCase();
+  return (
+    code === 'LICENSE_INACTIVE' ||
+    message.includes('license is missing') ||
+    message.includes('license is revoked') ||
+    message.includes('license is expired') ||
+    message.includes('no active license')
+  );
+}
+
+function shouldForceLogout(err: any): boolean {
+  return isTokenExpiredError(err) || isLicenseInactiveError(err);
+}
+
+function forceLogout(auth: AuthService, organizationContext: OrganizationContextService, router: Router): void {
+  auth.clearUnauthorizedAccess();
+  auth.clearSession();
+  organizationContext.clearSelectedOrganizationId();
+  if (!window.location.pathname.startsWith('/login')) {
+    void router.navigate(['/login']);
+  }
 }

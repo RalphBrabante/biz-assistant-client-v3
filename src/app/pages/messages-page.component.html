@@ -1,0 +1,100 @@
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Inbox</div>
+        <h1 class="h3 mb-2">Organization Messages</h1>
+        <p class="text-secondary mb-0">All organization notifications sorted from newest to oldest.</p>
+      </div>
+      <button class="btn btn-outline-dark" (click)="load()" [disabled]="loading()">
+        <i class="bi bi-arrow-clockwise me-1"></i>{{ loading() ? 'Refreshing...' : 'Refresh' }}
+      </button>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label fw-semibold">Search</label>
+        <input class="form-control" [(ngModel)]="query" placeholder="Search title or message" />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label fw-semibold">Status</label>
+        <select class="form-select" [(ngModel)]="isReadFilter">
+          <option value="">All</option>
+          <option value="unread">Unread</option>
+          <option value="read">Read</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Rows per page</label>
+        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+          <option [value]="10">10</option>
+          <option [value]="20">20</option>
+          <option [value]="50">50</option>
+          <option [value]="100">100</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <button class="btn btn-outline-primary w-100" (click)="applyFilters()" [disabled]="loading()">
+          <i class="bi bi-funnel me-1"></i>Apply
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
+    <div *ngIf="error()" class="alert alert-danger mt-3 mb-0">{{ error() }}</div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th>Message</th>
+          <th>Type</th>
+          <th>Created By</th>
+          <th>Created At</th>
+          <th>Status</th>
+          <th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="!loading() && rows().length === 0">
+          <td colspan="7" class="text-center text-secondary py-4">No messages found.</td>
+        </tr>
+        <tr *ngFor="let row of rows(); trackBy: trackById">
+          <td class="fw-semibold">{{ row.title }}</td>
+          <td class="small">{{ row.message }}</td>
+          <td class="text-capitalize">{{ entityTypeLabel(row.entityType) }}</td>
+          <td class="small">{{ creatorLabel(row) }}</td>
+          <td class="small">{{ formatTimestamp(row.createdAt) }}</td>
+          <td>
+            <span class="badge rounded-pill" [ngClass]="row.isRead ? 'text-bg-secondary' : 'text-bg-primary'">
+              {{ row.isRead ? 'Read' : 'Unread' }}
+            </span>
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" type="button" (click)="markAsRead(row)" [disabled]="!!row.isRead">
+              <i class="bi bi-check2 me-1"></i>{{ row.isRead ? 'Read' : 'Mark read' }}
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+    <div class="small text-secondary">Showing {{ rows().length }} of {{ total }} messages</div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(1)" [disabled]="loading() || page <= 1"><i class="bi bi-chevron-double-left"></i></button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading() || page <= 1"><i class="bi bi-chevron-left"></i></button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading() || page >= totalPages"><i class="bi bi-chevron-right"></i></button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading() || page >= totalPages"><i class="bi bi-chevron-double-right"></i></button>
+    </div>
+  </div>
+</section>
+
