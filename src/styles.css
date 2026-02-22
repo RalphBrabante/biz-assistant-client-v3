@@ -294,51 +294,6 @@ body {
   }
 }
 
-/* Consolidated data-table actions: one trigger with hover list */
-.actions-hover-menu {
-  position: relative;
-  display: inline-block;
-  text-align: left;
-}
-
-.actions-hover-trigger {
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.actions-hover-menu-list {
-  position: absolute;
-  top: 0;
-  right: calc(100% + 0.35rem);
-  display: none;
-  width: max-content;
-  min-width: 0;
-  padding: 0.25rem;
-  background: var(--bs-body-bg);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.5rem;
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.12);
-  z-index: 3000;
-  justify-items: stretch;
-}
-
-.actions-hover-trigger:focus + .actions-hover-menu-list,
-.actions-hover-menu:focus-within .actions-hover-menu-list {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.actions-hover-menu-list .btn,
-.actions-hover-menu-list a.btn {
-  width: 100%;
-  justify-content: flex-start;
-  white-space: nowrap;
-}
-
 /* Table/Card toggle rendering for data tables */
 .table-view-wrapper.table-card-view table,
 .table-view-wrapper.table-card-view tbody,
@@ -355,7 +310,6 @@ body {
 .table-view-wrapper.table-card-view tbody tr {
   position: relative;
   padding: 0.75rem;
-  padding-top: 2.75rem;
   border-bottom: 1px solid var(--bs-border-color);
 }
 
@@ -366,12 +320,11 @@ body {
 }
 
 .table-view-wrapper.table-card-view tbody td:last-child {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  width: auto;
-  margin-top: 0;
-  z-index: 2;
+  position: static;
+  margin-top: 0.5rem;
+  width: 100% !important;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .view-toggle-group {
@@ -387,22 +340,12 @@ body {
   justify-content: center;
 }
 
-[data-bs-theme='dark'] .actions-hover-menu-list {
-  background: #182437;
-  border-color: #2d415f;
-  box-shadow: 0 0.65rem 1.2rem rgba(0, 0, 0, 0.45);
-}
-
-[data-bs-theme='dark'] .actions-hover-menu-list .btn,
-[data-bs-theme='dark'] .actions-hover-menu-list a.btn {
-  border-color: #3a5274;
-  color: #dce7f7;
-}
-
-[data-bs-theme='dark'] .actions-hover-menu-list .btn:hover,
-[data-bs-theme='dark'] .actions-hover-menu-list a.btn:hover {
-  background: #243754;
-  color: #ffffff;
+.table-actions-inline {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
 }
 
 [data-bs-theme='dark'] .view-toggle-group .btn {

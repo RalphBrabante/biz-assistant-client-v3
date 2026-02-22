@@ -92,11 +92,7 @@
             <td>{{ row.isSystem ? 'Yes' : 'No' }}</td>
             <td>{{ row.isActive ? 'Yes' : 'No' }}</td>
             <td class="text-end">
-              <div class="actions-hover-menu">
-                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
-                  <i class="bi bi-three-dots"></i>
-                </button>
-                <div class="actions-hover-menu-list">
+              <div class="table-actions-inline">
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
                   <i class="bi bi-pencil-square"></i>
                 </button>
@@ -110,7 +106,6 @@
                 >
                   <i class="bi bi-trash3"></i>
                 </button>
-              </div>
               </div>
             </td>
           </ng-container>
@@ -131,18 +126,13 @@
               </div>
             </td>
             <td class="text-end">
-              <div class="actions-hover-menu">
-                <button class="btn btn-sm btn-outline-secondary actions-hover-trigger" type="button" appTooltip title="Actions">
-                  <i class="bi bi-three-dots"></i>
-                </button>
-                <div class="actions-hover-menu-list">
+              <div class="table-actions-inline">
                 <button class="btn btn-sm btn-outline-success" type="button" [disabled]="submitting()" (click)="saveEdit()" appTooltip title="Save">
                   <i class="bi bi-floppy2"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" type="button" (click)="cancelEdit()" appTooltip title="Cancel">
                   <i class="bi bi-x-lg"></i>
                 </button>
-              </div>
               </div>
             </td>
           </ng-template>

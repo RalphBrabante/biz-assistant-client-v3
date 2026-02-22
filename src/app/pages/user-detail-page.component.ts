@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
 import { ApiResponse } from '../core/types';
 
@@ -43,6 +44,21 @@ interface UserDetail {
   isActive?: boolean;
   role?: string;
   roles?: UserRoleRow[];
+  organizations?: UserOrganizationRow[];
+}
+
+interface UserOrganizationRow {
+  id: string;
+  name?: string;
+  legalName?: string;
+  OrganizationUser?: {
+    id?: string;
+    role?: string;
+    isActive?: boolean;
+    isPrimary?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  };
 }
 
 @Component({
@@ -53,6 +69,7 @@ interface UserDetail {
 })
 export class UserDetailPageComponent {
   private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly confirmDialog = inject(ConfirmDialogService);
 
@@ -68,7 +85,13 @@ export class UserDetailPageComponent {
   readonly assignableRoles = signal<RoleRow[]>([]);
 
   selectedRoleId = '';
+  selectedPrimaryOrganizationId = '';
   form: Record<string, unknown> = {};
+
+  get isSuperuser(): boolean {
+    const roleCodes = this.auth.currentUser()?.roleCodes || [];
+    return roleCodes.some((code) => String(code || '').toLowerCase() === 'superuser');
+  }
 
   get userId(): string {
     return String(this.route.snapshot.paramMap.get('id') || '').trim();
@@ -111,6 +134,12 @@ export class UserDetailPageComponent {
           isEmailVerified: user?.isEmailVerified === true,
           isActive: user?.isActive !== false,
         };
+        const primaryMembership = (user?.organizations || []).find(
+          (org) => org?.OrganizationUser?.isPrimary === true
+        );
+        this.selectedPrimaryOrganizationId = String(
+          primaryMembership?.id || user?.organizationId || ''
+        ).trim();
       },
       error: (err) => {
         this.loading.set(false);
@@ -221,8 +250,63 @@ export class UserDetailPageComponent {
     return 'text-bg-light border border-secondary-subtle text-secondary';
   }
 
+  organizationLabel(row: UserOrganizationRow): string {
+    return String(row.name || row.legalName || row.id || '-').trim() || '-';
+  }
+
+  async savePrimaryOrganization(): Promise<void> {
+    if (!this.isSuperuser) {
+      this.error.set('Only superusers can set a primary organization.');
+      return;
+    }
+
+    const selectedId = String(this.selectedPrimaryOrganizationId || '').trim();
+    if (!selectedId) {
+      this.error.set('Select a primary organization first.');
+      return;
+    }
+
+    const user = this.user();
+    const currentId = String(user?.organizationId || '').trim();
+    if (currentId && currentId === selectedId) {
+      this.message.set('Primary organization is already set.');
+      return;
+    }
+
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Set Primary Organization',
+      message: 'Set this as the user’s default organization on login?',
+      confirmText: 'Set Primary',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-building-check',
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    this.submitting.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    this.api.update<UserDetail>('/api/v1/users', this.userId, { organizationId: selectedId }).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        this.message.set(response.message || 'Primary organization updated successfully.');
+        this.loadUser();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.message || 'Unable to update primary organization.');
+      },
+    });
+  }
+
   trackByRoleId(_index: number, role: UserRoleRow): string {
     return role.id;
+  }
+
+  trackByOrganizationId(_index: number, organization: UserOrganizationRow): string {
+    return organization.id;
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

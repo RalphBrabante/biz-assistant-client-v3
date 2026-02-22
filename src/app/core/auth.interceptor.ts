@@ -2,11 +2,13 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
+import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { OrganizationContextService } from './organization-context.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
+  const router = inject(Router);
   const organizationContext = inject(OrganizationContextService);
   const token = auth.token();
   let request = req;
@@ -46,6 +48,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (!token || request.url.includes('/api/v1/auth/login') || request.url.includes('/api/v1/dev/')) {
     return next(request).pipe(
       catchError((err) => {
+        if (isTokenExpiredError(err)) {
+          auth.clearSession();
+          organizationContext.clearSelectedOrganizationId();
+          if (!window.location.pathname.startsWith('/login')) {
+            void router.navigate(['/login']);
+          }
+          return throwError(() => err);
+        }
         if (err?.status === 403) {
           auth.showUnauthorizedAccess(
             err?.error?.message || 'You are not allowed to access this resource.'
@@ -64,6 +74,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     })
   ).pipe(
     catchError((err) => {
+      if (isTokenExpiredError(err)) {
+        auth.clearSession();
+        organizationContext.clearSelectedOrganizationId();
+        if (!window.location.pathname.startsWith('/login')) {
+          void router.navigate(['/login']);
+        }
+        return throwError(() => err);
+      }
       if (err?.status === 403) {
         auth.showUnauthorizedAccess(
           err?.error?.message || 'You are not allowed to access this resource.'
@@ -88,4 +106,14 @@ function isCreateOrImportPost(rawUrl: string): boolean {
 
   const normalized = pathname.replace(/\/+$/, '');
   return /^\/api\/v1\/[^/]+$/.test(normalized);
+}
+
+function isTokenExpiredError(err: any): boolean {
+  if (!err || err.status !== 401) {
+    return false;
+  }
+
+  const code = String(err?.error?.code || '').trim().toUpperCase();
+  const message = String(err?.error?.message || '').trim().toLowerCase();
+  return code === 'TOKEN_EXPIRED' || message.includes('token has expired');
 }

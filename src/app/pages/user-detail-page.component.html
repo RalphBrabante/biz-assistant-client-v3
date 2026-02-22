@@ -79,6 +79,40 @@
   </div>
 </section>
 
+<section class="card border-0 shadow-sm rounded-4 mb-4" *ngIf="isSuperuser && user() as row">
+  <div class="card-body p-4">
+    <h2 class="h5 mb-3">Primary Organization</h2>
+    <p class="text-secondary mb-3">
+      Set the default organization this user will use when logging in.
+    </p>
+
+    <div *ngIf="(row.organizations || []).length === 0" class="alert alert-warning mb-0">
+      This user has no organization memberships yet.
+    </div>
+
+    <div *ngIf="(row.organizations || []).length > 0" class="row g-3 align-items-end">
+      <div class="col-12 col-md-8">
+        <label class="form-label">Primary Organization</label>
+        <select class="form-select" [(ngModel)]="selectedPrimaryOrganizationId">
+          <option value="">Select organization</option>
+          <option
+            *ngFor="let organization of (row.organizations || []); trackBy: trackByOrganizationId"
+            [value]="organization.id"
+          >
+            {{ organizationLabel(organization) }}
+            {{ organization.OrganizationUser?.isPrimary ? '(Current Primary)' : '' }}
+          </option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <button class="btn btn-outline-primary w-100" [disabled]="submitting()" (click)="savePrimaryOrganization()">
+          {{ submitting() ? 'Saving...' : 'Set Primary Organization' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="card border-0 shadow-sm rounded-4" *ngIf="user() as row">
   <div class="card-body p-4">
     <h2 class="h5 mb-3">User Roles</h2>
