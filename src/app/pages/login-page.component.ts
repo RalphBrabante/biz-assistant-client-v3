@@ -127,7 +127,11 @@ export class LoginPageComponent {
     }
 
     this.http
-      .post<ApiResponse<LoginPayload>>('/api/v1/auth/login', payload)
+      .post<ApiResponse<LoginPayload>>('/api/v1/auth/login', payload, {
+        headers: {
+          'ngsw-bypass': 'true',
+        },
+      })
       .subscribe({
         next: (response) => {
           this.loading = false;
