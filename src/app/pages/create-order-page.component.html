@@ -17,7 +17,51 @@
 
 <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
 <div *ngIf="message" class="alert alert-success">{{ message }}</div>
+<div *ngIf="!hasOrganizationContext" class="alert alert-warning d-flex align-items-center gap-2">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <span>Select a specific organization from context to enable order creation.</span>
+</div>
 
+<div class="modal-backdrop fade show" *ngIf="showOrganizationWarningModal"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="showOrganizationWarningModal ? 'block' : 'none'"
+  [attr.aria-hidden]="!showOrganizationWarningModal"
+  *ngIf="showOrganizationWarningModal"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+          Select Organization Context
+        </h5>
+        <button type="button" class="btn-close" (click)="closeOrganizationWarningModal()"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-2 d-flex align-items-start gap-2">
+          <i class="bi bi-info-circle text-primary mt-1"></i>
+          <span>You are in <strong>All Organizations</strong> mode. Order creation requires a specific organization context.</span>
+        </p>
+        <p class="mb-0 d-flex align-items-start gap-2 small text-secondary">
+          <i class="bi bi-cursor-fill mt-1"></i>
+          <span>Choose one organization from the context selector in the header, then continue creating the order.</span>
+        </p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="goToOrdersFromWarning()">
+          <i class="bi bi-arrow-left me-1"></i>Back to Orders
+        </button>
+        <button class="btn btn-primary" (click)="closeOrganizationWarningModal()">
+          <i class="bi bi-check2-circle me-1"></i>I Understand
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div [attr.inert]="!hasOrganizationContext ? '' : null" [class.opacity-50]="!hasOrganizationContext">
 <section class="card border-0 shadow-sm rounded-4 mb-4">
   <div class="card-body p-4">
     <h2 class="h5 mb-3">Order Details</h2>
@@ -157,7 +201,7 @@
               </div>
 
               <div class="mt-3 fw-semibold">
-                {{ formatMoney(itemUnitPrice(item), item.currency || currentOrganizationCurrency) }}
+                {{ formatMoney(itemUnitPrice(item), item.currency || activeCurrency) }}
               </div>
 
               <button
@@ -225,7 +269,7 @@
               >
                 +
               </button>
-              <div class="ms-auto fw-semibold">{{ formatMoney(itemLineTotal(row), row.item.currency || currentOrganizationCurrency) }}</div>
+              <div class="ms-auto fw-semibold">{{ formatMoney(itemLineTotal(row), row.item.currency || activeCurrency) }}</div>
             </div>
             <div class="small text-secondary mt-2" *ngIf="row.item.type === 'product'">
               Available stock: {{ maxStock(row.item) }}
@@ -238,17 +282,17 @@
 
         <hr class="my-3" />
 
-        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ formatMoney(subtotalAmount, currentOrganizationCurrency) }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ formatMoney(subtotalAmount, activeCurrency) }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span>VAT Rate</span><strong>{{ organizationVatRate | number: '1.0-2' }}%</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Taxable Amount</span><strong>{{ formatMoney(taxableAmount, currentOrganizationCurrency) }}</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ formatMoney(taxAmount, currentOrganizationCurrency) }}</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Withholding Tax</span><strong>{{ formatMoney(withHoldingTaxAmount, currentOrganizationCurrency) }}</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ formatMoney(discountAmount, currentOrganizationCurrency) }}</strong></div>
-        <div class="d-flex justify-content-between small mb-3"><span>Shipping</span><strong>{{ formatMoney(shippingAmount, currentOrganizationCurrency) }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Taxable Amount</span><strong>{{ formatMoney(taxableAmount, activeCurrency) }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Tax</span><strong>{{ formatMoney(taxAmount, activeCurrency) }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Withholding Tax</span><strong>{{ formatMoney(withHoldingTaxAmount, activeCurrency) }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><strong>{{ formatMoney(discountAmount, activeCurrency) }}</strong></div>
+        <div class="d-flex justify-content-between small mb-3"><span>Shipping</span><strong>{{ formatMoney(shippingAmount, activeCurrency) }}</strong></div>
 
         <div class="d-flex justify-content-between fs-5 mb-3">
           <span class="fw-semibold">Total</span>
-          <strong>{{ formatMoney(totalAmount, currentOrganizationCurrency) }}</strong>
+          <strong>{{ formatMoney(totalAmount, activeCurrency) }}</strong>
         </div>
 
         <div class="small text-secondary mt-auto">
@@ -263,10 +307,11 @@
   <button
     class="btn btn-primary btn-lg rounded-pill shadow d-inline-flex align-items-center gap-2"
     type="button"
-    [disabled]="submitting"
+    [disabled]="submitting || !hasOrganizationContext"
     (click)="placeOrder()"
   >
     <i class="bi" [ngClass]="submitting ? 'bi-arrow-repeat' : 'bi-bag-check'"></i>
     <span>{{ submitting ? 'Placing Order...' : 'Place Order' }}</span>
   </button>
+</div>
 </div>

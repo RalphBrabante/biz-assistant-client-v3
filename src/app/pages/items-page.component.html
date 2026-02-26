@@ -1,3 +1,41 @@
+<div *ngIf="isContextLocked" class="alert alert-warning d-flex align-items-center gap-2">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <span>Select a specific organization from context to enable this page.</span>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="showOrganizationWarningModal"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="showOrganizationWarningModal ? 'block' : 'none'"
+  [attr.aria-hidden]="!showOrganizationWarningModal"
+  *ngIf="showOrganizationWarningModal"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+          Select Organization Context
+        </h5>
+        <button type="button" class="btn-close" (click)="closeOrganizationWarningModal()"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-2 d-flex align-items-start gap-2">
+          <i class="bi bi-info-circle text-primary mt-1"></i>
+          <span>You are in <strong>All Organizations</strong> mode. This page requires a specific organization context.</span>
+        </p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-primary" (click)="closeOrganizationWarningModal()">
+          <i class="bi bi-check2-circle me-1"></i>I Understand
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div [attr.inert]="isContextLocked ? '' : null" [class.opacity-50]="isContextLocked">
 <section class="card border-0 shadow-sm rounded-4 mb-4">
   <div class="card-body p-4 p-lg-5 role-hero">
     <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
@@ -248,49 +286,59 @@
       </div>
       <div class="modal-body pt-3">
         <div *ngIf="createModalError()" class="alert alert-danger py-2">{{ createModalError() }}</div>
-        <form class="row g-3" [formGroup]="createItemForm" (ngSubmit)="createItem()">
+        <form class="row g-3" [formGroup]="createItemForm" (ngSubmit)="createItem()" novalidate>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Name</label>
-            <input class="form-control" formControlName="name" />
+            <label class="form-label fw-semibold">Name <span *ngIf="isCreateFieldRequired('name')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="name" [class.is-invalid]="shouldShowCreateFieldError('name')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('name') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">SKU</label>
-            <input class="form-control" formControlName="sku" />
+            <label class="form-label fw-semibold">SKU <span *ngIf="isCreateFieldRequired('sku')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="sku" [class.is-invalid]="shouldShowCreateFieldError('sku')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('sku') }}</div>
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Type</label>
-            <input class="form-control" formControlName="type" />
+            <label class="form-label fw-semibold">Type <span *ngIf="isCreateFieldRequired('type')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="type" [class.is-invalid]="shouldShowCreateFieldError('type')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('type') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Category</label>
-            <input class="form-control" formControlName="category" />
+            <label class="form-label fw-semibold">Category <span *ngIf="isCreateFieldRequired('category')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="category" [class.is-invalid]="shouldShowCreateFieldError('category')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('category') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Unit</label>
-            <input class="form-control" formControlName="unit" />
+            <label class="form-label fw-semibold">Unit <span *ngIf="isCreateFieldRequired('unit')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="unit" [class.is-invalid]="shouldShowCreateFieldError('unit')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('unit') }}</div>
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Price</label>
-            <input type="number" step="0.01" class="form-control" formControlName="price" />
+            <label class="form-label fw-semibold">Price <span *ngIf="isCreateFieldRequired('price')" class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control" formControlName="price" [class.is-invalid]="shouldShowCreateFieldError('price')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('price') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Cost</label>
-            <input type="number" step="0.01" class="form-control" formControlName="cost" />
+            <label class="form-label fw-semibold">Cost <span *ngIf="isCreateFieldRequired('cost')" class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control" formControlName="cost" [class.is-invalid]="shouldShowCreateFieldError('cost')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('cost') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Discounted Price</label>
-            <input type="number" step="0.01" class="form-control" formControlName="discountedPrice" />
+            <label class="form-label fw-semibold">Discounted Price <span *ngIf="isCreateFieldRequired('discountedPrice')" class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control" formControlName="discountedPrice" [class.is-invalid]="shouldShowCreateFieldError('discountedPrice')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('discountedPrice') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Stock</label>
-            <input type="number" class="form-control" formControlName="stock" />
+            <label class="form-label fw-semibold">Stock <span *ngIf="isCreateFieldRequired('stock')" class="text-danger">*</span></label>
+            <input type="number" class="form-control" formControlName="stock" [class.is-invalid]="shouldShowCreateFieldError('stock')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('stock') }}</div>
           </div>
 
           <div class="col-12">
-            <label class="form-label fw-semibold">Description</label>
-            <textarea rows="2" class="form-control" formControlName="description"></textarea>
+            <label class="form-label fw-semibold">Description <span *ngIf="isCreateFieldRequired('description')" class="text-danger">*</span></label>
+            <textarea rows="2" class="form-control" formControlName="description" [class.is-invalid]="shouldShowCreateFieldError('description')"></textarea>
+            <div class="invalid-feedback">{{ getCreateFieldError('description') }}</div>
           </div>
 
           <div class="col-12 col-md-4 d-flex align-items-end">
@@ -309,6 +357,7 @@
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <div class="modal-backdrop fade show" *ngIf="isEditModalOpen()"></div>

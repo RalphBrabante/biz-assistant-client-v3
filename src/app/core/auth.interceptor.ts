@@ -38,7 +38,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     !req.url.includes('/api/v1/auth/') &&
     !req.url.includes('/api/v1/dev/') &&
     organizationContext.isAllOrganizationsSelected() &&
-    isCreateOrImportPost(req.url)
+    isCreateOrImportPost(req.url) &&
+    !isOrganizationsEndpoint(req.url)
   ) {
     const message = 'Select a specific organization first. Imports and data creation are disabled in All Organizations mode.';
     auth.showUnauthorizedAccess(message);
@@ -98,6 +99,16 @@ function isCreateOrImportPost(rawUrl: string): boolean {
 
   const normalized = pathname.replace(/\/+$/, '');
   return /^\/api\/v1\/[^/]+$/.test(normalized);
+}
+
+function isOrganizationsEndpoint(rawUrl: string): boolean {
+  let pathname = rawUrl;
+  try {
+    pathname = new URL(rawUrl, window.location.origin).pathname;
+  } catch (_err) {
+    pathname = rawUrl.split('?')[0] || rawUrl;
+  }
+  return /^\/api\/v1\/organizations(\/|$)/.test(pathname);
 }
 
 function isTokenExpiredError(err: any): boolean {

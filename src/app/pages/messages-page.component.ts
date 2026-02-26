@@ -44,21 +44,51 @@ export class MessagesPageComponent {
   totalPages = 1;
   isReadFilter = '';
   query = '';
+  showOrganizationWarningModal = false;
+
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
+  }
+
+  get currentOrganizationId(): string {
+    return String(this.organizationContext.getActiveOrganizationId() || '').trim();
+  }
+
+  get hasOrganizationContext(): boolean {
+    return Boolean(this.currentOrganizationId);
+  }
+
+  get isContextLocked(): boolean {
+    return this.isSuperuser && !this.hasOrganizationContext;
+  }
 
   ngOnInit(): void {
+    this.showOrganizationWarningModal = this.isContextLocked;
     this.load();
   }
 
+  closeOrganizationWarningModal(): void {
+    this.showOrganizationWarningModal = false;
+  }
+
   load(): void {
+    if (this.isContextLocked) {
+      this.loading.set(false);
+      this.error.set('');
+      this.rows.set([]);
+      this.total = 0;
+      this.totalPages = 1;
+      this.page = 1;
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     const params = new URLSearchParams({
       page: String(this.page),
       limit: String(this.pageSize),
     });
-    const organizationId = String(this.organizationContext.getActiveOrganizationId() || '').trim();
-    if (organizationId) {
-      params.set('organizationId', organizationId);
+    if (this.currentOrganizationId) {
+      params.set('organizationId', this.currentOrganizationId);
     }
     if (this.isReadFilter === 'read') {
       params.set('isRead', 'true');
@@ -87,11 +117,13 @@ export class MessagesPageComponent {
   }
 
   applyFilters(): void {
+    if (this.isContextLocked) return;
     this.page = 1;
     this.load();
   }
 
   onPageSizeChange(value: string): void {
+    if (this.isContextLocked) return;
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
@@ -99,7 +131,7 @@ export class MessagesPageComponent {
   }
 
   goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+    if (this.isContextLocked || page < 1 || page > this.totalPages || page === this.page || this.loading()) {
       return;
     }
     this.page = page;
@@ -107,6 +139,7 @@ export class MessagesPageComponent {
   }
 
   markAsRead(row: MessageRow): void {
+    if (this.isContextLocked) return;
     if (!row?.id || row.isRead) {
       return;
     }
@@ -156,4 +189,3 @@ export class MessagesPageComponent {
     return row.id;
   }
 }
-

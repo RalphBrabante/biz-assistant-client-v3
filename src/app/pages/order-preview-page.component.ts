@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { AbstractControl, FormsModule, ReactiveFormsModule, Validators, FormBuilder } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -69,6 +69,7 @@ interface OrderRow {
   currency?: string;
   orderNumber: string;
   createdAt?: string;
+  dueDate?: string;
   customerId?: string;
   customer?: {
     id: string;
@@ -114,13 +115,14 @@ interface WithholdingTaxTypeOption {
 @Component({
   selector: 'app-order-preview-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink],
   templateUrl: './order-preview-page.component.html',
 })
 export class OrderPreviewPageComponent {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly fb = inject(FormBuilder);
 
   orderId = '';
   order: OrderRow | null = null;
@@ -151,8 +153,12 @@ export class OrderPreviewPageComponent {
   catalogLoading = false;
   cart: CartItem[] = [];
   showCompleteModal = false;
-  completionSalesInvoiceId = '';
-  completionSalesInvoiceIssueDate = '';
+  completeOrderForm = this.fb.group({
+    salesInvoiceId: ['', [Validators.required, Validators.pattern(/^\d{4}$/)]],
+    salesInvoiceIssueDate: [this.todayIsoDate(), [Validators.required]],
+    dueDate: [this.todayIsoDate(), [Validators.required]],
+  });
+  completeFormSubmitted = false;
   completionModalError = '';
   organizationVatRate = 0;
   applyWithholdingTax = false;
@@ -161,6 +167,14 @@ export class OrderPreviewPageComponent {
   loadingWithholdingTaxTypes = false;
   activityVisibleCount = 3;
   private readonly currencyFormatterCache = new Map<string, Intl.NumberFormat>();
+  private readonly statusLabelMap: Record<string, string> = {
+    pending: 'pending',
+    confirmed: 'confirmed',
+    refunded: 'refunded',
+    completed: 'completed',
+    cancelled: 'cancelled',
+    processing: 'processing',
+  };
 
   ngOnInit(): void {
     this.orderId = String(this.route.snapshot.paramMap.get('id') || '');
@@ -175,8 +189,81 @@ export class OrderPreviewPageComponent {
     return String(this.order?.status || '').toLowerCase() === 'completed';
   }
 
+  get isRefunded(): boolean {
+    return String(this.order?.status || '').toLowerCase() === 'refunded';
+  }
+
+  get isFinalized(): boolean {
+    return this.isCompleted || this.isRefunded;
+  }
+
+  get baseStatus(): string {
+    return String(this.order?.status || '').toLowerCase();
+  }
+
+  get selectedStatusNormalized(): string {
+    return String(this.status || '').toLowerCase();
+  }
+
+  get allowedStatusOptions(): string[] {
+    const from = this.baseStatus;
+    switch (from) {
+      case 'pending':
+        return ['pending', 'confirmed', 'cancelled'];
+      case 'confirmed':
+        return ['confirmed', 'completed'];
+      case 'processing':
+        return ['processing', 'completed'];
+      case 'completed':
+        return ['completed', 'refunded'];
+      case 'refunded':
+        return ['refunded'];
+      case 'cancelled':
+        return ['cancelled'];
+      default: {
+        const fallback = this.selectedStatusNormalized || from || 'pending';
+        return [fallback];
+      }
+    }
+  }
+
+  statusLabel(status: string): string {
+    const normalized = String(status || '').toLowerCase();
+    return this.statusLabelMap[normalized] || normalized || '-';
+  }
+
+  private isValidStatusTransition(fromRaw: string, toRaw: string): boolean {
+    const from = String(fromRaw || '').toLowerCase();
+    const to = String(toRaw || '').toLowerCase();
+    if (!from || !to) {
+      return false;
+    }
+    if (from === to) {
+      return true;
+    }
+    if (from === 'pending') {
+      return to === 'confirmed' || to === 'cancelled';
+    }
+    if (from === 'confirmed') {
+      return to === 'completed';
+    }
+    if (from === 'processing') {
+      return to === 'completed';
+    }
+    if (from === 'completed') {
+      return to === 'refunded';
+    }
+    return false;
+  }
+
   get isLocked(): boolean {
-    return this.isCompleted || String(this.status || '').toLowerCase() === 'completed';
+    const normalizedSelected = String(this.status || '').toLowerCase();
+    return this.isFinalized || normalizedSelected === 'completed' || normalizedSelected === 'refunded';
+  }
+
+  get isOrderedItemsLocked(): boolean {
+    const normalizedStatus = String(this.status || this.order?.status || '').toLowerCase();
+    return normalizedStatus === 'processing' || normalizedStatus === 'confirmed' || normalizedStatus === 'completed' || normalizedStatus === 'refunded';
   }
 
   get organizationId(): string {
@@ -333,7 +420,7 @@ export class OrderPreviewPageComponent {
   }
 
   searchItems(): void {
-    if (this.isLocked) return;
+    if (this.isOrderedItemsLocked) return;
     if (!this.organizationId) {
       this.showError('Order organization is missing.');
       return;
@@ -366,7 +453,7 @@ export class OrderPreviewPageComponent {
   }
 
   loadMoreItems(): void {
-    if (this.isLocked || this.catalogLoading || this.catalogLoadingMore || !this.catalogHasMore) {
+    if (this.isOrderedItemsLocked || this.catalogLoading || this.catalogLoadingMore || !this.catalogHasMore) {
       return;
     }
 
@@ -420,7 +507,7 @@ export class OrderPreviewPageComponent {
   }
 
   addToCart(item: ItemRow): void {
-    if (this.isLocked) return;
+    if (this.isOrderedItemsLocked) return;
     const existing = this.cart.find((entry) => entry.item.id === item.id);
     if (existing) {
       this.increase(item.id);
@@ -434,7 +521,7 @@ export class OrderPreviewPageComponent {
   }
 
   increase(itemId: string): void {
-    if (this.isLocked) return;
+    if (this.isOrderedItemsLocked) return;
     const entry = this.cart.find((row) => row.item.id === itemId);
     if (!entry) return;
     if (entry.item.type === 'product' && entry.quantity >= this.maxStock(entry.item)) {
@@ -445,7 +532,7 @@ export class OrderPreviewPageComponent {
   }
 
   decrease(itemId: string): void {
-    if (this.isLocked) return;
+    if (this.isOrderedItemsLocked) return;
     const entry = this.cart.find((row) => row.item.id === itemId);
     if (!entry) return;
     entry.quantity -= 1;
@@ -455,7 +542,7 @@ export class OrderPreviewPageComponent {
   }
 
   updateQuantity(itemId: string, value: unknown): void {
-    if (this.isLocked) return;
+    if (this.isOrderedItemsLocked) return;
     const entry = this.cart.find((row) => row.item.id === itemId);
     if (!entry) {
       return;
@@ -483,7 +570,7 @@ export class OrderPreviewPageComponent {
   }
 
   async removeFromCart(itemId: string): Promise<void> {
-    if (this.isLocked) return;
+    if (this.isOrderedItemsLocked) return;
     const confirmed = await this.confirmDialog.confirm({
       title: 'Remove Item',
       message: 'Remove this item from the order cart?',
@@ -567,6 +654,18 @@ export class OrderPreviewPageComponent {
 
   get selectedCustomer(): CustomerRow | undefined {
     return this.customerResults.find((row) => row.id === this.selectedCustomerId);
+  }
+
+  get isPendingStatus(): boolean {
+    return String(this.status || this.order?.status || '').toLowerCase() === 'pending';
+  }
+
+  get displayCustomerName(): string {
+    return this.selectedCustomer?.name || this.order?.customer?.name || '-';
+  }
+
+  get displayCustomerTaxId(): string {
+    return this.selectedCustomer?.taxId || this.order?.customer?.taxId || '-';
   }
 
   get deliveryLines(): OrderSnapshotRow[] {
@@ -653,8 +752,8 @@ export class OrderPreviewPageComponent {
   }
 
   async saveOrder(): Promise<void> {
-    if (this.isCompleted) {
-      this.showError('Completed orders are locked and can no longer be edited.');
+    if (this.isFinalized) {
+      this.showError('Finalized orders are locked and can no longer be edited.');
       return;
     }
     if (!this.orderId) return;
@@ -666,12 +765,19 @@ export class OrderPreviewPageComponent {
       this.showError('Order must have at least one item.');
       return;
     }
-    const invalidStockEntry = this.cart.find(
-      (row) => row.item.type === 'product' && row.quantity > this.maxStock(row.item)
-    );
-    if (invalidStockEntry) {
-      this.showError(`Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`);
+    if (!this.isValidStatusTransition(this.baseStatus, this.status)) {
+      this.showError('Invalid status transition. Allowed: pending -> confirmed/cancelled, confirmed -> completed, completed -> refunded.');
       return;
+    }
+    const shouldUpdateOrderedItems = !this.isOrderedItemsLocked && this.haveOrderedItemsChanged();
+    if (shouldUpdateOrderedItems) {
+      const invalidStockEntry = this.cart.find(
+        (row) => row.item.type === 'product' && row.quantity > this.maxStock(row.item)
+      );
+      if (invalidStockEntry) {
+        this.showError(`Quantity for ${invalidStockEntry.item.name} exceeds available stock (${this.maxStock(invalidStockEntry.item)}).`);
+        return;
+      }
     }
 
     this.error = '';
@@ -693,8 +799,8 @@ export class OrderPreviewPageComponent {
       notes: this.notes.trim() || undefined,
     };
 
-    // If transitioning to completed, do not reprocess/replace order items.
-    if (String(this.status).toLowerCase() !== 'completed') {
+    // Send orderedItems only when user actually changed line items.
+    if (shouldUpdateOrderedItems) {
       payload['orderedItems'] = this.cart.map((row) => ({
         itemId: row.item.id,
         quantity: row.quantity,
@@ -702,8 +808,13 @@ export class OrderPreviewPageComponent {
     }
 
     if (!this.isCompleted && String(this.status).toLowerCase() === 'completed') {
-      this.completionSalesInvoiceId = '';
-      this.completionSalesInvoiceIssueDate = this.todayIsoDate();
+      const defaultDueDate = String(this.order?.dueDate || '').trim() || this.todayIsoDate();
+      this.completeOrderForm.reset({
+        salesInvoiceId: '',
+        salesInvoiceIssueDate: this.todayIsoDate(),
+        dueDate: defaultDueDate,
+      });
+      this.completeFormSubmitted = false;
       this.completionModalError = '';
       this.showCompleteModal = true;
       return;
@@ -723,18 +834,68 @@ export class OrderPreviewPageComponent {
     this.submitOrderUpdate(payload);
   }
 
+  async markAsRefunded(): Promise<void> {
+    if (!this.isCompleted) {
+      this.showError('Only completed orders can be refunded.');
+      return;
+    }
+
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Mark Order As Refunded',
+      message: 'Set this completed order status to refunded?',
+      confirmText: 'Mark Refunded',
+      confirmButtonClass: 'btn-danger',
+      iconClass: 'bi-arrow-counterclockwise',
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    this.submitOrderUpdate({ status: 'refunded' });
+  }
+
   closeCompleteModal(): void {
     if (this.saving) return;
     this.showCompleteModal = false;
+    this.completeFormSubmitted = false;
     this.completionModalError = '';
   }
 
-  confirmCompletion(): void {
-    const salesInvoiceId = this.completionSalesInvoiceId.trim();
-    if (!salesInvoiceId) {
-      this.completionModalError = 'Sales Invoice ID is required to complete this order.';
+  onCompletionSalesInvoiceIdInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
       return;
     }
+    const masked = String(input.value || '').replace(/\D/g, '').slice(0, 4);
+    if (input.value !== masked) {
+      input.value = masked;
+    }
+    this.completeOrderForm.patchValue({ salesInvoiceId: masked }, { emitEvent: false });
+  }
+
+  onCompletionSalesInvoiceIdBlur(): void {
+    const raw = String(this.completeOrderForm.get('salesInvoiceId')?.value || '').replace(/\D/g, '').slice(0, 4);
+    if (!raw) {
+      this.completeOrderForm.patchValue({ salesInvoiceId: '' }, { emitEvent: false });
+      return;
+    }
+    this.completeOrderForm.patchValue({ salesInvoiceId: raw.padStart(4, '0') }, { emitEvent: false });
+  }
+
+  confirmCompletion(): void {
+    this.completeFormSubmitted = true;
+    this.completeOrderForm.markAllAsTouched();
+    if (this.completeOrderForm.invalid) {
+      this.completionModalError = 'Please fix the validation errors before completing this order.';
+      return;
+    }
+
+    const salesInvoiceId = String(this.completeOrderForm.get('salesInvoiceId')?.value || '')
+      .replace(/\D/g, '')
+      .slice(0, 4)
+      .padStart(4, '0');
+    const salesInvoiceIssueDate = String(this.completeOrderForm.get('salesInvoiceIssueDate')?.value || '').trim() || this.todayIsoDate();
+    const dueDate = String(this.completeOrderForm.get('dueDate')?.value || '').trim() || this.todayIsoDate();
     this.completionModalError = '';
 
     const payload: Record<string, unknown> = {
@@ -751,7 +912,9 @@ export class OrderPreviewPageComponent {
       totalAmount: this.totalAmount,
       notes: this.notes.trim() || undefined,
       salesInvoiceId,
-      salesInvoiceIssueDate: this.completionSalesInvoiceIssueDate || this.todayIsoDate(),
+      salesInvoiceIssueDate,
+      dueDate,
+      salesInvoiceDueDate: dueDate,
     };
 
     this.submitOrderUpdate(payload);
@@ -767,8 +930,12 @@ export class OrderPreviewPageComponent {
       next: (response) => {
         this.saving = false;
         this.showCompleteModal = false;
-        this.completionSalesInvoiceId = '';
-        this.completionSalesInvoiceIssueDate = '';
+        this.completeOrderForm.reset({
+          salesInvoiceId: '',
+          salesInvoiceIssueDate: this.todayIsoDate(),
+          dueDate: this.todayIsoDate(),
+        });
+        this.completeFormSubmitted = false;
         this.completionModalError = '';
         this.message = response.message || 'Order updated successfully.';
         this.loadOrder();
@@ -783,6 +950,35 @@ export class OrderPreviewPageComponent {
         this.showError(message);
       },
     });
+  }
+
+  getCompleteControl(name: 'salesInvoiceId' | 'salesInvoiceIssueDate' | 'dueDate'): AbstractControl | null {
+    return this.completeOrderForm.get(name);
+  }
+
+  isCompleteFieldRequired(name: 'salesInvoiceId' | 'salesInvoiceIssueDate' | 'dueDate'): boolean {
+    return Boolean(this.getCompleteControl(name)?.hasValidator(Validators.required));
+  }
+
+  shouldShowCompleteFieldError(name: 'salesInvoiceId' | 'salesInvoiceIssueDate' | 'dueDate'): boolean {
+    const control = this.getCompleteControl(name);
+    return Boolean(control?.invalid && (control.touched || control.dirty || this.completeFormSubmitted));
+  }
+
+  getCompleteFieldError(name: 'salesInvoiceId' | 'salesInvoiceIssueDate' | 'dueDate'): string {
+    const control = this.getCompleteControl(name);
+    if (!control || !this.shouldShowCompleteFieldError(name)) {
+      return '';
+    }
+    if (control.hasError('required')) {
+      if (name === 'salesInvoiceId') return 'Sales Invoice ID is required.';
+      if (name === 'salesInvoiceIssueDate') return 'Issue Date is required.';
+      return 'Due Date is required.';
+    }
+    if (name === 'salesInvoiceId' && control.hasError('pattern')) {
+      return 'Sales Invoice ID must be exactly 4 digits.';
+    }
+    return 'Invalid value.';
   }
 
   customerLabel(row: CustomerRow): string {
@@ -816,6 +1012,38 @@ export class OrderPreviewPageComponent {
     }
     const snapshotRate = Number(this.order?.orderedItemSnapshots?.[0]?.taxRate ?? 0);
     return Number.isFinite(snapshotRate) && snapshotRate > 0 ? Number(snapshotRate.toFixed(2)) : 0;
+  }
+
+  private haveOrderedItemsChanged(): boolean {
+    const normalizedCart = this.cart
+      .map((row) => ({
+        itemId: String(row.item.id || '').trim(),
+        quantity: Math.max(1, Number(row.quantity || 1)),
+      }))
+      .filter((row) => row.itemId)
+      .sort((a, b) => a.itemId.localeCompare(b.itemId));
+
+    const normalizedSnapshots = (this.order?.orderedItemSnapshots || [])
+      .map((row) => ({
+        itemId: String(row.itemId || '').trim(),
+        quantity: Math.max(1, Number(row.quantity || 1)),
+      }))
+      .filter((row) => row.itemId)
+      .sort((a, b) => a.itemId.localeCompare(b.itemId));
+
+    if (normalizedCart.length !== normalizedSnapshots.length) {
+      return true;
+    }
+
+    for (let index = 0; index < normalizedCart.length; index += 1) {
+      const cartRow = normalizedCart[index];
+      const snapshotRow = normalizedSnapshots[index];
+      if (!snapshotRow || cartRow.itemId !== snapshotRow.itemId || cartRow.quantity !== snapshotRow.quantity) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private loadWithholdingTaxTypes(): void {

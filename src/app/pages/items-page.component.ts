@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -96,6 +96,20 @@ export class ItemsPageComponent {
   readonly importModalError = signal('');
   readonly importSummary = signal<ItemImportSummary | null>(null);
   readonly filter = signal('');
+  private readonly createFieldLabels: Record<string, string> = {
+    type: 'Type',
+    sku: 'SKU',
+    name: 'Name',
+    description: 'Description',
+    category: 'Category',
+    unit: 'Unit',
+    price: 'Price',
+    cost: 'Cost',
+    discountedPrice: 'Discounted Price',
+    currency: 'Currency',
+    stock: 'Stock',
+    reorderLevel: 'Reorder Level',
+  };
   vendorFilter = '';
   vendorFilterSearch = '';
   readonly pageSizeOptions = [10, 20, 50, 100];
@@ -126,6 +140,16 @@ export class ItemsPageComponent {
     return this.organizationContext.isSuperuser();
   }
 
+  get hasOrganizationContext(): boolean {
+    return Boolean(this.currentOrganizationId.trim());
+  }
+
+  get isContextLocked(): boolean {
+    return this.isSuperuser && !this.hasOrganizationContext;
+  }
+
+  showOrganizationWarningModal = false;
+
   get canReadOrganizations(): boolean {
     return this.isSuperuser || this.auth.hasPermission('organizations.read');
   }
@@ -144,6 +168,7 @@ export class ItemsPageComponent {
 
   ngOnInit(): void {
     this.restoreTablePreferences();
+    this.showOrganizationWarningModal = this.isContextLocked;
     if (this.canReadOrganizations) {
       this.loadOrganizations();
     } else {
@@ -211,12 +236,25 @@ export class ItemsPageComponent {
     this.load();
   }
 
+  closeOrganizationWarningModal(): void {
+    this.showOrganizationWarningModal = false;
+  }
+
   ngOnDestroy(): void {
     this.vendorFilterSearchSub?.unsubscribe();
     this.editVendorSearchSub?.unsubscribe();
   }
 
   load(): void {
+    if (this.isContextLocked) {
+      this.loading.set(false);
+      this.rows.set([]);
+      this.total = 0;
+      this.totalPages = 1;
+      this.page = 1;
+      this.error.set('');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     const q = this.filter().trim();
@@ -274,6 +312,7 @@ export class ItemsPageComponent {
   }
 
   openCreateModal(): void {
+    if (this.isContextLocked) return;
     this.createItemForm = this.newCreateItemForm();
     this.error.set('');
     this.createModalError.set('');
@@ -287,6 +326,10 @@ export class ItemsPageComponent {
   }
 
   createItem(): void {
+    if (this.isContextLocked) {
+      this.createModalError.set('Select a specific organization before creating an item.');
+      return;
+    }
     if (!this.currentOrganizationId.trim()) {
       if (this.organizationContext.isAllOrganizationsSelected()) {
         this.createModalError.set('Select a specific organization before creating an item.');
@@ -325,7 +368,47 @@ export class ItemsPageComponent {
     });
   }
 
+  getCreateControl(controlName: string): AbstractControl | null {
+    return this.createItemForm.get(controlName);
+  }
+
+  isCreateFieldRequired(controlName: string): boolean {
+    const control = this.getCreateControl(controlName);
+    if (!control || typeof control.hasValidator !== 'function') {
+      return false;
+    }
+    return control.hasValidator(Validators.required);
+  }
+
+  shouldShowCreateFieldError(controlName: string): boolean {
+    const control = this.getCreateControl(controlName);
+    if (!control) {
+      return false;
+    }
+    return control.invalid && (control.touched || control.dirty);
+  }
+
+  getCreateFieldError(controlName: string): string {
+    const control = this.getCreateControl(controlName);
+    if (!control || !this.shouldShowCreateFieldError(controlName)) {
+      return '';
+    }
+    const label = this.createFieldLabels[controlName] || 'This field';
+    if (control.hasError('required')) {
+      return `${label} is required.`;
+    }
+    if (control.hasError('maxlength')) {
+      const requiredLength = control.getError('maxlength')?.requiredLength;
+      return `${label} must be at most ${requiredLength} characters.`;
+    }
+    if (control.hasError('min')) {
+      return `${label} must be 0 or greater.`;
+    }
+    return `${label} is invalid.`;
+  }
+
   openEditModal(row: ItemRow): void {
+    if (this.isContextLocked) return;
     this.editingId = row.id;
     this.editForm = {
       organizationId: row.organizationId || '',
@@ -364,6 +447,7 @@ export class ItemsPageComponent {
   }
 
   openImportModal(): void {
+    if (this.isContextLocked) return;
     this.importFile = null;
     this.importModalError.set('');
     this.error.set('');
@@ -383,6 +467,10 @@ export class ItemsPageComponent {
   }
 
   importItemsCsv(): void {
+    if (this.isContextLocked) {
+      this.importModalError.set('Select a specific organization before importing items.');
+      return;
+    }
     if (!this.importFile) {
       this.importModalError.set('Please select a CSV file to import.');
       return;
@@ -436,6 +524,7 @@ export class ItemsPageComponent {
   }
 
   exportItemsCsv(): void {
+    if (this.isContextLocked) return;
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');
@@ -473,6 +562,7 @@ export class ItemsPageComponent {
   }
 
   async saveEdit(): Promise<void> {
+    if (this.isContextLocked) return;
     if (!this.editingId) {
       return;
     }
@@ -508,6 +598,7 @@ export class ItemsPageComponent {
   }
 
   async removeItem(id: string): Promise<void> {
+    if (this.isContextLocked) return;
     const confirmed = await this.confirmDialog.confirm({
       title: 'Delete Item',
       message: 'Delete this item? This action cannot be undone.',
@@ -536,11 +627,13 @@ export class ItemsPageComponent {
   }
 
   setViewMode(mode: TableViewMode): void {
+    if (this.isContextLocked) return;
     this.viewMode = mode;
     this.persistTablePreferences();
   }
 
   onFilterChange(value: string): void {
+    if (this.isContextLocked) return;
     this.filter.set(value);
     this.page = 1;
     this.persistTablePreferences();
@@ -548,6 +641,7 @@ export class ItemsPageComponent {
   }
 
   onPageSizeChange(value: string): void {
+    if (this.isContextLocked) return;
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
@@ -556,6 +650,7 @@ export class ItemsPageComponent {
   }
 
   onVendorFilterSearchChange(value: string): void {
+    if (this.isContextLocked) return;
     const query = String(value || '');
     this.vendorFilterSearch = query;
     if (this.selectedVendorFilter()) {
@@ -590,6 +685,7 @@ export class ItemsPageComponent {
   }
 
   clearVendorFilter(): void {
+    if (this.isContextLocked) return;
     this.selectedVendorFilter.set(null);
     this.vendorFilter = '';
     this.vendorFilterSearch = '';
@@ -601,7 +697,7 @@ export class ItemsPageComponent {
   }
 
   goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+    if (this.isContextLocked || page < 1 || page > this.totalPages || page === this.page || this.loading()) {
       return;
     }
     this.page = page;

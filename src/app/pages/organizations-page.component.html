@@ -127,114 +127,7 @@
   </div>
 </section>
 
-<section class="card border-0 shadow-sm rounded-4" *ngIf="editingId">
-  <div class="card-body p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2 class="h5 mb-0">Edit Organization</h2>
-      <button class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
-    </div>
-
-    <div class="row g-3">
-      <div class="col-12 col-md-4">
-        <label class="form-label">Name</label>
-        <input class="form-control" [(ngModel)]="editForm['name']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Legal Name</label>
-        <input class="form-control" [(ngModel)]="editForm['legalName']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Tax ID</label>
-        <input class="form-control" [(ngModel)]="editForm['taxId']" />
-      </div>
-
-      <div class="col-12 col-md-8">
-        <label class="form-label">Address Line 1</label>
-        <input class="form-control" [(ngModel)]="editForm['addressLine1']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Address Line 2</label>
-        <input class="form-control" [(ngModel)]="editForm['addressLine2']" />
-      </div>
-
-      <div class="col-12 col-md-3">
-        <label class="form-label">City</label>
-        <input class="form-control" [(ngModel)]="editForm['city']" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">State</label>
-        <input class="form-control" [(ngModel)]="editForm['state']" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Postal Code</label>
-        <input class="form-control" [(ngModel)]="editForm['postalCode']" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Country</label>
-        <input class="form-control" [(ngModel)]="editForm['country']" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Currency</label>
-        <input class="form-control" [(ngModel)]="editForm['currency']" placeholder="USD" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Tax Type <span class="text-danger">*</span></label>
-        <select class="form-select" [(ngModel)]="editForm['taxTypeId']" required>
-          <option value="">Select tax type</option>
-          <option *ngFor="let taxType of taxTypes()" [value]="taxType.id">
-            {{ taxType.code }} - {{ taxType.name }} ({{ taxType.percentage }}%)
-          </option>
-        </select>
-      </div>
-
-      <div class="col-12 col-md-4">
-        <label class="form-label">Contact Name</label>
-        <input class="form-control" [(ngModel)]="editForm['contactName']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Contact Email</label>
-        <input type="email" class="form-control" [(ngModel)]="editForm['contactEmail']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Phone</label>
-        <input class="form-control" [(ngModel)]="editForm['phone']" />
-      </div>
-
-      <div class="col-12 col-md-4">
-        <label class="form-label">Website</label>
-        <input class="form-control" [(ngModel)]="editForm['website']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Industry</label>
-        <input class="form-control" [(ngModel)]="editForm['industry']" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">Employee Count</label>
-        <input type="number" class="form-control" [(ngModel)]="editForm['employeeCount']" />
-      </div>
-
-      <div class="col-12">
-        <label class="form-label">Notes</label>
-        <textarea rows="2" class="form-control" [(ngModel)]="editForm['notes']"></textarea>
-      </div>
-
-      <div class="col-12 col-md-4 d-flex align-items-end">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" [(ngModel)]="editForm['isActive']" />
-          <label class="form-check-label">Active</label>
-        </div>
-      </div>
-
-      <div class="col-12 d-flex gap-2">
-        <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
-          {{ submitting() ? 'Saving...' : 'Save Organization' }}
-        </button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<div class="modal-backdrop fade show" *ngIf="isCreateModalOpen()"></div>
+<div class="modal-backdrop fade show" *ngIf="isCreateModalOpen() || isEditModalOpen()"></div>
 <div
   class="modal fade show"
   tabindex="-1"
@@ -252,94 +145,119 @@
         <div *ngIf="createModalError()" class="alert alert-danger mb-3">
           {{ createModalError() }}
         </div>
-        <form class="row g-3" [formGroup]="createOrganizationForm" (ngSubmit)="createOrganization()">
+        <form class="row g-3" [formGroup]="createOrganizationForm" (ngSubmit)="createOrganization()" novalidate>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Name</label>
-            <input class="form-control" formControlName="name" />
+            <label class="form-label fw-semibold">Name <span *ngIf="isCreateFieldRequired('name')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="name" [class.is-invalid]="shouldShowCreateFieldError('name')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('name') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Legal Name</label>
-            <input class="form-control" formControlName="legalName" />
+            <label class="form-label fw-semibold">Legal Name <span *ngIf="isCreateFieldRequired('legalName')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="legalName" [class.is-invalid]="shouldShowCreateFieldError('legalName')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('legalName') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Tax ID</label>
-            <input class="form-control" formControlName="taxId" />
+            <label class="form-label fw-semibold">Tax ID <span *ngIf="isCreateFieldRequired('taxId')" class="text-danger">*</span></label>
+            <input
+              class="form-control"
+              formControlName="taxId"
+              placeholder="499-531-238-00000"
+              inputmode="numeric"
+              [class.is-invalid]="shouldShowCreateFieldError('taxId')"
+              (input)="onCreateTaxIdInput($event)"
+            />
+            <div class="invalid-feedback">{{ getCreateFieldError('taxId') }}</div>
           </div>
 
           <div class="col-12 col-md-8">
-            <label class="form-label fw-semibold">Address Line 1</label>
-            <input class="form-control" formControlName="addressLine1" />
+            <label class="form-label fw-semibold">Address Line 1 <span *ngIf="isCreateFieldRequired('addressLine1')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="addressLine1" [class.is-invalid]="shouldShowCreateFieldError('addressLine1')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('addressLine1') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Address Line 2</label>
-            <input class="form-control" formControlName="addressLine2" />
+            <label class="form-label fw-semibold">Address Line 2 <span *ngIf="isCreateFieldRequired('addressLine2')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="addressLine2" [class.is-invalid]="shouldShowCreateFieldError('addressLine2')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('addressLine2') }}</div>
           </div>
 
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">City</label>
-            <input class="form-control" formControlName="city" />
+            <label class="form-label fw-semibold">City <span *ngIf="isCreateFieldRequired('city')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="city" [class.is-invalid]="shouldShowCreateFieldError('city')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('city') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">State</label>
-            <input class="form-control" formControlName="state" />
+            <label class="form-label fw-semibold">State <span *ngIf="isCreateFieldRequired('state')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="state" [class.is-invalid]="shouldShowCreateFieldError('state')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('state') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Postal Code</label>
-            <input class="form-control" formControlName="postalCode" />
+            <label class="form-label fw-semibold">Postal Code <span *ngIf="isCreateFieldRequired('postalCode')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="postalCode" [class.is-invalid]="shouldShowCreateFieldError('postalCode')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('postalCode') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Country</label>
-            <select class="form-select" formControlName="country">
+            <label class="form-label fw-semibold">Country <span *ngIf="isCreateFieldRequired('country')" class="text-danger">*</span></label>
+            <select class="form-select" formControlName="country" [class.is-invalid]="shouldShowCreateFieldError('country')">
               <option *ngFor="let country of countryOptions" [value]="country">{{ country }}</option>
             </select>
+            <div class="invalid-feedback">{{ getCreateFieldError('country') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Currency</label>
-            <select class="form-select" formControlName="currency">
+            <label class="form-label fw-semibold">Currency <span *ngIf="isCreateFieldRequired('currency')" class="text-danger">*</span></label>
+            <select class="form-select" formControlName="currency" [class.is-invalid]="shouldShowCreateFieldError('currency')">
               <option *ngFor="let currency of currencyOptions" [value]="currency.code">
                 {{ currency.label }}
               </option>
             </select>
+            <div class="invalid-feedback">{{ getCreateFieldError('currency') }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Tax Type <span class="text-danger">*</span></label>
-            <select class="form-select" formControlName="taxTypeId" required>
+            <label class="form-label fw-semibold">Tax Type <span *ngIf="isCreateFieldRequired('taxTypeId')" class="text-danger">*</span></label>
+            <select class="form-select" formControlName="taxTypeId" [class.is-invalid]="shouldShowCreateFieldError('taxTypeId')">
               <option value="">Select tax type</option>
               <option *ngFor="let taxType of taxTypes()" [value]="taxType.id">
                 {{ taxType.code }} - {{ taxType.name }} ({{ taxType.percentage }}%)
               </option>
             </select>
+            <div class="invalid-feedback">{{ getCreateFieldError('taxTypeId') }}</div>
           </div>
 
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Contact Name</label>
-            <input class="form-control" formControlName="contactName" />
+            <label class="form-label fw-semibold">Contact Name <span *ngIf="isCreateFieldRequired('contactName')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="contactName" [class.is-invalid]="shouldShowCreateFieldError('contactName')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('contactName') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Contact Email</label>
-            <input type="email" class="form-control" formControlName="contactEmail" />
+            <label class="form-label fw-semibold">Contact Email <span *ngIf="isCreateFieldRequired('contactEmail')" class="text-danger">*</span></label>
+            <input type="email" class="form-control" formControlName="contactEmail" [class.is-invalid]="shouldShowCreateFieldError('contactEmail')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('contactEmail') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Phone</label>
-            <input class="form-control" formControlName="phone" />
+            <label class="form-label fw-semibold">Phone <span *ngIf="isCreateFieldRequired('phone')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="phone" [class.is-invalid]="shouldShowCreateFieldError('phone')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('phone') }}</div>
           </div>
 
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Website</label>
-            <input class="form-control" formControlName="website" />
+            <label class="form-label fw-semibold">Website <span *ngIf="isCreateFieldRequired('website')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="website" [class.is-invalid]="shouldShowCreateFieldError('website')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('website') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Industry</label>
-            <input class="form-control" formControlName="industry" />
+            <label class="form-label fw-semibold">Industry <span *ngIf="isCreateFieldRequired('industry')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="industry" [class.is-invalid]="shouldShowCreateFieldError('industry')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('industry') }}</div>
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Employee Count</label>
-            <input type="number" class="form-control" formControlName="employeeCount" />
+            <label class="form-label fw-semibold">Employee Count <span *ngIf="isCreateFieldRequired('employeeCount')" class="text-danger">*</span></label>
+            <input type="number" class="form-control" formControlName="employeeCount" [class.is-invalid]="shouldShowCreateFieldError('employeeCount')" />
+            <div class="invalid-feedback">{{ getCreateFieldError('employeeCount') }}</div>
           </div>
 
           <div class="col-12">
-            <label class="form-label fw-semibold">Notes</label>
-            <textarea rows="2" class="form-control" formControlName="notes"></textarea>
+            <label class="form-label fw-semibold">Notes <span *ngIf="isCreateFieldRequired('notes')" class="text-danger">*</span></label>
+            <textarea rows="2" class="form-control" formControlName="notes" [class.is-invalid]="shouldShowCreateFieldError('notes')"></textarea>
+            <div class="invalid-feedback">{{ getCreateFieldError('notes') }}</div>
           </div>
 
           <div class="col-12 col-md-4 d-flex align-items-end">
@@ -354,6 +272,156 @@
         <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
         <button class="btn btn-primary" [disabled]="submitting()" (click)="createOrganization()">
           {{ submitting() ? 'Creating...' : 'Create Organization' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isEditModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isEditModalOpen()"
+  *ngIf="isEditModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Edit Organization</h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div *ngIf="editModalError()" class="alert alert-danger mb-3">
+          {{ editModalError() }}
+        </div>
+        <form class="row g-3" [formGroup]="editOrganizationForm" (ngSubmit)="saveEdit()" novalidate>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Name <span *ngIf="isEditFieldRequired('name')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="name" [class.is-invalid]="shouldShowEditFieldError('name')" />
+            <div class="invalid-feedback">{{ getEditFieldError('name') }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Legal Name <span *ngIf="isEditFieldRequired('legalName')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="legalName" [class.is-invalid]="shouldShowEditFieldError('legalName')" />
+            <div class="invalid-feedback">{{ getEditFieldError('legalName') }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Tax ID <span *ngIf="isEditFieldRequired('taxId')" class="text-danger">*</span></label>
+            <input
+              class="form-control"
+              formControlName="taxId"
+              placeholder="499-531-238-00000"
+              inputmode="numeric"
+              [class.is-invalid]="shouldShowEditFieldError('taxId')"
+              (input)="onEditTaxIdInput($event)"
+            />
+            <div class="invalid-feedback">{{ getEditFieldError('taxId') }}</div>
+          </div>
+
+          <div class="col-12 col-md-8">
+            <label class="form-label fw-semibold">Address Line 1 <span *ngIf="isEditFieldRequired('addressLine1')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="addressLine1" [class.is-invalid]="shouldShowEditFieldError('addressLine1')" />
+            <div class="invalid-feedback">{{ getEditFieldError('addressLine1') }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Address Line 2 <span *ngIf="isEditFieldRequired('addressLine2')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="addressLine2" [class.is-invalid]="shouldShowEditFieldError('addressLine2')" />
+            <div class="invalid-feedback">{{ getEditFieldError('addressLine2') }}</div>
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">City <span *ngIf="isEditFieldRequired('city')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="city" [class.is-invalid]="shouldShowEditFieldError('city')" />
+            <div class="invalid-feedback">{{ getEditFieldError('city') }}</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">State <span *ngIf="isEditFieldRequired('state')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="state" [class.is-invalid]="shouldShowEditFieldError('state')" />
+            <div class="invalid-feedback">{{ getEditFieldError('state') }}</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Postal Code <span *ngIf="isEditFieldRequired('postalCode')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="postalCode" [class.is-invalid]="shouldShowEditFieldError('postalCode')" />
+            <div class="invalid-feedback">{{ getEditFieldError('postalCode') }}</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Country <span *ngIf="isEditFieldRequired('country')" class="text-danger">*</span></label>
+            <select class="form-select" formControlName="country" [class.is-invalid]="shouldShowEditFieldError('country')">
+              <option *ngFor="let country of countryOptions" [value]="country">{{ country }}</option>
+            </select>
+            <div class="invalid-feedback">{{ getEditFieldError('country') }}</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Currency <span *ngIf="isEditFieldRequired('currency')" class="text-danger">*</span></label>
+            <select class="form-select" formControlName="currency" [class.is-invalid]="shouldShowEditFieldError('currency')">
+              <option *ngFor="let currency of currencyOptions" [value]="currency.code">
+                {{ currency.label }}
+              </option>
+            </select>
+            <div class="invalid-feedback">{{ getEditFieldError('currency') }}</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Tax Type <span *ngIf="isEditFieldRequired('taxTypeId')" class="text-danger">*</span></label>
+            <select class="form-select" formControlName="taxTypeId" [class.is-invalid]="shouldShowEditFieldError('taxTypeId')">
+              <option value="">Select tax type</option>
+              <option *ngFor="let taxType of taxTypes()" [value]="taxType.id">
+                {{ taxType.code }} - {{ taxType.name }} ({{ taxType.percentage }}%)
+              </option>
+            </select>
+            <div class="invalid-feedback">{{ getEditFieldError('taxTypeId') }}</div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Contact Name <span *ngIf="isEditFieldRequired('contactName')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="contactName" [class.is-invalid]="shouldShowEditFieldError('contactName')" />
+            <div class="invalid-feedback">{{ getEditFieldError('contactName') }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Contact Email <span *ngIf="isEditFieldRequired('contactEmail')" class="text-danger">*</span></label>
+            <input type="email" class="form-control" formControlName="contactEmail" [class.is-invalid]="shouldShowEditFieldError('contactEmail')" />
+            <div class="invalid-feedback">{{ getEditFieldError('contactEmail') }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Phone <span *ngIf="isEditFieldRequired('phone')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="phone" [class.is-invalid]="shouldShowEditFieldError('phone')" />
+            <div class="invalid-feedback">{{ getEditFieldError('phone') }}</div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Website <span *ngIf="isEditFieldRequired('website')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="website" [class.is-invalid]="shouldShowEditFieldError('website')" />
+            <div class="invalid-feedback">{{ getEditFieldError('website') }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Industry <span *ngIf="isEditFieldRequired('industry')" class="text-danger">*</span></label>
+            <input class="form-control" formControlName="industry" [class.is-invalid]="shouldShowEditFieldError('industry')" />
+            <div class="invalid-feedback">{{ getEditFieldError('industry') }}</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Employee Count <span *ngIf="isEditFieldRequired('employeeCount')" class="text-danger">*</span></label>
+            <input type="number" class="form-control" formControlName="employeeCount" [class.is-invalid]="shouldShowEditFieldError('employeeCount')" />
+            <div class="invalid-feedback">{{ getEditFieldError('employeeCount') }}</div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-semibold">Notes <span *ngIf="isEditFieldRequired('notes')" class="text-danger">*</span></label>
+            <textarea rows="2" class="form-control" formControlName="notes" [class.is-invalid]="shouldShowEditFieldError('notes')"></textarea>
+            <div class="invalid-feedback">{{ getEditFieldError('notes') }}</div>
+          </div>
+
+          <div class="col-12 col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" formControlName="isActive" />
+              <label class="form-check-label">Active</label>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeEditModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
+          {{ submitting() ? 'Saving...' : 'Save Organization' }}
         </button>
       </div>
     </div>

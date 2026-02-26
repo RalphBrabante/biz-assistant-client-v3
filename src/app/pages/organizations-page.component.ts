@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -69,10 +69,32 @@ export class OrganizationsPageComponent {
   readonly submitting = signal(false);
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
+  readonly isEditModalOpen = signal(false);
   readonly taxTypes = signal<TaxTypeOption[]>([]);
   readonly createModalError = signal('');
+  readonly editModalError = signal('');
   readonly countryOptions = this.buildCountryOptions();
   readonly currencyOptions = this.buildCurrencyOptions();
+  private readonly createFieldLabels: Record<string, string> = {
+    name: 'Name',
+    legalName: 'Legal Name',
+    taxId: 'Tax ID',
+    addressLine1: 'Address Line 1',
+    addressLine2: 'Address Line 2',
+    city: 'City',
+    state: 'State',
+    postalCode: 'Postal Code',
+    country: 'Country',
+    currency: 'Currency',
+    taxTypeId: 'Tax Type',
+    contactName: 'Contact Name',
+    contactEmail: 'Contact Email',
+    phone: 'Phone',
+    website: 'Website',
+    industry: 'Industry',
+    employeeCount: 'Employee Count',
+    notes: 'Notes',
+  };
 
   readonly message = signal('');
   readonly error = signal('');
@@ -85,9 +107,9 @@ export class OrganizationsPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'organizations-page';
 
-  createOrganizationForm: FormGroup = this.newCreateOrganizationForm();
+  createOrganizationForm: FormGroup = this.newOrganizationFormGroup();
+  editOrganizationForm: FormGroup = this.newOrganizationFormGroup();
   editingId = '';
-  editForm: Record<string, unknown> = this.newOrgForm();
 
   readonly filteredRows = computed(() => {
     const q = this.filter().trim().toLowerCase();
@@ -113,6 +135,10 @@ export class OrganizationsPageComponent {
 
   get currentOrganizationCurrency(): string {
     return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
+  }
+
+  get currentUserCountry(): string {
+    return String(this.auth.currentUser()?.country || '').trim() || 'United States';
   }
 
   load(): void {
@@ -149,7 +175,7 @@ export class OrganizationsPageComponent {
   }
 
   openCreateModal(): void {
-    this.createOrganizationForm = this.newCreateOrganizationForm();
+    this.createOrganizationForm = this.newOrganizationFormGroup();
     this.loadTaxTypes();
     this.createModalError.set('');
     this.message.set('');
@@ -188,10 +214,98 @@ export class OrganizationsPageComponent {
     });
   }
 
+  getCreateControl(controlName: string): AbstractControl | null {
+    return this.createOrganizationForm.get(controlName);
+  }
+
+  getEditControl(controlName: string): AbstractControl | null {
+    return this.editOrganizationForm.get(controlName);
+  }
+
+  isCreateFieldRequired(controlName: string): boolean {
+    const control = this.getCreateControl(controlName);
+    if (!control || typeof control.hasValidator !== 'function') {
+      return false;
+    }
+    return control.hasValidator(Validators.required);
+  }
+
+  shouldShowCreateFieldError(controlName: string): boolean {
+    const control = this.getCreateControl(controlName);
+    if (!control) {
+      return false;
+    }
+    return control.invalid && (control.touched || control.dirty);
+  }
+
+  getCreateFieldError(controlName: string): string {
+    const control = this.getCreateControl(controlName);
+    if (!control || !this.shouldShowCreateFieldError(controlName)) {
+      return '';
+    }
+
+    const label = this.createFieldLabels[controlName] || 'This field';
+
+    if (control.hasError('required')) {
+      return `${label} is required.`;
+    }
+    if (control.hasError('email')) {
+      return 'Enter a valid email address.';
+    }
+    if (control.hasError('maxlength')) {
+      const requiredLength = control.getError('maxlength')?.requiredLength;
+      return `${label} must be at most ${requiredLength} characters.`;
+    }
+    if (control.hasError('min')) {
+      return `${label} must be 0 or greater.`;
+    }
+    return `${label} is invalid.`;
+  }
+
+  isEditFieldRequired(controlName: string): boolean {
+    const control = this.getEditControl(controlName);
+    if (!control || typeof control.hasValidator !== 'function') {
+      return false;
+    }
+    return control.hasValidator(Validators.required);
+  }
+
+  shouldShowEditFieldError(controlName: string): boolean {
+    const control = this.getEditControl(controlName);
+    if (!control) {
+      return false;
+    }
+    return control.invalid && (control.touched || control.dirty);
+  }
+
+  getEditFieldError(controlName: string): string {
+    const control = this.getEditControl(controlName);
+    if (!control || !this.shouldShowEditFieldError(controlName)) {
+      return '';
+    }
+
+    const label = this.createFieldLabels[controlName] || 'This field';
+
+    if (control.hasError('required')) {
+      return `${label} is required.`;
+    }
+    if (control.hasError('email')) {
+      return 'Enter a valid email address.';
+    }
+    if (control.hasError('maxlength')) {
+      const requiredLength = control.getError('maxlength')?.requiredLength;
+      return `${label} must be at most ${requiredLength} characters.`;
+    }
+    if (control.hasError('min')) {
+      return `${label} must be 0 or greater.`;
+    }
+    return `${label} is invalid.`;
+  }
+
   startEdit(row: OrganizationRow): void {
     this.loadTaxTypes();
     this.editingId = row.id;
-    this.editForm = {
+    this.editOrganizationForm = this.newOrganizationFormGroup({
       name: row.name || '',
       legalName: row.legalName || '',
       taxId: row.taxId || '',
@@ -200,7 +314,7 @@ export class OrganizationsPageComponent {
       city: row.city || '',
       state: row.state || '',
       postalCode: row.postalCode || '',
-      country: row.country || 'United States',
+      country: row.country || this.currentUserCountry,
       currency: row.currency || this.currentOrganizationCurrency,
       taxTypeId: row.taxTypeId || row.taxType?.id || '',
       contactName: row.contactName || '',
@@ -211,21 +325,26 @@ export class OrganizationsPageComponent {
       employeeCount: row.employeeCount ?? 0,
       notes: row.notes || '',
       isActive: row.isActive !== false,
-    };
+    });
+    this.editModalError.set('');
+    this.error.set('');
+    this.message.set('');
+    this.isEditModalOpen.set(true);
   }
 
-  cancelEdit(): void {
+  closeEditModal(): void {
+    this.isEditModalOpen.set(false);
+    this.editModalError.set('');
     this.editingId = '';
-    this.editForm = this.newOrgForm();
   }
 
   async saveEdit(): Promise<void> {
     if (!this.editingId) {
       return;
     }
-    const editValidationError = this.validateRequiredFields(this.editForm);
-    if (editValidationError) {
-      this.error.set(editValidationError);
+    if (this.editOrganizationForm.invalid) {
+      this.editOrganizationForm.markAllAsTouched();
+      this.editModalError.set('Please complete all required organization fields.');
       return;
     }
     const confirmed = await this.confirmDialog.confirm({
@@ -240,21 +359,21 @@ export class OrganizationsPageComponent {
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.editModalError.set('');
     this.message.set('');
 
-    const payload = this.buildPayload(this.editForm);
+    const payload = this.buildPayload(this.editOrganizationForm.getRawValue());
 
     this.api.update<OrganizationRow>('/api/v1/organizations', this.editingId, payload).subscribe({
       next: (response) => {
         this.submitting.set(false);
         this.message.set(response.message || 'Organization updated successfully.');
-        this.cancelEdit();
+        this.closeEditModal();
         this.load();
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to update organization.');
+        this.editModalError.set(err?.error?.message || 'Unable to update organization.');
       },
     });
   }
@@ -373,7 +492,7 @@ export class OrganizationsPageComponent {
       city: '',
       state: '',
       postalCode: '',
-      country: 'United States',
+      country: this.currentUserCountry,
       currency: this.currentOrganizationCurrency,
       taxTypeId: '',
       contactName: '',
@@ -387,12 +506,46 @@ export class OrganizationsPageComponent {
     };
   }
 
-  private newCreateOrganizationForm(): FormGroup {
-    const defaults = this.newOrgForm();
+  onCreateTaxIdInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+    const masked = this.formatTaxId(input.value);
+    if (input.value !== masked) {
+      input.value = masked;
+    }
+    this.createOrganizationForm.patchValue({ taxId: masked }, { emitEvent: false });
+  }
+
+  onEditTaxIdInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+    const masked = this.formatTaxId(input.value);
+    if (input.value !== masked) {
+      input.value = masked;
+    }
+    this.editOrganizationForm.patchValue({ taxId: masked }, { emitEvent: false });
+  }
+
+  private formatTaxId(raw: unknown): string {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0, 14);
+    const p1 = digits.slice(0, 3);
+    const p2 = digits.slice(3, 6);
+    const p3 = digits.slice(6, 9);
+    const p4 = digits.slice(9, 14);
+    return [p1, p2, p3, p4].filter(Boolean).join('-');
+  }
+
+  private newOrganizationFormGroup(initialValues: Partial<Record<string, unknown>> = {}): FormGroup {
+    const defaults = { ...this.newOrgForm(), ...initialValues };
+    const maskedTaxId = this.formatTaxId(defaults['taxId']);
     return this.fb.group({
       name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
       legalName: [defaults['legalName'], [Validators.maxLength(180)]],
-      taxId: [defaults['taxId'], [Validators.maxLength(120)]],
+      taxId: [maskedTaxId, [Validators.maxLength(120)]],
       addressLine1: [defaults['addressLine1'], [Validators.required, Validators.maxLength(255)]],
       addressLine2: [defaults['addressLine2'], [Validators.maxLength(255)]],
       city: [defaults['city'], [Validators.required, Validators.maxLength(120)]],
@@ -451,23 +604,6 @@ export class OrganizationsPageComponent {
     }
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : undefined;
-  }
-
-  private validateRequiredFields(form: Record<string, unknown>): string {
-    const name = this.asString(form['name']);
-    const addressLine1 = this.asString(form['addressLine1']);
-    const city = this.asString(form['city']);
-    const contactEmail = this.asString(form['contactEmail']);
-    const phone = this.asString(form['phone']);
-    const taxTypeId = this.asString(form['taxTypeId']);
-
-    if (!name) return 'Name is required.';
-    if (!addressLine1) return 'Address Line 1 is required.';
-    if (!city) return 'City is required.';
-    if (!contactEmail) return 'Contact Email is required.';
-    if (!phone) return 'Phone is required.';
-    if (!taxTypeId) return 'Tax Type is required.';
-    return '';
   }
 
   private buildCountryOptions(): string[] {

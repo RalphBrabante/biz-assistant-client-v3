@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -67,7 +67,30 @@ export class CustomersPageComponent {
   readonly isImportModalOpen = signal(false);
   readonly exporting = signal(false);
   readonly importModalError = signal('');
+  readonly createModalError = signal('');
+  readonly editModalError = signal('');
   readonly countryOptions = this.buildCountryOptions();
+  private readonly createFieldLabels: Record<string, string> = {
+    customerCode: 'Customer Code',
+    type: 'Type',
+    name: 'Name',
+    legalName: 'Legal Name',
+    taxId: 'Tax ID',
+    contactPerson: 'Contact Person',
+    email: 'Email',
+    phone: 'Phone',
+    mobile: 'Mobile',
+    addressLine1: 'Address Line 1',
+    addressLine2: 'Address Line 2',
+    city: 'City',
+    state: 'State',
+    postalCode: 'Postal Code',
+    country: 'Country',
+    creditLimit: 'Credit Limit',
+    paymentTermsDays: 'Payment Terms',
+    status: 'Status',
+    notes: 'Notes',
+  };
 
   readonly message = signal('');
   readonly error = signal('');
@@ -80,9 +103,9 @@ export class CustomersPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'customers-page';
 
-  createCustomerForm: FormGroup = this.newCreateCustomerForm();
+  createCustomerForm: FormGroup = this.newCustomerFormGroup();
+  editCustomerForm: FormGroup = this.newCustomerFormGroup();
   editingId = '';
-  editForm: Record<string, unknown> = this.newCustomerForm();
   private importFile: File | null = null;
 
   readonly filteredRows = computed(() => {
@@ -111,12 +134,36 @@ export class CustomersPageComponent {
     return this.organizationContext.isSuperuser();
   }
 
+  get hasOrganizationContext(): boolean {
+    return Boolean(this.currentOrganizationId.trim());
+  }
+
+  get isContextLocked(): boolean {
+    return this.isSuperuser && !this.hasOrganizationContext;
+  }
+
+  showOrganizationWarningModal = false;
+
   ngOnInit(): void {
     this.restoreTablePreferences();
+    this.showOrganizationWarningModal = this.isContextLocked;
     this.load();
   }
 
+  closeOrganizationWarningModal(): void {
+    this.showOrganizationWarningModal = false;
+  }
+
   load(): void {
+    if (this.isContextLocked) {
+      this.loading.set(false);
+      this.rows.set([]);
+      this.total = 0;
+      this.totalPages = 1;
+      this.page = 1;
+      this.error.set('');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     const q = this.filter().trim();
@@ -150,17 +197,21 @@ export class CustomersPageComponent {
   }
 
   openCreateModal(): void {
-    this.createCustomerForm = this.newCreateCustomerForm();
+    if (this.isContextLocked) return;
+    this.createCustomerForm = this.newCustomerFormGroup();
     this.error.set('');
+    this.createModalError.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
   }
 
   closeCreateModal(): void {
+    this.createModalError.set('');
     this.isCreateModalOpen.set(false);
   }
 
   openImportModal(): void {
+    if (this.isContextLocked) return;
     this.importFile = null;
     this.importModalError.set('');
     this.error.set('');
@@ -180,23 +231,27 @@ export class CustomersPageComponent {
   }
 
   createCustomer(): void {
+    if (this.isContextLocked) {
+      this.createModalError.set('Select a specific organization before creating a customer.');
+      return;
+    }
     if (!this.currentOrganizationId.trim()) {
       if (this.organizationContext.isAllOrganizationsSelected()) {
-        this.error.set('Select a specific organization before creating a customer.');
+        this.createModalError.set('Select a specific organization before creating a customer.');
         return;
       }
-      this.error.set('Logged in user has no organization assigned.');
+      this.createModalError.set('Logged in user has no organization assigned.');
       return;
     }
 
     if (this.createCustomerForm.invalid) {
       this.createCustomerForm.markAllAsTouched();
-      this.error.set('Please complete all required customer fields.');
+      this.createModalError.set('Please complete all required customer fields.');
       return;
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.createModalError.set('');
     this.message.set('');
 
     const currentUser = this.auth.currentUser();
@@ -216,20 +271,129 @@ export class CustomersPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to create customer.');
+        this.createModalError.set(err?.error?.message || 'Unable to create customer.');
       },
     });
   }
 
+  getCreateControl(controlName: string): AbstractControl | null {
+    return this.createCustomerForm.get(controlName);
+  }
+
+  isCreateFieldRequired(controlName: string): boolean {
+    const control = this.getCreateControl(controlName);
+    if (!control || typeof control.hasValidator !== 'function') {
+      return false;
+    }
+    return control.hasValidator(Validators.required);
+  }
+
+  shouldShowCreateFieldError(controlName: string): boolean {
+    const control = this.getCreateControl(controlName);
+    if (!control) {
+      return false;
+    }
+    return control.invalid && (control.touched || control.dirty);
+  }
+
+  getCreateFieldError(controlName: string): string {
+    const control = this.getCreateControl(controlName);
+    if (!control || !this.shouldShowCreateFieldError(controlName)) {
+      return '';
+    }
+    const label = this.createFieldLabels[controlName] || 'This field';
+    if (control.hasError('required')) {
+      return `${label} is required.`;
+    }
+    if (control.hasError('email')) {
+      return 'Enter a valid email address.';
+    }
+    if (control.hasError('maxlength')) {
+      const requiredLength = control.getError('maxlength')?.requiredLength;
+      return `${label} must be at most ${requiredLength} characters.`;
+    }
+    if (control.hasError('min')) {
+      return `${label} must be 0 or greater.`;
+    }
+    return `${label} is invalid.`;
+  }
+
+  getEditControl(controlName: string): AbstractControl | null {
+    return this.editCustomerForm.get(controlName);
+  }
+
+  isEditFieldRequired(controlName: string): boolean {
+    const control = this.getEditControl(controlName);
+    if (!control || typeof control.hasValidator !== 'function') {
+      return false;
+    }
+    return control.hasValidator(Validators.required);
+  }
+
+  shouldShowEditFieldError(controlName: string): boolean {
+    const control = this.getEditControl(controlName);
+    if (!control) {
+      return false;
+    }
+    return control.invalid && (control.touched || control.dirty);
+  }
+
+  getEditFieldError(controlName: string): string {
+    const control = this.getEditControl(controlName);
+    if (!control || !this.shouldShowEditFieldError(controlName)) {
+      return '';
+    }
+    const label = this.createFieldLabels[controlName] || 'This field';
+    if (control.hasError('required')) {
+      return `${label} is required.`;
+    }
+    if (control.hasError('email')) {
+      return 'Enter a valid email address.';
+    }
+    if (control.hasError('maxlength')) {
+      const requiredLength = control.getError('maxlength')?.requiredLength;
+      return `${label} must be at most ${requiredLength} characters.`;
+    }
+    if (control.hasError('min')) {
+      return `${label} must be 0 or greater.`;
+    }
+    return `${label} is invalid.`;
+  }
+
+  onCreateTaxIdInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+    const masked = this.formatTaxId(input.value);
+    if (input.value !== masked) {
+      input.value = masked;
+    }
+    this.createCustomerForm.patchValue({ taxId: masked }, { emitEvent: false });
+  }
+
+  onEditTaxIdInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+    const masked = this.formatTaxId(input.value);
+    if (input.value !== masked) {
+      input.value = masked;
+    }
+    this.editCustomerForm.patchValue({ taxId: masked }, { emitEvent: false });
+  }
+
   openEditModal(row: CustomerRow): void {
+    if (this.isContextLocked) return;
     this.editingId = row.id;
-    this.editForm = {
+    this.editCustomerForm = this.newCustomerFormGroup({
       organizationId: row.organizationId || '',
       customerCode: row.customerCode || '',
       type: row.type || 'business',
       name: row.name || '',
       legalName: row.legalName || '',
-      taxId: row.taxId || '',
+      taxId: this.formatTaxId(row.taxId || ''),
       contactPerson: row.contactPerson || '',
       email: row.email || '',
       phone: row.phone || '',
@@ -245,7 +409,8 @@ export class CustomersPageComponent {
       status: row.status || 'active',
       notes: row.notes || '',
       isActive: row.isActive !== false,
-    };
+    });
+    this.editModalError.set('');
     this.error.set('');
     this.message.set('');
     this.isEditModalOpen.set(true);
@@ -253,12 +418,22 @@ export class CustomersPageComponent {
 
   closeEditModal(): void {
     this.editingId = '';
-    this.editForm = this.newCustomerForm();
+    this.editCustomerForm = this.newCustomerFormGroup();
+    this.editModalError.set('');
     this.isEditModalOpen.set(false);
   }
 
   async saveEdit(): Promise<void> {
+    if (this.isContextLocked) {
+      this.editModalError.set('Select a specific organization before updating customers.');
+      return;
+    }
     if (!this.editingId) {
+      return;
+    }
+    if (this.editCustomerForm.invalid) {
+      this.editCustomerForm.markAllAsTouched();
+      this.editModalError.set('Please complete all required customer fields.');
       return;
     }
     const confirmed = await this.confirmDialog.confirm({
@@ -273,12 +448,12 @@ export class CustomersPageComponent {
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.editModalError.set('');
     this.message.set('');
 
     const currentUser = this.auth.currentUser();
     const payload = this.buildPayload({
-      ...this.editForm,
+      ...this.editCustomerForm.getRawValue(),
       updatedBy: currentUser?.id || '',
     });
 
@@ -291,12 +466,13 @@ export class CustomersPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to update customer.');
+        this.editModalError.set(err?.error?.message || 'Unable to update customer.');
       },
     });
   }
 
   async removeCustomer(id: string): Promise<void> {
+    if (this.isContextLocked) return;
     const confirmed = await this.confirmDialog.confirm({
       title: 'Delete Customer',
       message: 'Delete this customer? This action cannot be undone.',
@@ -325,6 +501,7 @@ export class CustomersPageComponent {
   }
 
   exportCustomersCsv(): void {
+    if (this.isContextLocked) return;
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');
@@ -359,6 +536,10 @@ export class CustomersPageComponent {
   }
 
   importCustomersCsv(): void {
+    if (this.isContextLocked) {
+      this.importModalError.set('Select a specific organization before importing customers.');
+      return;
+    }
     if (!this.importFile) {
       this.importModalError.set('Please select a CSV file to import.');
       return;
@@ -394,11 +575,13 @@ export class CustomersPageComponent {
   }
 
   setViewMode(mode: TableViewMode): void {
+    if (this.isContextLocked) return;
     this.viewMode = mode;
     this.persistTablePreferences();
   }
 
   onFilterChange(value: string): void {
+    if (this.isContextLocked) return;
     this.filter.set(value);
     this.page = 1;
     this.persistTablePreferences();
@@ -406,6 +589,7 @@ export class CustomersPageComponent {
   }
 
   onPageSizeChange(value: string): void {
+    if (this.isContextLocked) return;
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
@@ -414,7 +598,7 @@ export class CustomersPageComponent {
   }
 
   goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+    if (this.isContextLocked || page < 1 || page > this.totalPages || page === this.page || this.loading()) {
       return;
     }
     this.page = page;
@@ -491,9 +675,10 @@ export class CustomersPageComponent {
     };
   }
 
-  private newCreateCustomerForm(): FormGroup {
-    const defaults = this.newCustomerForm();
+  private newCustomerFormGroup(initialValues: Partial<Record<string, unknown>> = {}): FormGroup {
+    const defaults = { ...this.newCustomerForm(), ...initialValues };
     return this.fb.group({
+      organizationId: [defaults['organizationId']],
       customerCode: [defaults['customerCode'], [Validators.maxLength(120)]],
       type: [defaults['type'], [Validators.required]],
       name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
@@ -518,8 +703,7 @@ export class CustomersPageComponent {
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
-    return {
-      organizationId: this.asString(form['organizationId']),
+    const payload: Record<string, unknown> = {
       customerCode: this.optionalString(form['customerCode']),
       type: this.optionalString(form['type']),
       name: this.asString(form['name']),
@@ -543,6 +727,13 @@ export class CustomersPageComponent {
       createdBy: this.optionalString(form['createdBy']),
       updatedBy: this.optionalString(form['updatedBy']),
     };
+
+    const organizationId = this.asString(form['organizationId']);
+    if (organizationId) {
+      payload['organizationId'] = organizationId;
+    }
+
+    return payload;
   }
 
   private asString(value: unknown): string {
@@ -560,6 +751,15 @@ export class CustomersPageComponent {
     }
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : undefined;
+  }
+
+  private formatTaxId(raw: unknown): string {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0, 14);
+    const p1 = digits.slice(0, 3);
+    const p2 = digits.slice(3, 6);
+    const p3 = digits.slice(6, 9);
+    const p4 = digits.slice(9, 14);
+    return [p1, p2, p3, p4].filter(Boolean).join('-');
   }
 
   private buildCountryOptions(): string[] {

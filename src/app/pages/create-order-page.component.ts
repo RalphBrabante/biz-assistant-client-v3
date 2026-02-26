@@ -40,6 +40,7 @@ interface CustomerRow {
 
 interface OrganizationTaxInfo {
   id: string;
+  currency?: string;
   taxTypeId?: string;
   taxType?: {
     id: string;
@@ -93,6 +94,7 @@ export class CreateOrderPageComponent {
   customerSearchPerformed = false;
   customerSearchStatus = '';
   organizationVatRate = 0;
+  organizationCurrency = '';
   applyWithholdingTax = false;
   withholdingTaxTypeId = '';
   withholdingTaxTypes: WithholdingTaxTypeOption[] = [];
@@ -103,18 +105,35 @@ export class CreateOrderPageComponent {
   submitting = false;
   error = '';
   message = '';
+  showOrganizationWarningModal = false;
 
   get currentOrganizationId(): string {
     return this.organizationContext.getActiveOrganizationId();
+  }
+
+  get hasOrganizationContext(): boolean {
+    return Boolean(this.currentOrganizationId.trim());
   }
 
   get currentOrganizationCurrency(): string {
     return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
+  get isSuperuser(): boolean {
+    return this.organizationContext.isSuperuser();
+  }
+
+  get needsOrganizationSelectionWarning(): boolean {
+    return this.isSuperuser && this.organizationContext.isAllOrganizationsSelected();
+  }
+
+  get activeCurrency(): string {
+    return String(this.organizationCurrency || this.currentOrganizationCurrency || 'USD').toUpperCase();
+  }
+
   formatMoney(value: unknown, currency?: string): string {
     const amount = Number(value ?? 0);
-    const code = String(currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
+    const code = String(currency || this.activeCurrency || 'USD').toUpperCase();
     const normalizedAmount = Number.isFinite(amount) ? amount : 0;
     const formatter = this.currencyFormatterCache.get(code);
     if (formatter) {
@@ -146,6 +165,16 @@ export class CreateOrderPageComponent {
   ngOnInit(): void {
     this.loadOrganizationTaxRate();
     this.loadWithholdingTaxTypes();
+    this.showOrganizationWarningModal = this.needsOrganizationSelectionWarning;
+  }
+
+  closeOrganizationWarningModal(): void {
+    this.showOrganizationWarningModal = false;
+  }
+
+  goToOrdersFromWarning(): void {
+    this.showOrganizationWarningModal = false;
+    void this.router.navigate(['/orders']);
   }
 
   searchItems(): void {
@@ -428,7 +457,7 @@ export class CreateOrderPageComponent {
       status: this.status,
       paymentStatus: this.paymentStatus,
       fulfillmentStatus: this.fulfillmentStatus,
-      currency: this.currentOrganizationCurrency,
+      currency: this.activeCurrency,
       subtotalAmount: this.subtotalAmount,
       taxAmount: this.taxAmount,
       withHoldingTaxAmount: this.withHoldingTaxAmount,
@@ -553,6 +582,7 @@ export class CreateOrderPageComponent {
     const orgId = this.currentOrganizationId.trim();
     if (!orgId) {
       this.organizationVatRate = 0;
+      this.organizationCurrency = this.currentOrganizationCurrency;
       return;
     }
 
@@ -560,9 +590,11 @@ export class CreateOrderPageComponent {
       next: (response) => {
         const taxPercentage = Number(response.data?.taxType?.percentage ?? 0);
         this.organizationVatRate = Number.isFinite(taxPercentage) && taxPercentage > 0 ? taxPercentage : 0;
+        this.organizationCurrency = String(response.data?.currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
       },
       error: () => {
         this.organizationVatRate = 0;
+        this.organizationCurrency = this.currentOrganizationCurrency;
       },
     });
   }

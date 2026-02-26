@@ -9,6 +9,9 @@
       <a class="btn btn-outline-dark" routerLink="/orders">
         <i class="bi bi-arrow-left me-1"></i>Back to Orders
       </a>
+      <button class="btn btn-danger" *ngIf="isCompleted" type="button" (click)="markAsRefunded()">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Mark Refunded
+      </button>
       <button class="btn btn-dark" *ngIf="isCompleted" type="button" (click)="printOrder()">
         <i class="bi bi-printer me-1"></i>Print Order Receipt
       </button>
@@ -21,17 +24,20 @@
 <div *ngIf="isCompleted" class="alert alert-warning">
   This order is completed. Editing is disabled.
 </div>
+<div *ngIf="isRefunded" class="alert alert-danger">
+  This order is refunded. Editing is disabled.
+</div>
 <div *ngIf="!isCompleted && isLocked" class="alert alert-warning no-print">
   Status is set to completed. Fields are locked; save to finalize completion.
 </div>
 
-<section class="card border-0 shadow-sm rounded-4 mb-4 no-print" *ngIf="order && !isCompleted">
+<section class="card border-0 shadow-sm rounded-4 mb-4 no-print" *ngIf="order && !isFinalized">
   <div class="card-body p-4">
     <h2 class="h5 mb-3">Order Details</h2>
     <div class="row g-3">
       <div class="col-12 col-md-4">
         <label class="form-label">Order Number</label>
-        <input class="form-control" [value]="order.orderNumber" readonly />
+        <input class="form-control" [value]="order.orderNumber" disabled readonly />
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">Shipping Amount</label>
@@ -66,11 +72,7 @@
       <div class="col-12 col-md-4">
         <label class="form-label">Status</label>
         <select class="form-select" [(ngModel)]="status" [disabled]="isCompleted">
-          <option value="pending">pending</option>
-          <option value="confirmed">confirmed</option>
-          <option value="processing">processing</option>
-          <option value="completed">completed</option>
-          <option value="cancelled">cancelled</option>
+          <option *ngFor="let option of allowedStatusOptions" [value]="option">{{ statusLabel(option) }}</option>
         </select>
       </div>
       <div class="col-12 col-md-4">
@@ -92,7 +94,7 @@
         </select>
       </div>
 
-      <div class="col-12 col-md-8">
+      <div class="col-12 col-md-8" *ngIf="isPendingStatus">
         <label class="form-label">Customer Search (name or tax ID)</label>
         <div class="input-group">
           <input class="form-control" [(ngModel)]="customerSearchQuery" (keyup.enter)="searchCustomers()" [disabled]="isLocked" />
@@ -101,7 +103,7 @@
           </button>
         </div>
       </div>
-      <div class="col-12 col-md-4">
+      <div class="col-12 col-md-4" *ngIf="isPendingStatus">
         <label class="form-label">Select Customer</label>
         <select class="form-select" [(ngModel)]="selectedCustomerId" [disabled]="isLocked">
           <option value="">Select customer</option>
@@ -112,6 +114,14 @@
       <div class="col-12">
         <label class="form-label">Notes</label>
         <textarea rows="2" class="form-control" [(ngModel)]="notes" [disabled]="isLocked"></textarea>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Customer Details</label>
+        <div class="border rounded-3 p-3 bg-body-tertiary">
+          <div class="fw-semibold">{{ displayCustomerName }}</div>
+          <div class="small text-secondary">Tax ID: {{ displayCustomerTaxId }}</div>
+        </div>
       </div>
     </div>
   </div>
@@ -173,7 +183,7 @@
   </div>
 </section>
 
-<section class="card border-0 shadow-sm rounded-4 mt-2 mb-4 no-print" *ngIf="order && isCompleted">
+<section class="card border-0 shadow-sm rounded-4 mt-2 mb-4 no-print" *ngIf="order && isFinalized">
   <div class="card-body p-4">
     <h2 class="h5 mb-3">Order Details</h2>
     <div class="row g-3">
@@ -249,7 +259,7 @@
 </section>
 
 <div class="row g-4 no-print" *ngIf="order">
-  <div class="col-12 col-xl-7" *ngIf="!isLocked">
+  <div class="col-12 col-xl-7" *ngIf="!isOrderedItemsLocked">
     <section class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body p-4">
         <h2 class="h5 mb-3">Search Items</h2>
@@ -300,7 +310,7 @@
     </section>
   </div>
 
-  <div class="col-12" [class.col-xl-5]="!isLocked" [class.col-xl-12]="isLocked" *ngIf="!isCompleted">
+  <div class="col-12" [class.col-xl-5]="!isOrderedItemsLocked" [class.col-xl-12]="isOrderedItemsLocked" *ngIf="!isCompleted">
     <section class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body p-4 d-flex flex-column">
         <h2 class="h5 mb-3">Ordered Items</h2>
@@ -319,23 +329,23 @@
             </div>
 
             <div class="d-flex align-items-center gap-2 mt-3">
-              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="decrease(row.item.id)" [disabled]="isLocked">-</button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="decrease(row.item.id)" [disabled]="isOrderedItemsLocked">-</button>
               <input
                 type="number"
                 class="form-control form-control-sm text-center"
-                [class.is-invalid]="exceedsStock(row)"
+                [class.is-invalid]="!isOrderedItemsLocked && exceedsStock(row)"
                 style="max-width: 90px"
                 min="1"
                 step="1"
                 [max]="row.item.type === 'product' ? maxStock(row.item) : null"
                 [ngModel]="row.quantity"
                 (ngModelChange)="updateQuantity(row.item.id, $event)"
-                [disabled]="isLocked"
+                [disabled]="isOrderedItemsLocked"
               />
-              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="increase(row.item.id)" [disabled]="isLocked">+</button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="increase(row.item.id)" [disabled]="isOrderedItemsLocked">+</button>
               <div class="ms-auto fw-semibold">{{ formatMoney((itemUnitPrice(row.item) * row.quantity), row.item.currency || orderCurrency) }}</div>
             </div>
-            <div class="small text-danger mt-1" *ngIf="exceedsStock(row)">
+            <div class="small text-danger mt-1" *ngIf="!isOrderedItemsLocked && exceedsStock(row)">
               Entered quantity is higher than available stock.
             </div>
           </div>
@@ -377,31 +387,66 @@
         <button type="button" class="btn-close" (click)="closeCompleteModal()" [disabled]="saving"></button>
       </div>
       <div class="modal-body pt-3">
-        <p class="text-secondary mb-3">Provide Sales Invoice ID. This will mark the order as completed and create the sales invoice record.</p>
+        <p class="text-secondary mb-3">Provide sales invoice details. This will mark the order as completed and create the sales invoice record.</p>
         <div *ngIf="completionModalError" class="alert alert-danger py-2">{{ completionModalError }}</div>
-        <div class="row g-3">
-          <div class="col-12">
-            <label class="form-label fw-semibold">Sales Invoice ID</label>
-            <input
-              type="text"
-              class="form-control"
-              placeholder="Enter sales invoice id"
-              [(ngModel)]="completionSalesInvoiceId"
-              [disabled]="saving"
-              (keyup.enter)="confirmCompletion()"
-            />
+        <form [formGroup]="completeOrderForm" (ngSubmit)="confirmCompletion()">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Sales Invoice ID
+                <span class="text-danger" *ngIf="isCompleteFieldRequired('salesInvoiceId')">*</span>
+              </label>
+              <input
+                type="text"
+                class="form-control"
+                [class.is-invalid]="shouldShowCompleteFieldError('salesInvoiceId')"
+                placeholder="9999"
+                formControlName="salesInvoiceId"
+                inputmode="numeric"
+                maxlength="4"
+                pattern="[0-9]{4}"
+                (input)="onCompletionSalesInvoiceIdInput($event)"
+                (blur)="onCompletionSalesInvoiceIdBlur()"
+                [disabled]="saving"
+              />
+              <div class="invalid-feedback d-block" *ngIf="shouldShowCompleteFieldError('salesInvoiceId')">
+                {{ getCompleteFieldError('salesInvoiceId') }}
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Issue Date
+                <span class="text-danger" *ngIf="isCompleteFieldRequired('salesInvoiceIssueDate')">*</span>
+              </label>
+              <input
+                type="date"
+                class="form-control"
+                [class.is-invalid]="shouldShowCompleteFieldError('salesInvoiceIssueDate')"
+                formControlName="salesInvoiceIssueDate"
+                [disabled]="saving"
+              />
+              <div class="invalid-feedback d-block" *ngIf="shouldShowCompleteFieldError('salesInvoiceIssueDate')">
+                {{ getCompleteFieldError('salesInvoiceIssueDate') }}
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Due Date
+                <span class="text-danger" *ngIf="isCompleteFieldRequired('dueDate')">*</span>
+              </label>
+              <input
+                type="date"
+                class="form-control"
+                [class.is-invalid]="shouldShowCompleteFieldError('dueDate')"
+                formControlName="dueDate"
+                [disabled]="saving"
+              />
+              <div class="invalid-feedback d-block" *ngIf="shouldShowCompleteFieldError('dueDate')">
+                {{ getCompleteFieldError('dueDate') }}
+              </div>
+            </div>
           </div>
-          <div class="col-12">
-            <label class="form-label fw-semibold">Issue Date</label>
-            <input
-              type="date"
-              class="form-control"
-              [(ngModel)]="completionSalesInvoiceIssueDate"
-              [disabled]="saving"
-            />
-            <div class="form-text">Defaults to today. You can override it.</div>
-          </div>
-        </div>
+        </form>
       </div>
       <div class="modal-footer border-0 pt-0">
         <button type="button" class="btn btn-outline-secondary" (click)="closeCompleteModal()" [disabled]="saving">Cancel</button>
@@ -413,7 +458,7 @@
   </div>
 </div>
 
-<section class="card border-0 shadow-sm rounded-4 mt-2 mb-4 print-delivery-sheet" *ngIf="order && isCompleted">
+<section class="card border-0 shadow-sm rounded-4 mt-2 mb-4 print-delivery-sheet" *ngIf="order && isFinalized">
   <div class="card-body p-4 p-lg-5">
     <div class="d-flex justify-content-between align-items-start mb-4">
       <div>
@@ -475,7 +520,7 @@
   </div>
 </section>
 
-<div class="position-fixed bottom-0 end-0 p-3 p-md-4 no-print" style="z-index: 1045;" *ngIf="!isCompleted">
+<div class="position-fixed bottom-0 end-0 p-3 p-md-4 no-print" style="z-index: 1045;" *ngIf="!isFinalized">
   <button
     class="btn btn-primary btn-lg rounded-pill shadow d-inline-flex align-items-center gap-2"
     type="button"

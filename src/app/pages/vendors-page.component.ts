@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ConfirmDialogService } from '../core/confirm-dialog.service';
@@ -64,6 +64,7 @@ export class VendorsPageComponent {
   readonly isImportModalOpen = signal(false);
   readonly exporting = signal(false);
   readonly importModalError = signal('');
+  readonly vendorModalError = signal('');
   readonly countryOptions = this.buildCountryOptions();
 
   readonly message = signal('');
@@ -78,9 +79,10 @@ export class VendorsPageComponent {
     viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'vendors-page';
 
-  createVendorForm: FormGroup = this.newCreateVendorForm();
+  vendorModalMode: 'create' | 'edit' = 'create';
+  vendorFormSubmitted = false;
+  vendorForm: FormGroup = this.newVendorFormGroup();
   editingId = '';
-  editForm: Record<string, unknown> = this.newVendorForm();
   private importFile: File | null = null;
 
   get currentUserId(): string {
@@ -95,12 +97,25 @@ export class VendorsPageComponent {
     return this.organizationContext.isSuperuser();
   }
 
+  get isContextLocked(): boolean {
+    return this.isSuperuser && !this.currentOrganizationId;
+  }
+
   ngOnInit(): void {
     this.restoreTablePreferences();
     this.load();
   }
 
   load(): void {
+    if (this.isContextLocked) {
+      this.loading.set(false);
+      this.rows.set([]);
+      this.total = 0;
+      this.totalPages = 1;
+      this.page = 1;
+      this.error.set('');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
 
@@ -136,17 +151,29 @@ export class VendorsPageComponent {
   }
 
   openCreateModal(): void {
-    this.createVendorForm = this.newCreateVendorForm();
+    if (this.isContextLocked) {
+      return;
+    }
+    this.vendorModalMode = 'create';
+    this.vendorForm = this.newVendorFormGroup();
+    this.vendorFormSubmitted = false;
+    this.editingId = '';
     this.error.set('');
+    this.vendorModalError.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
   }
 
   closeCreateModal(): void {
     this.isCreateModalOpen.set(false);
+    this.vendorFormSubmitted = false;
+    this.vendorModalError.set('');
   }
 
   openImportModal(): void {
+    if (this.isContextLocked) {
+      return;
+    }
     this.importFile = null;
     this.importModalError.set('');
     this.error.set('');
@@ -166,23 +193,29 @@ export class VendorsPageComponent {
   }
 
   createVendor(): void {
+    if (this.isContextLocked) {
+      this.vendorModalError.set('Select a specific organization before creating a vendor.');
+      return;
+    }
     if (this.organizationContext.isAllOrganizationsSelected()) {
-      this.error.set('Select a specific organization before creating a vendor.');
+      this.vendorModalError.set('Select a specific organization before creating a vendor.');
       return;
     }
 
-    if (this.createVendorForm.invalid) {
-      this.createVendorForm.markAllAsTouched();
-      this.error.set('Please complete all required vendor fields.');
+    this.normalizeVendorName();
+    this.vendorFormSubmitted = true;
+    if (this.vendorForm.invalid) {
+      this.vendorForm.markAllAsTouched();
+      this.vendorModalError.set('Please complete all required vendor fields.');
       return;
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.vendorModalError.set('');
     this.message.set('');
 
-    const payload = this.buildPayload({
-      ...this.createVendorForm.getRawValue(),
+    const payload = this.buildVendorMutationPayload({
+      ...this.vendorForm.getRawValue(),
       createdBy: this.currentUserId,
       updatedBy: this.currentUserId,
     });
@@ -197,14 +230,18 @@ export class VendorsPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to create vendor.');
+        this.vendorModalError.set(err?.error?.message || 'Unable to create vendor.');
       },
     });
   }
 
   openEditModal(row: VendorRow): void {
+    if (this.isContextLocked) {
+      return;
+    }
+    this.vendorModalMode = 'edit';
     this.editingId = row.id;
-    this.editForm = {
+    this.vendorForm = this.newVendorFormGroup({
       name: row.name || '',
       legalName: row.legalName || '',
       taxId: row.taxId || '',
@@ -222,23 +259,37 @@ export class VendorsPageComponent {
       paymentTerms: row.paymentTerms || '',
       notes: row.notes || '',
       status: row.status || 'active',
-      updatedBy: this.currentUserId,
-    };
+    });
+    this.vendorFormSubmitted = false;
     this.error.set('');
+    this.vendorModalError.set('');
     this.message.set('');
     this.isEditModalOpen.set(true);
   }
 
   closeEditModal(): void {
     this.editingId = '';
-    this.editForm = this.newVendorForm();
     this.isEditModalOpen.set(false);
+    this.vendorFormSubmitted = false;
+    this.vendorModalError.set('');
   }
 
   async saveEdit(): Promise<void> {
+    if (this.isContextLocked) {
+      this.vendorModalError.set('Select a specific organization before updating vendors.');
+      return;
+    }
     if (!this.editingId) {
       return;
     }
+    this.normalizeVendorName();
+    this.vendorFormSubmitted = true;
+    if (this.vendorForm.invalid) {
+      this.vendorForm.markAllAsTouched();
+      this.vendorModalError.set('Please complete all required vendor fields.');
+      return;
+    }
+
     const confirmed = await this.confirmDialog.confirm({
       title: 'Update Vendor',
       message: 'Save changes to this vendor?',
@@ -251,11 +302,11 @@ export class VendorsPageComponent {
     }
 
     this.submitting.set(true);
-    this.error.set('');
+    this.vendorModalError.set('');
     this.message.set('');
 
-    const payload = this.buildPayload({
-      ...this.editForm,
+    const payload = this.buildVendorMutationPayload({
+      ...this.vendorForm.getRawValue(),
       updatedBy: this.currentUserId,
     });
 
@@ -268,12 +319,15 @@ export class VendorsPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.error.set(err?.error?.message || 'Unable to update vendor.');
+        this.vendorModalError.set(err?.error?.message || 'Unable to update vendor.');
       },
     });
   }
 
   async removeVendor(id: string): Promise<void> {
+    if (this.isContextLocked) {
+      return;
+    }
     const confirmed = await this.confirmDialog.confirm({
       title: 'Delete Vendor',
       message: 'Delete this vendor? This action cannot be undone.',
@@ -302,6 +356,9 @@ export class VendorsPageComponent {
   }
 
   exportVendorsCsv(): void {
+    if (this.isContextLocked) {
+      return;
+    }
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');
@@ -336,6 +393,10 @@ export class VendorsPageComponent {
   }
 
   importVendorsCsv(): void {
+    if (this.isContextLocked) {
+      this.importModalError.set('Select a specific organization before importing vendors.');
+      return;
+    }
     if (!this.importFile) {
       this.importModalError.set('Please select a CSV file to import.');
       return;
@@ -371,11 +432,17 @@ export class VendorsPageComponent {
   }
 
   setViewMode(mode: TableViewMode): void {
+    if (this.isContextLocked) {
+      return;
+    }
     this.viewMode = mode;
     this.persistTablePreferences();
   }
 
   onFilterChange(value: string): void {
+    if (this.isContextLocked) {
+      return;
+    }
     this.filter.set(value);
     this.page = 1;
     this.persistTablePreferences();
@@ -383,6 +450,9 @@ export class VendorsPageComponent {
   }
 
   onPageSizeChange(value: string): void {
+    if (this.isContextLocked) {
+      return;
+    }
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
@@ -391,7 +461,7 @@ export class VendorsPageComponent {
   }
 
   goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+    if (this.isContextLocked || page < 1 || page > this.totalPages || page === this.page || this.loading()) {
       return;
     }
     this.page = page;
@@ -460,27 +530,79 @@ export class VendorsPageComponent {
     };
   }
 
-  private newCreateVendorForm(): FormGroup {
-    const defaults = this.newVendorForm();
+  private newVendorFormGroup(initial: Partial<Record<string, unknown>> = {}): FormGroup {
+    const defaults = { ...this.newVendorForm(), ...initial };
+    const maskedTaxId = this.formatTaxId(defaults['taxId']);
     return this.fb.group({
       name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
-      legalName: [defaults['legalName'], [Validators.maxLength(180)]],
-      taxId: [defaults['taxId'], [Validators.maxLength(120)]],
-      contactPerson: [defaults['contactPerson'], [Validators.maxLength(120)]],
+      legalName: [defaults['legalName'], [Validators.maxLength(200)]],
+      taxId: [maskedTaxId, [Validators.maxLength(64)]],
+      contactPerson: [defaults['contactPerson'], [Validators.maxLength(150)]],
       contactEmail: [defaults['contactEmail'], [Validators.email]],
-      phone: [defaults['phone'], [Validators.maxLength(40)]],
+      phone: [defaults['phone'], [Validators.maxLength(50)]],
       addressLine1: [defaults['addressLine1'], [Validators.maxLength(255)]],
       addressLine2: [defaults['addressLine2'], [Validators.maxLength(255)]],
-      city: [defaults['city'], [Validators.maxLength(120)]],
-      state: [defaults['state'], [Validators.maxLength(120)]],
+      city: [defaults['city'], [Validators.maxLength(100)]],
+      state: [defaults['state'], [Validators.maxLength(100)]],
       barangay: [defaults['barangay'], [Validators.maxLength(120)]],
       province: [defaults['province'], [Validators.maxLength(120)]],
       postalCode: [defaults['postalCode'], [Validators.maxLength(20)]],
-      country: [defaults['country']],
+      country: [defaults['country'], [Validators.maxLength(100)]],
       paymentTerms: [defaults['paymentTerms'], [Validators.maxLength(120)]],
-      notes: [defaults['notes'], [Validators.maxLength(2000)]],
+      notes: [defaults['notes']],
       status: [defaults['status'], [Validators.required]],
     });
+  }
+
+  onVendorTaxIdInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+    const masked = this.formatTaxId(input.value);
+    if (input.value !== masked) {
+      input.value = masked;
+    }
+    this.vendorForm.patchValue({ taxId: masked }, { emitEvent: false });
+  }
+
+  onVendorFormInput(): void {
+    if (!this.vendorModalError()) {
+      return;
+    }
+    this.vendorModalError.set('');
+  }
+
+  getVendorControl(name: string): AbstractControl | null {
+    return this.vendorForm.get(name);
+  }
+
+  isVendorFieldRequired(name: string): boolean {
+    return Boolean(this.getVendorControl(name)?.hasValidator(Validators.required));
+  }
+
+  shouldShowVendorError(name: string): boolean {
+    const control = this.getVendorControl(name);
+    return Boolean(control?.invalid && (control.touched || control.dirty || this.vendorFormSubmitted));
+  }
+
+  vendorFieldError(name: string): string {
+    const control = this.getVendorControl(name);
+    if (!control || !this.shouldShowVendorError(name)) {
+      return '';
+    }
+    if (control.hasError('required')) {
+      if (name === 'name') return 'Name is required.';
+      if (name === 'status') return 'Status is required.';
+      return 'This field is required.';
+    }
+    if (control.hasError('email')) {
+      return 'Enter a valid email address.';
+    }
+    if (control.hasError('maxlength')) {
+      return 'Value is too long.';
+    }
+    return 'Invalid value.';
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
@@ -507,9 +629,36 @@ export class VendorsPageComponent {
     };
   }
 
+  private buildVendorMutationPayload(form: Record<string, unknown>): Record<string, unknown> {
+    const payload = this.buildPayload(form);
+    if (this.isSuperuser && this.currentOrganizationId) {
+      payload['organizationId'] = this.currentOrganizationId;
+    }
+    return payload;
+  }
+
   private optionalString(value: unknown): string | undefined {
     const cleaned = String(value || '').trim();
     return cleaned ? cleaned : undefined;
+  }
+
+  private formatTaxId(raw: unknown): string {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0, 14);
+    const p1 = digits.slice(0, 3);
+    const p2 = digits.slice(3, 6);
+    const p3 = digits.slice(6, 9);
+    const p4 = digits.slice(9, 14);
+    return [p1, p2, p3, p4].filter(Boolean).join('-');
+  }
+
+  private normalizeVendorName(): void {
+    const control = this.vendorForm.get('name');
+    if (!control) {
+      return;
+    }
+    const normalized = String(control.value || '').replace(/\s+/g, ' ').trim();
+    control.setValue(normalized, { emitEvent: false });
+    control.updateValueAndValidity({ emitEvent: false });
   }
 
   private buildCountryOptions(): string[] {

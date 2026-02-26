@@ -162,8 +162,19 @@ export class ExpensesPageComponent {
     return this.organizationContext.isSuperuser();
   }
 
+  get hasOrganizationContext(): boolean {
+    return Boolean(this.currentOrganizationId.trim());
+  }
+
+  get isContextLocked(): boolean {
+    return this.isSuperuser && !this.hasOrganizationContext;
+  }
+
+  showOrganizationWarningModal = false;
+
   ngOnInit(): void {
     this.restoreTablePreferences();
+    this.showOrganizationWarningModal = this.isContextLocked;
     this.loadWithholdingTaxTypes();
     this.load();
     this.vendorSearchSub = this.vendorSearchInput$
@@ -202,11 +213,24 @@ export class ExpensesPageComponent {
       });
   }
 
+  closeOrganizationWarningModal(): void {
+    this.showOrganizationWarningModal = false;
+  }
+
   ngOnDestroy(): void {
     this.vendorSearchSub?.unsubscribe();
   }
 
   load(resetPage = false): void {
+    if (this.isContextLocked) {
+      this.loading.set(false);
+      this.rows.set([]);
+      this.total = 0;
+      this.totalPages = 1;
+      this.page = 1;
+      this.error.set('');
+      return;
+    }
     if (!this.currentOrganizationId && !this.organizationContext.isAllOrganizationsSelected()) {
       this.error.set('Logged in user has no organization assigned.');
       this.rows.set([]);
@@ -286,6 +310,7 @@ export class ExpensesPageComponent {
   }
 
   openCreateModal(): void {
+    if (this.isContextLocked) return;
     this.createExpenseForm = this.newCreateExpenseForm();
     this.loadWithholdingTaxTypes();
     this.vendorSearch.set('');
@@ -317,6 +342,7 @@ export class ExpensesPageComponent {
   }
 
   openImportModal(): void {
+    if (this.isContextLocked) return;
     this.importFile = null;
     this.importModalError.set('');
     this.message.set('');
@@ -331,6 +357,10 @@ export class ExpensesPageComponent {
   }
 
   createExpense(): void {
+    if (this.isContextLocked) {
+      this.createModalError.set('Select a specific organization before creating an expense.');
+      return;
+    }
     if (!this.currentOrganizationId) {
       if (this.organizationContext.isAllOrganizationsSelected()) {
         this.createModalError.set('Select a specific organization before creating an expense.');
@@ -388,6 +418,7 @@ export class ExpensesPageComponent {
   }
 
   startEdit(row: ExpenseRow): void {
+    if (this.isContextLocked) return;
     this.loadWithholdingTaxTypes();
     this.editingId = row.id;
     this.editForm = {
@@ -421,6 +452,7 @@ export class ExpensesPageComponent {
   }
 
   async saveEdit(): Promise<void> {
+    if (this.isContextLocked) return;
     if (!this.editingId) return;
     const confirmed = await this.confirmDialog.confirm({
       title: 'Update Expense',
@@ -454,6 +486,7 @@ export class ExpensesPageComponent {
   }
 
   async removeExpense(id: string): Promise<void> {
+    if (this.isContextLocked) return;
     const confirmed = await this.confirmDialog.confirm({
       title: 'Delete Expense',
       message: 'Delete this expense? This action cannot be undone.',
@@ -482,17 +515,20 @@ export class ExpensesPageComponent {
   }
 
   setViewMode(mode: TableViewMode): void {
+    if (this.isContextLocked) return;
     this.viewMode = mode;
     this.persistTablePreferences();
   }
 
   applyFilters(): void {
+    if (this.isContextLocked) return;
     this.page = 1;
     this.persistTablePreferences();
     this.load();
   }
 
   clearFilters(): void {
+    if (this.isContextLocked) return;
     this.searchQuery = '';
     this.statusFilter = '';
     this.paymentMethodFilter = '';
@@ -504,6 +540,7 @@ export class ExpensesPageComponent {
   }
 
   onPageSizeChange(value: string): void {
+    if (this.isContextLocked) return;
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
@@ -512,7 +549,7 @@ export class ExpensesPageComponent {
   }
 
   goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+    if (this.isContextLocked || page < 1 || page > this.totalPages || page === this.page || this.loading()) {
       return;
     }
     this.page = page;
@@ -557,6 +594,7 @@ export class ExpensesPageComponent {
   }
 
   onVendorSearchChange(value: string): void {
+    if (this.isContextLocked) return;
     const query = String(value || '');
     this.vendorSearch.set(query);
     if (!query.trim()) {
@@ -568,6 +606,7 @@ export class ExpensesPageComponent {
   }
 
   selectVendor(vendor: VendorOption): void {
+    if (this.isContextLocked) return;
     this.selectedCreateVendor.set(vendor);
     this.createExpenseForm.patchValue({
       vendorId: vendor.id,
@@ -580,6 +619,7 @@ export class ExpensesPageComponent {
   }
 
   clearSelectedVendor(): void {
+    if (this.isContextLocked) return;
     this.selectedCreateVendor.set(null);
     this.createExpenseForm.patchValue({
       vendorId: '',
@@ -592,17 +632,20 @@ export class ExpensesPageComponent {
   }
 
   openInlineVendorCreate(): void {
+    if (this.isContextLocked) return;
     this.showInlineVendorCreate.set(true);
     this.vendorCreateError.set('');
     this.vendorCreateForm = this.newVendorForm();
   }
 
   cancelInlineVendorCreate(): void {
+    if (this.isContextLocked) return;
     this.showInlineVendorCreate.set(false);
     this.vendorCreateError.set('');
   }
 
   createVendorFromInline(): void {
+    if (this.isContextLocked) return;
     if (!this.currentOrganizationId) {
       this.vendorCreateError.set('Select a specific organization first.');
       return;
@@ -669,6 +712,10 @@ export class ExpensesPageComponent {
   }
 
   importExpensesCsv(): void {
+    if (this.isContextLocked) {
+      this.importModalError.set('Select a specific organization before importing expenses.');
+      return;
+    }
     if (!this.importFile) {
       this.importModalError.set('Please select a CSV file to import.');
       return;
@@ -713,6 +760,7 @@ export class ExpensesPageComponent {
   }
 
   exportExpensesCsv(): void {
+    if (this.isContextLocked) return;
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');

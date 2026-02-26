@@ -128,6 +128,16 @@ export class ReportsPageComponent {
     return this.auth.hasPermission('reports.delete');
   }
 
+  get hasOrganizationContext(): boolean {
+    return Boolean(this.organizationContext.getActiveOrganizationId().trim());
+  }
+
+  get isContextLocked(): boolean {
+    return this.isSuperuser && !this.hasOrganizationContext;
+  }
+
+  showOrganizationWarningModal = false;
+
   private get orgParamValue(): string {
     const organizationId = this.organizationContext.getActiveOrganizationId();
     if (!organizationId) {
@@ -141,11 +151,16 @@ export class ReportsPageComponent {
 
   ngOnInit(): void {
     this.restoreTablePreferences();
+    this.showOrganizationWarningModal = this.isContextLocked;
     if (this.isSuperuser) {
       this.loadOrganizations();
     }
     this.loadSalesReports();
     this.loadExpenseReports();
+  }
+
+  closeOrganizationWarningModal(): void {
+    this.showOrganizationWarningModal = false;
   }
 
   private loadOrganizations(): void {
@@ -174,6 +189,16 @@ export class ReportsPageComponent {
   }
 
   loadSalesReports(): void {
+    if (this.isContextLocked) {
+      this.loadingSales.set(false);
+      this.salesRows.set([]);
+      this.latestSalesReport.set(null);
+      this.salesTotal = 0;
+      this.salesTotalPages = 1;
+      this.salesPage = 1;
+      this.salesError.set('');
+      return;
+    }
     this.loadingSales.set(true);
     this.salesError.set('');
 
@@ -209,6 +234,16 @@ export class ReportsPageComponent {
   }
 
   loadExpenseReports(): void {
+    if (this.isContextLocked) {
+      this.loadingExpenses.set(false);
+      this.expenseRows.set([]);
+      this.latestExpenseReport.set(null);
+      this.expenseTotal = 0;
+      this.expenseTotalPages = 1;
+      this.expensePage = 1;
+      this.expenseError.set('');
+      return;
+    }
     this.loadingExpenses.set(true);
     this.expenseError.set('');
 
@@ -244,6 +279,7 @@ export class ReportsPageComponent {
   }
 
   generateQuarterlySalesReport(): void {
+    if (this.isContextLocked) return;
     this.generatingSales.set(true);
     this.salesError.set('');
     this.salesMessage.set('');
@@ -273,6 +309,7 @@ export class ReportsPageComponent {
   }
 
   generateQuarterlyExpenseReport(): void {
+    if (this.isContextLocked) return;
     this.generatingExpenses.set(true);
     this.expenseError.set('');
     this.expenseMessage.set('');
@@ -302,6 +339,7 @@ export class ReportsPageComponent {
   }
 
   onFilterChange(): void {
+    if (this.isContextLocked) return;
     this.salesPage = 1;
     this.expensePage = 1;
     this.persistTablePreferences();
@@ -310,6 +348,7 @@ export class ReportsPageComponent {
   }
 
   onSalesPageSizeChange(value: string): void {
+    if (this.isContextLocked) return;
     const parsed = Number(value);
     this.salesPageSize = Number.isFinite(parsed) ? parsed : 20;
     this.salesPage = 1;
@@ -318,6 +357,7 @@ export class ReportsPageComponent {
   }
 
   onExpensePageSizeChange(value: string): void {
+    if (this.isContextLocked) return;
     const parsed = Number(value);
     this.expensePageSize = Number.isFinite(parsed) ? parsed : 20;
     this.expensePage = 1;
@@ -326,12 +366,13 @@ export class ReportsPageComponent {
   }
 
   setViewMode(mode: TableViewMode): void {
+    if (this.isContextLocked) return;
     this.viewMode = mode;
     this.persistTablePreferences();
   }
 
   goToSalesPage(page: number): void {
-    if (page < 1 || page > this.salesTotalPages || page === this.salesPage || this.loadingSales()) {
+    if (this.isContextLocked || page < 1 || page > this.salesTotalPages || page === this.salesPage || this.loadingSales()) {
       return;
     }
     this.salesPage = page;
@@ -340,7 +381,7 @@ export class ReportsPageComponent {
   }
 
   goToExpensePage(page: number): void {
-    if (page < 1 || page > this.expenseTotalPages || page === this.expensePage || this.loadingExpenses()) {
+    if (this.isContextLocked || page < 1 || page > this.expenseTotalPages || page === this.expensePage || this.loadingExpenses()) {
       return;
     }
     this.expensePage = page;
@@ -349,6 +390,7 @@ export class ReportsPageComponent {
   }
 
   async deleteSalesReport(id: string): Promise<void> {
+    if (this.isContextLocked) return;
     const reportId = String(id || '').trim();
     if (!reportId) {
       return;
@@ -381,6 +423,7 @@ export class ReportsPageComponent {
   }
 
   async deleteExpenseReport(id: string): Promise<void> {
+    if (this.isContextLocked) return;
     const reportId = String(id || '').trim();
     if (!reportId) {
       return;

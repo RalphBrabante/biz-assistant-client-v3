@@ -107,12 +107,36 @@ export class SalesInvoicesPageComponent {
     return this.organizationContext.isSuperuser();
   }
 
+  get hasOrganizationContext(): boolean {
+    return Boolean(this.currentOrganizationId.trim());
+  }
+
+  get isContextLocked(): boolean {
+    return this.isSuperuser && !this.hasOrganizationContext;
+  }
+
+  showOrganizationWarningModal = false;
+
   ngOnInit(): void {
     this.restoreTablePreferences();
+    this.showOrganizationWarningModal = this.isContextLocked;
     this.load();
   }
 
+  closeOrganizationWarningModal(): void {
+    this.showOrganizationWarningModal = false;
+  }
+
   load(): void {
+    if (this.isContextLocked) {
+      this.loading.set(false);
+      this.rows.set([]);
+      this.total = 0;
+      this.totalPages = 1;
+      this.page = 1;
+      this.error.set('');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     const params = new URLSearchParams({
@@ -163,6 +187,7 @@ export class SalesInvoicesPageComponent {
   }
 
   openCreateModal(): void {
+    if (this.isContextLocked) return;
     this.createInvoiceForm = this.newCreateInvoiceForm();
     this.error.set('');
     this.message.set('');
@@ -174,6 +199,7 @@ export class SalesInvoicesPageComponent {
   }
 
   openImportModal(): void {
+    if (this.isContextLocked) return;
     this.importFile = null;
     this.forceImport = false;
     this.importModalError.set('');
@@ -190,6 +216,10 @@ export class SalesInvoicesPageComponent {
   }
 
   createInvoice(): void {
+    if (this.isContextLocked) {
+      this.error.set('Select a specific organization before creating a sales invoice.');
+      return;
+    }
     if (!this.currentOrganizationId.trim()) {
       if (this.organizationContext.isAllOrganizationsSelected()) {
         this.error.set('Select a specific organization before creating a sales invoice.');
@@ -234,6 +264,10 @@ export class SalesInvoicesPageComponent {
   }
 
   importSalesInvoicesCsv(): void {
+    if (this.isContextLocked) {
+      this.importModalError.set('Select a specific organization before importing sales invoices.');
+      return;
+    }
     if (!this.importFile) {
       this.importModalError.set('Please select a CSV file to import.');
       return;
@@ -292,6 +326,7 @@ export class SalesInvoicesPageComponent {
   }
 
   exportSalesInvoicesCsv(): void {
+    if (this.isContextLocked) return;
     this.exporting.set(true);
     this.error.set('');
     this.message.set('');
@@ -340,6 +375,7 @@ export class SalesInvoicesPageComponent {
   }
 
   async removeInvoice(id: string): Promise<void> {
+    if (this.isContextLocked) return;
     const confirmed = await this.confirmDialog.confirm({
       title: 'Delete Sales Invoice',
       message: 'Delete this sales invoice? This action cannot be undone.',
@@ -368,17 +404,20 @@ export class SalesInvoicesPageComponent {
   }
 
   setViewMode(mode: TableViewMode): void {
+    if (this.isContextLocked) return;
     this.viewMode = mode;
     this.persistTablePreferences();
   }
 
   onFilterChange(): void {
+    if (this.isContextLocked) return;
     this.page = 1;
     this.persistTablePreferences();
     this.load();
   }
 
   setSort(value: string): void {
+    if (this.isContextLocked) return;
     this.sortBy = String(value || 'createdAt');
     this.page = 1;
     this.persistTablePreferences();
@@ -386,6 +425,7 @@ export class SalesInvoicesPageComponent {
   }
 
   toggleSortDirection(): void {
+    if (this.isContextLocked) return;
     this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
     this.page = 1;
     this.persistTablePreferences();
@@ -393,6 +433,7 @@ export class SalesInvoicesPageComponent {
   }
 
   clearFilters(): void {
+    if (this.isContextLocked) return;
     this.searchQuery = '';
     this.statusFilter = '';
     this.paymentStatusFilter = '';
@@ -406,6 +447,7 @@ export class SalesInvoicesPageComponent {
   }
 
   onPageSizeChange(value: string): void {
+    if (this.isContextLocked) return;
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;
     this.page = 1;
@@ -414,7 +456,7 @@ export class SalesInvoicesPageComponent {
   }
 
   goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages || page === this.page || this.loading()) {
+    if (this.isContextLocked || page < 1 || page > this.totalPages || page === this.page || this.loading()) {
       return;
     }
     this.page = page;
