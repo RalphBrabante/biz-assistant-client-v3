@@ -1,0 +1,295 @@
+<div *ngIf="isContextLocked" class="alert alert-warning d-flex align-items-center gap-2">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <span>Select a specific organization from context to enable this page.</span>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="showOrganizationWarningModal"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="showOrganizationWarningModal ? 'block' : 'none'"
+  [attr.aria-hidden]="!showOrganizationWarningModal"
+  *ngIf="showOrganizationWarningModal"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+          Select Organization Context
+        </h5>
+        <button type="button" class="btn-close" (click)="closeOrganizationWarningModal()"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-2 d-flex align-items-start gap-2">
+          <i class="bi bi-info-circle text-primary mt-1"></i>
+          <span>You are in <strong>All Organizations</strong> mode. This page requires a specific organization context.</span>
+        </p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-primary" (click)="closeOrganizationWarningModal()">
+          <i class="bi bi-check2-circle me-1"></i>I Understand
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div [attr.inert]="isContextLocked ? '' : null" [class.opacity-50]="isContextLocked">
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4 p-lg-5 role-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-2">Sales</div>
+        <h1 class="h3 mb-2">Customers</h1>
+        <p class="text-secondary mb-0">Manage customer profiles, tax IDs, and billing details.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <div class="btn-group table-actions-menu">
+          <button
+            class="btn btn-outline-dark dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            appTooltip
+            title="Table actions"
+          >
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="load()" [disabled]="loading()">
+                <i class="bi bi-arrow-clockwise"></i>
+                <span>{{ loading() ? 'Refreshing...' : 'Refresh' }}</span>
+              </button>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li class="dropdown-header text-uppercase small">CSV</li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="exportCustomersCsv()" [disabled]="exporting()">
+                <i class="bi bi-download"></i>
+                <span>{{ exporting() ? 'Exporting...' : 'Export CSV' }}</span>
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="openImportModal()">
+                <i class="bi bi-upload"></i>
+                <span>Import CSV</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+        <button class="btn btn-primary" (click)="openCreateModal()"><i class="bi bi-plus-lg me-1"></i>Create Customer</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <div class="row g-3 align-items-center">
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">Filter customers</label>
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Search by name, tax ID, code, email, organization"
+          [ngModel]="filter()"
+          (ngModelChange)="onFilterChange($event)"
+        />
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label fw-semibold">Rows per page</label>
+        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view">
+            <i class="bi bi-table"></i>
+          </button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view">
+            <i class="bi bi-grid-3x2-gap"></i>
+          </button>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Total Customers</div>
+          <div class="stat-value">{{ total }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="stat-chip">
+          <div class="stat-label">Page</div>
+          <div class="stat-value">{{ page }} / {{ totalPages }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
+    <div *ngIf="error()" class="alert alert-danger mt-3 mb-0">{{ error() }}</div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="table-responsive table-view-wrapper" [ngClass]="{ 'table-card-view': viewMode === 'card' }">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th *ngIf="isSuperuser">Organization</th>
+          <th>Name</th>
+          <th>Code</th>
+          <th>Tax ID</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Active</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="!loading() && filteredRows().length === 0">
+          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center text-secondary py-4">No customers found.</td>
+        </tr>
+
+        <tr *ngFor="let row of filteredRows(); trackBy: trackById">
+          <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
+          <td class="fw-semibold">{{ row.name }}</td>
+          <td>{{ row.customerCode || '-' }}</td>
+          <td>{{ row.taxId }}</td>
+          <td>{{ row.email || '-' }}</td>
+          <td>
+            <span class="badge rounded-pill" [ngClass]="customerStatusBadgeClass(row.status)">
+              {{ row.status || '-' }}
+            </span>
+          </td>
+          <td>
+            <span class="badge rounded-pill" [ngClass]="customerActiveBadgeClass(row.isActive)">
+              {{ row.isActive ? 'Yes' : 'No' }}
+            </span>
+          </td>
+          <td class="text-end">
+            <div class="table-actions-inline">
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="openEditModal(row)" appTooltip title="Edit">
+                <i class="bi bi-pencil-square"></i>
+              </button>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                type="button"
+                [disabled]="deletingId() === row.id"
+                (click)="removeCustomer(row.id)"
+                appTooltip
+                title="Delete"
+              >
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+    <div class="small text-secondary">Showing {{ rows().length }} of {{ total }} customers</div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(1)" [disabled]="loading() || page <= 1">First</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page - 1)" [disabled]="loading() || page <= 1">Prev</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(page + 1)" [disabled]="loading() || page >= totalPages">Next</button>
+      <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPage(totalPages)" [disabled]="loading() || page >= totalPages">Last</button>
+    </div>
+  </div>
+</section>
+
+<div class="modal-backdrop fade show" *ngIf="isCreateModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isCreateModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isCreateModalOpen()"
+  *ngIf="isCreateModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Create Customer</h5>
+        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div *ngIf="createModalError()" class="alert alert-danger mb-3">{{ createModalError() }}</div>
+        <form [formGroup]="createCustomerForm" (ngSubmit)="createCustomer()" novalidate>
+          <app-customer-form-fields [form]="createCustomerForm" [countryOptions]="countryOptions" (taxIdInput)="onCreateTaxIdInput($event)"></app-customer-form-fields>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="createCustomer()">
+          {{ submitting() ? 'Creating...' : 'Create Customer' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="isImportModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isImportModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isImportModalOpen()"
+  *ngIf="isImportModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Import Customers CSV</h5>
+        <button type="button" class="btn-close" (click)="closeImportModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div class="small text-secondary mb-2">Required columns: <code>name</code>, <code>taxId</code></div>
+        <div class="small text-secondary mb-3">
+          Optional columns: customerCode, type, legalName, contactPerson, email, phone, mobile, addressLine1, addressLine2, city, state, postalCode, country, creditLimit, paymentTermsDays, status, isActive, notes
+        </div>
+        <input type="file" class="form-control" accept=".csv,text/csv" (change)="onImportFileChange($event)" />
+        <div *ngIf="importModalError()" class="alert alert-danger py-2 mt-3 mb-0">{{ importModalError() }}</div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeImportModal()">Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="importCustomersCsv()">
+          {{ submitting() ? 'Importing...' : 'Import Customers' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="isEditModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isEditModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isEditModalOpen()"
+  *ngIf="isEditModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Edit Customer</h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div *ngIf="editModalError()" class="alert alert-danger mb-3">{{ editModalError() }}</div>
+        <form [formGroup]="editCustomerForm" (ngSubmit)="saveEdit()" novalidate>
+          <app-customer-form-fields [form]="editCustomerForm" [countryOptions]="countryOptions" (taxIdInput)="onEditTaxIdInput($event)"></app-customer-form-fields>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeEditModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
+          {{ submitting() ? 'Saving...' : 'Save Customer' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
