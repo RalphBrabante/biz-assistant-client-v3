@@ -35,6 +35,7 @@ export class VendorFormFieldsComponent {
     }
     if (control.hasError('required')) {
       if (name === 'name') return 'Name is required.';
+      if (name === 'category') return 'Category is required.';
       if (name === 'status') return 'Status is required.';
       return 'This field is required.';
     }

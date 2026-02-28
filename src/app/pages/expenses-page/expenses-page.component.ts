@@ -65,6 +65,7 @@ interface ExpenseRow {
 interface VendorOption {
   id: string;
   name: string;
+  category?: string;
   legalName?: string;
   taxId?: string;
   status?: string;
@@ -680,6 +681,7 @@ export class ExpensesPageComponent {
           this.selectVendor({
             id: created.id,
             name: createdVendorName,
+            category: created.category,
             legalName: created.legalName,
             taxId: created.taxId,
             status: created.status,
@@ -860,6 +862,7 @@ export class ExpensesPageComponent {
       vendorId: '',
       vendorTaxId: '',
       expenseNumber: '',
+      applyVat: false,
       vatExemptAmount: 0,
       withholdingTaxTypeId: '',
       category: '',
@@ -883,6 +886,7 @@ export class ExpensesPageComponent {
         vendorId: ['', [Validators.required]],
         vendorTaxId: [''],
         expenseNumber: [''],
+        applyVat: [false],
         vatExemptAmount: [0, [Validators.required, Validators.min(0)]],
         withholdingTaxTypeId: [''],
         category: ['', [Validators.required, Validators.maxLength(120)]],
@@ -915,6 +919,10 @@ export class ExpensesPageComponent {
   }
 
   private vatExemptNotGreaterThanAmountValidator(control: AbstractControl): ValidationErrors | null {
+    const applyVat = Boolean(control.get('applyVat')?.value);
+    if (!applyVat) {
+      return null;
+    }
     const amount = Number(control.get('amount')?.value ?? 0);
     const vatExemptAmount = Number(control.get('vatExemptAmount')?.value ?? 0);
     if (!Number.isFinite(amount) || !Number.isFinite(vatExemptAmount)) {
@@ -929,6 +937,7 @@ export class ExpensesPageComponent {
   private newVendorCreateForm(): FormGroup {
     return this.fb.group({
       name: ['', [Validators.required, Validators.maxLength(120)]],
+      category: ['others', [Validators.required]],
       legalName: ['', [Validators.maxLength(120)]],
       taxId: ['', [Validators.required, Validators.pattern(/^\d{3}-\d{3}-\d{3}-\d{5}$/)]],
       contactPerson: ['', [Validators.maxLength(120)]],
@@ -964,12 +973,13 @@ export class ExpensesPageComponent {
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
+    const applyVat = Boolean(form['applyVat']);
     return {
       organizationId: this.optionalString(form['organizationId']),
       vendorId: this.optionalString(form['vendorId']),
       vendorTaxId: this.optionalString(form['vendorTaxId']),
       expenseNumber: this.optionalString(form['expenseNumber']),
-      vatExemptAmount: this.optionalNumber(form['vatExemptAmount']),
+      vatExemptAmount: applyVat ? this.optionalNumber(form['vatExemptAmount']) : 0,
       withholdingTaxTypeId: this.optionalString(form['withholdingTaxTypeId']),
       category: this.optionalString(form['category']),
       description: this.optionalString(form['description']),
@@ -983,6 +993,19 @@ export class ExpensesPageComponent {
       createdBy: this.optionalString(form['createdBy']),
       updatedBy: this.optionalString(form['updatedBy']),
     };
+  }
+
+  onApplyVatChange(checked: boolean): void {
+    const control = this.createExpenseForm.get('vatExemptAmount');
+    if (!control) {
+      return;
+    }
+    if (!checked) {
+      control.setValue(0);
+      control.markAsUntouched();
+      control.updateValueAndValidity();
+      this.createExpenseForm.updateValueAndValidity();
+    }
   }
 
   private optionalString(value: unknown): string | undefined {

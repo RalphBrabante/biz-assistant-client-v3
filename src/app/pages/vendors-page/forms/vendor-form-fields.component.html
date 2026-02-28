@@ -8,6 +8,18 @@
     <div class="invalid-feedback d-block" *ngIf="shouldShowError('name')">{{ fieldError('name') }}</div>
   </div>
   <div class="col-12 col-md-4">
+    <label class="form-label fw-semibold">
+      Category
+      <span class="text-danger" *ngIf="isFieldRequired('category')">*</span>
+    </label>
+    <select class="form-select" formControlName="category" [class.is-invalid]="shouldShowError('category')">
+      <option value="goods">Goods</option>
+      <option value="operations">Operations</option>
+      <option value="others">Others</option>
+    </select>
+    <div class="invalid-feedback d-block" *ngIf="shouldShowError('category')">{{ fieldError('category') }}</div>
+  </div>
+  <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Legal Name</label>
     <input class="form-control" formControlName="legalName" [class.is-invalid]="shouldShowError('legalName')" />
     <div class="invalid-feedback d-block" *ngIf="shouldShowError('legalName')">{{ fieldError('legalName') }}</div>

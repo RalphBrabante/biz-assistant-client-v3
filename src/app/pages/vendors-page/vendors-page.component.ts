@@ -15,6 +15,7 @@ interface VendorRow {
   id: string;
   organizationId: string;
   name: string;
+  category?: string;
   legalName?: string;
   taxId?: string;
   contactPerson?: string;
@@ -244,6 +245,7 @@ export class VendorsPageComponent {
     this.editingId = row.id;
     this.vendorForm = this.newVendorFormGroup({
       name: row.name || '',
+      category: row.category || 'others',
       legalName: row.legalName || '',
       taxId: row.taxId || '',
       contactPerson: row.contactPerson || '',
@@ -510,6 +512,7 @@ export class VendorsPageComponent {
   private newVendorForm(): Record<string, unknown> {
     return {
       name: '',
+      category: 'others',
       legalName: '',
       taxId: '',
       contactPerson: '',
@@ -536,6 +539,7 @@ export class VendorsPageComponent {
     const maskedTaxId = this.formatTaxId(defaults['taxId']);
     return this.fb.group({
       name: [defaults['name'], [Validators.required, Validators.maxLength(180)]],
+      category: [defaults['category'], [Validators.required]],
       legalName: [defaults['legalName'], [Validators.maxLength(200)]],
       taxId: [maskedTaxId, [Validators.maxLength(64)]],
       contactPerson: [defaults['contactPerson'], [Validators.maxLength(150)]],
@@ -577,6 +581,7 @@ export class VendorsPageComponent {
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
     return {
       name: this.optionalString(form['name']),
+      category: this.optionalString(form['category']),
       legalName: this.optionalString(form['legalName']),
       taxId: this.optionalString(form['taxId']),
       contactPerson: this.optionalString(form['contactPerson']),
