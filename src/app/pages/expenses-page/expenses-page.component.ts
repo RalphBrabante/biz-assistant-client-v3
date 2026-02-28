@@ -113,7 +113,7 @@ export class ExpensesPageComponent {
   readonly withholdingTaxTypes = signal<WithholdingTaxTypeOption[]>([]);
   readonly vendorSearch = signal('');
   readonly selectedCreateVendor = signal<VendorOption | null>(null);
-  readonly showInlineVendorCreate = signal(false);
+  readonly isVendorCreateModalOpen = signal(false);
   readonly creatingVendor = signal(false);
   readonly vendorCreateError = signal('');
   readonly createFileName = signal('');
@@ -138,7 +138,7 @@ export class ExpensesPageComponent {
   readonly pageSizeOptions = [10, 20, 50, 100];
 
   createExpenseForm: FormGroup = this.newCreateExpenseForm();
-  vendorCreateForm: Record<string, unknown> = this.newVendorForm();
+  vendorCreateForm: FormGroup = this.newVendorCreateForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newExpenseForm();
   private readonly vendorSearchInput$ = new Subject<string>();
@@ -316,11 +316,11 @@ export class ExpensesPageComponent {
     this.vendorSearch.set('');
     this.selectedCreateVendor.set(null);
     this.vendors.set([]);
-    this.showInlineVendorCreate.set(false);
+    this.isVendorCreateModalOpen.set(false);
     this.vendorCreateError.set('');
     this.createFile = null;
     this.createFileName.set('');
-    this.vendorCreateForm = this.newVendorForm();
+    this.vendorCreateForm = this.newVendorCreateForm();
     this.loadingVendors.set(false);
     this.error.set('');
     this.createModalError.set('');
@@ -333,12 +333,12 @@ export class ExpensesPageComponent {
     this.vendorSearch.set('');
     this.selectedCreateVendor.set(null);
     this.vendors.set([]);
-    this.showInlineVendorCreate.set(false);
+    this.isVendorCreateModalOpen.set(false);
     this.vendorCreateError.set('');
     this.createModalError.set('');
     this.createFile = null;
     this.createFileName.set('');
-    this.vendorCreateForm = this.newVendorForm();
+    this.vendorCreateForm = this.newVendorCreateForm();
   }
 
   openImportModal(): void {
@@ -631,23 +631,31 @@ export class ExpensesPageComponent {
     this.vendors.set([]);
   }
 
-  openInlineVendorCreate(): void {
+  openVendorCreateModal(): void {
     if (this.isContextLocked) return;
-    this.showInlineVendorCreate.set(true);
     this.vendorCreateError.set('');
-    this.vendorCreateForm = this.newVendorForm();
+    this.vendorCreateForm = this.newVendorCreateForm();
+    this.isVendorCreateModalOpen.set(true);
   }
 
-  cancelInlineVendorCreate(): void {
+  closeVendorCreateModal(): void {
     if (this.isContextLocked) return;
-    this.showInlineVendorCreate.set(false);
+    if (this.creatingVendor()) {
+      return;
+    }
+    this.isVendorCreateModalOpen.set(false);
     this.vendorCreateError.set('');
   }
 
-  createVendorFromInline(): void {
+  createVendorFromModal(): void {
     if (this.isContextLocked) return;
     if (!this.currentOrganizationId) {
       this.vendorCreateError.set('Select a specific organization first.');
+      return;
+    }
+    if (this.vendorCreateForm.invalid) {
+      this.vendorCreateForm.markAllAsTouched();
+      this.vendorCreateError.set('Please complete all required vendor fields.');
       return;
     }
 
@@ -655,7 +663,7 @@ export class ExpensesPageComponent {
     this.vendorCreateError.set('');
 
     const payload = {
-      ...this.vendorCreateForm,
+      ...this.vendorCreateForm.getRawValue(),
       organizationId: this.currentOrganizationId,
       createdBy: this.currentUserId,
       updatedBy: this.currentUserId,
@@ -666,14 +674,18 @@ export class ExpensesPageComponent {
         this.creatingVendor.set(false);
         const created = response.data;
         if (created?.id) {
+          const createdVendorName =
+            String(created.name || '').trim() ||
+            String(this.vendorCreateForm.get('name')?.value || '').trim();
           this.selectVendor({
             id: created.id,
-            name: created.name || '',
+            name: createdVendorName,
             legalName: created.legalName,
             taxId: created.taxId,
             status: created.status,
           });
-          this.showInlineVendorCreate.set(false);
+          this.closeVendorCreateModal();
+          this.message.set('Vendor created and selected.');
         }
       },
       error: (err) => {
@@ -831,6 +843,17 @@ export class ExpensesPageComponent {
     return !!this.createExpenseForm.errors?.[errorCode];
   }
 
+  vendorCreateControlHasError(controlName: string, errorCode?: string): boolean {
+    const control = this.vendorCreateForm.get(controlName);
+    if (!control || !(control.touched || control.dirty)) {
+      return false;
+    }
+    if (!errorCode) {
+      return control.invalid;
+    }
+    return !!control.errors?.[errorCode];
+  }
+
   private newExpenseForm(): Record<string, unknown> {
     return {
       organizationId: '',
@@ -903,26 +926,41 @@ export class ExpensesPageComponent {
     return null;
   }
 
-  private newVendorForm(): Record<string, unknown> {
-    return {
-      name: '',
-      legalName: '',
-      taxId: '',
-      contactPerson: '',
-      contactEmail: '',
-      phone: '',
-      addressLine1: '',
-      addressLine2: '',
-      city: '',
-      state: '',
-      barangay: '',
-      province: '',
-      postalCode: '',
-      country: 'United States',
-      paymentTerms: '',
-      status: 'active',
-      notes: '',
-    };
+  private newVendorCreateForm(): FormGroup {
+    return this.fb.group({
+      name: ['', [Validators.required, Validators.maxLength(120)]],
+      legalName: ['', [Validators.maxLength(120)]],
+      taxId: ['', [Validators.required, Validators.pattern(/^\d{3}-\d{3}-\d{3}-\d{5}$/)]],
+      contactPerson: ['', [Validators.maxLength(120)]],
+      contactEmail: ['', [Validators.email, Validators.maxLength(120)]],
+      phone: ['', [Validators.maxLength(50)]],
+      addressLine1: ['', [Validators.maxLength(255)]],
+      addressLine2: ['', [Validators.maxLength(255)]],
+      city: ['', [Validators.maxLength(120)]],
+      state: ['', [Validators.maxLength(120)]],
+      barangay: ['', [Validators.maxLength(120)]],
+      province: ['', [Validators.maxLength(120)]],
+      postalCode: ['', [Validators.maxLength(50)]],
+      country: ['United States', [Validators.maxLength(100)]],
+      paymentTerms: ['', [Validators.maxLength(120)]],
+      status: ['active', [Validators.required]],
+      notes: ['', [Validators.maxLength(2000)]],
+    });
+  }
+
+  onVendorTaxIdInput(value: string): void {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 14);
+    const parts = [
+      digits.slice(0, 3),
+      digits.slice(3, 6),
+      digits.slice(6, 9),
+      digits.slice(9, 14),
+    ].filter((part) => part.length > 0);
+    const masked = parts.join('-');
+
+    this.vendorCreateForm.patchValue({ taxId: masked }, { emitEvent: false });
+    this.vendorCreateForm.get('taxId')?.markAsTouched();
+    this.vendorCreateForm.get('taxId')?.updateValueAndValidity();
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

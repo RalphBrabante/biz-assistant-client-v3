@@ -27,7 +27,10 @@
 <div *ngIf="isRefunded" class="alert alert-danger">
   This order is refunded. Editing is disabled.
 </div>
-<div *ngIf="!isCompleted && isLocked" class="alert alert-warning no-print">
+<div *ngIf="isCancelled" class="alert alert-warning">
+  This order is cancelled. Editing is disabled.
+</div>
+<div *ngIf="!isFinalized && isLocked" class="alert alert-warning no-print">
   Status is set to completed. Fields are locked; save to finalize completion.
 </div>
 
@@ -310,7 +313,7 @@
     </section>
   </div>
 
-  <div class="col-12" [class.col-xl-5]="!isOrderedItemsLocked" [class.col-xl-12]="isOrderedItemsLocked" *ngIf="!isCompleted">
+  <div class="col-12" [class.col-xl-5]="!isOrderedItemsLocked" [class.col-xl-12]="isOrderedItemsLocked" *ngIf="!isFinalized">
     <section class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body p-4 d-flex flex-column">
         <h2 class="h5 mb-3">Ordered Items</h2>
@@ -524,7 +527,7 @@
   <button
     class="btn btn-primary btn-lg rounded-pill shadow d-inline-flex align-items-center gap-2"
     type="button"
-    [disabled]="saving || isCompleted"
+    [disabled]="saving || isFinalized"
     (click)="saveOrder()"
   >
     <i class="bi" [ngClass]="saving ? 'bi-arrow-repeat' : 'bi-save'"></i>

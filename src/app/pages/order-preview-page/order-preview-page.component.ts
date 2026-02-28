@@ -189,12 +189,16 @@ export class OrderPreviewPageComponent {
     return String(this.order?.status || '').toLowerCase() === 'completed';
   }
 
+  get isCancelled(): boolean {
+    return String(this.order?.status || '').toLowerCase() === 'cancelled';
+  }
+
   get isRefunded(): boolean {
     return String(this.order?.status || '').toLowerCase() === 'refunded';
   }
 
   get isFinalized(): boolean {
-    return this.isCompleted || this.isRefunded;
+    return this.isCompleted || this.isRefunded || this.isCancelled;
   }
 
   get baseStatus(): string {
@@ -211,9 +215,9 @@ export class OrderPreviewPageComponent {
       case 'pending':
         return ['pending', 'confirmed', 'cancelled'];
       case 'confirmed':
-        return ['confirmed', 'completed'];
+        return ['confirmed', 'processing', 'completed', 'cancelled'];
       case 'processing':
-        return ['processing', 'completed'];
+        return ['processing', 'completed', 'cancelled'];
       case 'completed':
         return ['completed', 'refunded'];
       case 'refunded':
@@ -245,10 +249,10 @@ export class OrderPreviewPageComponent {
       return to === 'confirmed' || to === 'cancelled';
     }
     if (from === 'confirmed') {
-      return to === 'completed';
+      return to === 'processing' || to === 'completed' || to === 'cancelled';
     }
     if (from === 'processing') {
-      return to === 'completed';
+      return to === 'completed' || to === 'cancelled';
     }
     if (from === 'completed') {
       return to === 'refunded';
@@ -258,12 +262,12 @@ export class OrderPreviewPageComponent {
 
   get isLocked(): boolean {
     const normalizedSelected = String(this.status || '').toLowerCase();
-    return this.isFinalized || normalizedSelected === 'completed' || normalizedSelected === 'refunded';
+    return this.isFinalized || normalizedSelected === 'completed' || normalizedSelected === 'refunded' || normalizedSelected === 'cancelled';
   }
 
   get isOrderedItemsLocked(): boolean {
     const normalizedStatus = String(this.status || this.order?.status || '').toLowerCase();
-    return normalizedStatus === 'processing' || normalizedStatus === 'confirmed' || normalizedStatus === 'completed' || normalizedStatus === 'refunded';
+    return normalizedStatus === 'processing' || normalizedStatus === 'confirmed' || normalizedStatus === 'completed' || normalizedStatus === 'refunded' || normalizedStatus === 'cancelled';
   }
 
   get organizationId(): string {
