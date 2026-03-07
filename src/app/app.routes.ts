@@ -34,9 +34,13 @@ import { ProfileSettingsPageComponent } from './pages/profile-settings-page/prof
 import { VerifyEmailPageComponent } from './pages/verify-email-page/verify-email-page.component';
 import { HomeRedirectPageComponent } from './pages/home-redirect-page/home-redirect-page.component';
 import { MessagesPageComponent } from './pages/messages-page/messages-page.component';
+import { PrivacyPolicyPageComponent } from './pages/privacy-policy-page/privacy-policy-page.component';
+import { TermsOfServicePageComponent } from './pages/terms-of-service-page/terms-of-service-page.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPageComponent },
+  { path: 'privacy-policy', component: PrivacyPolicyPageComponent },
+  { path: 'terms-of-service', component: TermsOfServicePageComponent },
   { path: 'reset-password', component: ResetPasswordPageComponent },
   { path: 'verify-email', component: VerifyEmailPageComponent },
   {

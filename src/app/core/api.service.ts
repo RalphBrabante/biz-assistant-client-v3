@@ -1,10 +1,12 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiResponse } from './types';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
+  private readonly bypassSwHeaders = new HttpHeaders({ 'ngsw-bypass': 'true' });
+
   constructor(private readonly http: HttpClient) {}
 
   list<T>(endpoint: string): Observable<ApiResponse<T[]>> {
@@ -16,7 +18,9 @@ export class ApiService {
   }
 
   createFormData<T>(endpoint: string, payload: FormData): Observable<ApiResponse<T>> {
-    return this.http.post<ApiResponse<T>>(endpoint, payload);
+    return this.http.post<ApiResponse<T>>(endpoint, payload, {
+      headers: this.bypassSwHeaders,
+    });
   }
 
   update<T>(endpoint: string, id: string, payload: Record<string, unknown>): Observable<ApiResponse<T>> {
@@ -36,7 +40,9 @@ export class ApiService {
   }
 
   putFormData<T>(endpoint: string, payload: FormData): Observable<ApiResponse<T>> {
-    return this.http.put<ApiResponse<T>>(endpoint, payload);
+    return this.http.put<ApiResponse<T>>(endpoint, payload, {
+      headers: this.bypassSwHeaders,
+    });
   }
 
   download(endpoint: string): Observable<Blob> {
