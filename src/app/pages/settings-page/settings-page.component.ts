@@ -13,6 +13,10 @@ interface CacheSettingPayload {
 
 interface StorageSettingPayload {
   provider: 'local' | 'do_spaces' | 'google_drive';
+  uploadTargets: {
+    expenseAttachment: 'local' | 'do_spaces' | 'google_drive';
+    profileImage: 'local' | 'do_spaces' | 'google_drive';
+  };
   doSpaces: {
     endpoint: string;
     region: string;
@@ -54,6 +58,8 @@ export class SettingsPageComponent {
   readonly message = signal('');
   readonly cacheEnabled = signal(true);
   readonly storageProvider = signal<'local' | 'do_spaces' | 'google_drive'>('local');
+  readonly expenseAttachmentProvider = signal<'local' | 'do_spaces' | 'google_drive'>('local');
+  readonly profileImageProvider = signal<'local' | 'do_spaces' | 'google_drive'>('local');
   readonly doSpacesEndpoint = signal('');
   readonly doSpacesRegion = signal('');
   readonly doSpacesBucket = signal('');
@@ -71,6 +77,14 @@ export class SettingsPageComponent {
   readonly googleDriveFolderId = signal('');
   readonly googleDriveAccountEmail = signal('');
   readonly googleDriveConnected = signal(false);
+
+  get requiresDoSpaces(): boolean {
+    return [this.storageProvider(), this.expenseAttachmentProvider(), this.profileImageProvider()].includes('do_spaces');
+  }
+
+  get requiresGoogleDrive(): boolean {
+    return [this.storageProvider(), this.expenseAttachmentProvider(), this.profileImageProvider()].includes('google_drive');
+  }
 
   get isSuperuser(): boolean {
     const roleCodes = (this.auth.currentUser()?.roleCodes || []).map((code) =>
@@ -126,6 +140,18 @@ export class SettingsPageComponent {
       next: (response: ApiResponse<StorageSettingPayload>) => {
         const data = response.data;
         this.storageProvider.set((data?.provider || 'local') as 'local' | 'do_spaces' | 'google_drive');
+        this.expenseAttachmentProvider.set(
+          (data?.uploadTargets?.expenseAttachment || data?.provider || 'local') as
+            | 'local'
+            | 'do_spaces'
+            | 'google_drive'
+        );
+        this.profileImageProvider.set(
+          (data?.uploadTargets?.profileImage || data?.provider || 'local') as
+            | 'local'
+            | 'do_spaces'
+            | 'google_drive'
+        );
         this.doSpacesEndpoint.set(String(data?.doSpaces?.endpoint || ''));
         this.doSpacesRegion.set(String(data?.doSpaces?.region || ''));
         this.doSpacesBucket.set(String(data?.doSpaces?.bucket || ''));
@@ -198,6 +224,10 @@ export class SettingsPageComponent {
     this.api
       .put<StorageSettingPayload>('/api/v1/settings/storage', {
         provider: this.storageProvider(),
+        uploadTargets: {
+          expenseAttachment: this.expenseAttachmentProvider(),
+          profileImage: this.profileImageProvider(),
+        },
         doSpaces: {
           endpoint: this.doSpacesEndpoint().trim(),
           region: this.doSpacesRegion().trim(),

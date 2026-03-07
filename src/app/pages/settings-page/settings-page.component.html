@@ -42,18 +42,35 @@
             <option value="do_spaces">DigitalOcean Spaces</option>
             <option value="google_drive">Google Drive</option>
           </select>
+          <div class="form-text">Default provider for upload fields unless a field-specific provider is selected below.</div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold">Expense Attachments</label>
+          <select class="form-select" [ngModel]="expenseAttachmentProvider()" (ngModelChange)="expenseAttachmentProvider.set($event)">
+            <option value="local">Local Storage</option>
+            <option value="do_spaces">DigitalOcean Spaces</option>
+            <option value="google_drive">Google Drive</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold">Profile Images</label>
+          <select class="form-select" [ngModel]="profileImageProvider()" (ngModelChange)="profileImageProvider.set($event)">
+            <option value="local">Local Storage</option>
+            <option value="do_spaces">DigitalOcean Spaces</option>
+            <option value="google_drive">Google Drive</option>
+          </select>
         </div>
       </div>
 
-      <div class="alert alert-info mt-3 mb-0" *ngIf="storageProvider() === 'do_spaces' && !doSpacesConfigured()">
+      <div class="alert alert-info mt-3 mb-0" *ngIf="requiresDoSpaces && !doSpacesConfigured()">
         DigitalOcean Spaces is selected but not fully configured yet.
       </div>
 
-      <div class="alert alert-info mt-3 mb-0" *ngIf="storageProvider() === 'google_drive' && !googleDriveConnected()">
+      <div class="alert alert-info mt-3 mb-0" *ngIf="requiresGoogleDrive && !googleDriveConnected()">
         Google Drive is selected but not connected yet.
       </div>
 
-      <div class="row g-3 mt-1" *ngIf="storageProvider() === 'do_spaces'">
+      <div class="row g-3 mt-1" *ngIf="requiresDoSpaces">
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold">Spaces Endpoint</label>
           <input class="form-control" [ngModel]="doSpacesEndpoint()" (ngModelChange)="doSpacesEndpoint.set($event)" placeholder="nyc3.digitaloceanspaces.com" />
@@ -90,7 +107,7 @@
         </div>
       </div>
 
-      <div class="row g-3 mt-1" *ngIf="storageProvider() === 'google_drive'">
+      <div class="row g-3 mt-1" *ngIf="requiresGoogleDrive">
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold">Google Client ID</label>
           <input class="form-control" [ngModel]="googleDriveClientId()" (ngModelChange)="googleDriveClientId.set($event)" />
