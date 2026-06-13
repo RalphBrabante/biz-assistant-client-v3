@@ -114,6 +114,7 @@ export class ExpensesPageComponent {
   readonly withholdingTaxTypes = signal<WithholdingTaxTypeOption[]>([]);
   readonly vendorSearch = signal('');
   readonly selectedCreateVendor = signal<VendorOption | null>(null);
+  readonly vendorDropdownOpen = signal(false);
   readonly isVendorCreateModalOpen = signal(false);
   readonly creatingVendor = signal(false);
   readonly vendorCreateError = signal('');
@@ -317,6 +318,7 @@ export class ExpensesPageComponent {
     this.vendorSearch.set('');
     this.selectedCreateVendor.set(null);
     this.vendors.set([]);
+    this.vendorDropdownOpen.set(false);
     this.isVendorCreateModalOpen.set(false);
     this.vendorCreateError.set('');
     this.createFile = null;
@@ -334,6 +336,7 @@ export class ExpensesPageComponent {
     this.vendorSearch.set('');
     this.selectedCreateVendor.set(null);
     this.vendors.set([]);
+    this.vendorDropdownOpen.set(false);
     this.isVendorCreateModalOpen.set(false);
     this.vendorCreateError.set('');
     this.createModalError.set('');
@@ -528,6 +531,33 @@ export class ExpensesPageComponent {
     this.load();
   }
 
+  get hasActiveFilters(): boolean {
+    return !!(this.searchQuery.trim() || this.statusFilter || this.paymentMethodFilter || this.expenseDateFrom || this.expenseDateTo);
+  }
+
+  get activeFilterCount(): number {
+    let count = 0;
+    if (this.searchQuery.trim()) count++;
+    if (this.statusFilter) count++;
+    if (this.paymentMethodFilter) count++;
+    if (this.expenseDateFrom || this.expenseDateTo) count++;
+    return count;
+  }
+
+  expenseStatusLabel(value: string): string {
+    const labels: Record<string, string> = {
+      draft: 'Draft', submitted: 'Submitted', approved: 'Approved', paid: 'Paid', cancelled: 'Cancelled',
+    };
+    return labels[value] || value;
+  }
+
+  expensePaymentMethodLabel(value: string): string {
+    const labels: Record<string, string> = {
+      cash: 'Cash', bank_transfer: 'Bank Transfer', check: 'Check', card: 'Card', other: 'Other',
+    };
+    return labels[value] || value;
+  }
+
   clearFilters(): void {
     if (this.isContextLocked) return;
     this.searchQuery = '';
@@ -606,6 +636,10 @@ export class ExpensesPageComponent {
     this.vendorSearchInput$.next(query);
   }
 
+  onVendorSearchBlur(): void {
+    setTimeout(() => this.vendorDropdownOpen.set(false), 160);
+  }
+
   selectVendor(vendor: VendorOption): void {
     if (this.isContextLocked) return;
     this.selectedCreateVendor.set(vendor);
@@ -630,6 +664,7 @@ export class ExpensesPageComponent {
     this.createExpenseForm.get('vendorId')?.updateValueAndValidity();
     this.vendorSearch.set('');
     this.vendors.set([]);
+    this.vendorDropdownOpen.set(false);
   }
 
   openVendorCreateModal(): void {
@@ -862,7 +897,6 @@ export class ExpensesPageComponent {
       vendorId: '',
       vendorTaxId: '',
       expenseNumber: '',
-      applyVat: false,
       vatExemptAmount: 0,
       withholdingTaxTypeId: '',
       category: '',
@@ -886,8 +920,7 @@ export class ExpensesPageComponent {
         vendorId: ['', [Validators.required]],
         vendorTaxId: [''],
         expenseNumber: [''],
-        applyVat: [false],
-        vatExemptAmount: [0, [Validators.required, Validators.min(0)]],
+        vatExemptAmount: [0, [Validators.min(0)]],
         withholdingTaxTypeId: [''],
         category: ['', [Validators.required, Validators.maxLength(120)]],
         description: ['', [Validators.maxLength(2000)]],
@@ -919,10 +952,6 @@ export class ExpensesPageComponent {
   }
 
   private vatExemptNotGreaterThanAmountValidator(control: AbstractControl): ValidationErrors | null {
-    const applyVat = Boolean(control.get('applyVat')?.value);
-    if (!applyVat) {
-      return null;
-    }
     const amount = Number(control.get('amount')?.value ?? 0);
     const vatExemptAmount = Number(control.get('vatExemptAmount')?.value ?? 0);
     if (!Number.isFinite(amount) || !Number.isFinite(vatExemptAmount)) {
@@ -973,13 +1002,12 @@ export class ExpensesPageComponent {
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
-    const applyVat = Boolean(form['applyVat']);
     return {
       organizationId: this.optionalString(form['organizationId']),
       vendorId: this.optionalString(form['vendorId']),
       vendorTaxId: this.optionalString(form['vendorTaxId']),
       expenseNumber: this.optionalString(form['expenseNumber']),
-      vatExemptAmount: applyVat ? this.optionalNumber(form['vatExemptAmount']) : 0,
+      vatExemptAmount: this.optionalNumber(form['vatExemptAmount']),
       withholdingTaxTypeId: this.optionalString(form['withholdingTaxTypeId']),
       category: this.optionalString(form['category']),
       description: this.optionalString(form['description']),
@@ -993,19 +1021,6 @@ export class ExpensesPageComponent {
       createdBy: this.optionalString(form['createdBy']),
       updatedBy: this.optionalString(form['updatedBy']),
     };
-  }
-
-  onApplyVatChange(checked: boolean): void {
-    const control = this.createExpenseForm.get('vatExemptAmount');
-    if (!control) {
-      return;
-    }
-    if (!checked) {
-      control.setValue(0);
-      control.markAsUntouched();
-      control.updateValueAndValidity();
-      this.createExpenseForm.updateValueAndValidity();
-    }
   }
 
   private optionalString(value: unknown): string | undefined {

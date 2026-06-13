@@ -109,6 +109,7 @@ export class AppShellComponent {
   unreadMessageCount = 0;
   notificationsOpen = false;
   notificationsLoading = false;
+  markingAllRead = false;
   notificationsError = '';
   notifications: SidebarMessage[] = [];
   notificationsPage = 1;
@@ -485,6 +486,36 @@ export class AppShellComponent {
       return;
     }
     this.loadNotifications(this.notificationsPage + 1, true);
+  }
+
+  get hasUnreadNotifications(): boolean {
+    return this.unreadMessageCount > 0;
+  }
+
+  markAllAsRead(): void {
+    if (this.markingAllRead || !this.hasUnreadNotifications) {
+      return;
+    }
+    this.markingAllRead = true;
+    const params = new URLSearchParams();
+    const activeOrganizationId = String(this.organizationContext.getActiveOrganizationId() || '').trim();
+    if (activeOrganizationId) {
+      params.set('organizationId', activeOrganizationId);
+    }
+    const query = params.toString();
+    const endpoint = query ? `/api/v1/messages/read-all?${query}` : '/api/v1/messages/read-all';
+
+    this.api.put<{ updatedCount: number }>(endpoint, {}).subscribe({
+      next: () => {
+        const now = new Date().toISOString();
+        this.notifications = this.notifications.map((msg) => ({ ...msg, isRead: true, readAt: now }));
+        this.unreadMessageCount = 0;
+        this.markingAllRead = false;
+      },
+      error: () => {
+        this.markingAllRead = false;
+      },
+    });
   }
 
   markNotificationAsRead(row: SidebarMessage): void {

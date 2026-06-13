@@ -174,15 +174,28 @@
         <button type="button" class="btn-close" (click)="closeNotifications()"></button>
       </div>
       <div class="modal-body pt-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <div class="small text-secondary">
-            Unread: <span class="fw-semibold">{{ unreadMessageCount }}</span>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="small text-secondary lh-sm">
+            <span *ngIf="unreadMessageCount > 0" class="badge text-bg-danger rounded-pill me-1">{{ unreadMessageCount }}</span>
+            <span *ngIf="unreadMessageCount === 0" class="text-success me-1"><i class="bi bi-check2-all"></i></span>
+            {{ unreadMessageCount > 0 ? 'unread' : 'All read' }}
           </div>
-          <div class="d-flex gap-2">
-            <a class="btn btn-sm btn-outline-primary" routerLink="/messages" (click)="closeNotifications()">
+          <div class="d-flex gap-2 align-items-center">
+            <button
+              class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+              type="button"
+              (click)="markAllAsRead()"
+              [disabled]="markingAllRead || !hasUnreadNotifications"
+              title="Mark all notifications as read"
+            >
+              <span *ngIf="markingAllRead" class="spinner-border spinner-border-sm" role="status"></span>
+              <i *ngIf="!markingAllRead" class="bi bi-check2-all"></i>
+              <span class="d-none d-sm-inline">Mark all read</span>
+            </button>
+            <a class="btn btn-sm btn-outline-primary" routerLink="/messages" (click)="closeNotifications()" title="View all messages">
               <i class="bi bi-box-arrow-up-right"></i>
             </a>
-            <button class="btn btn-sm btn-outline-secondary" type="button" (click)="loadNotifications(1, false)" [disabled]="notificationsLoading">
+            <button class="btn btn-sm btn-outline-secondary" type="button" (click)="loadNotifications(1, false)" [disabled]="notificationsLoading" title="Refresh">
               <i class="bi bi-arrow-clockwise"></i>
             </button>
           </div>

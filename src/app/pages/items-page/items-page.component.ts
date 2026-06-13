@@ -684,6 +684,23 @@ export class ItemsPageComponent {
     this.load();
   }
 
+  get hasActiveFilters(): boolean {
+    return !!(this.filter().trim() || this.selectedVendorFilter());
+  }
+
+  get activeFilterCount(): number {
+    let count = 0;
+    if (this.filter().trim()) count++;
+    if (this.selectedVendorFilter()) count++;
+    return count;
+  }
+
+  clearFilters(): void {
+    if (this.isContextLocked) return;
+    this.filter.set('');
+    this.clearVendorFilter();
+  }
+
   clearVendorFilter(): void {
     if (this.isContextLocked) return;
     this.selectedVendorFilter.set(null);

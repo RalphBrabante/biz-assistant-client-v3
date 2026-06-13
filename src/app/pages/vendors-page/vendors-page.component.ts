@@ -442,6 +442,19 @@ export class VendorsPageComponent {
     this.persistTablePreferences();
   }
 
+  get hasActiveFilters(): boolean {
+    return !!this.filter().trim();
+  }
+
+  get activeFilterCount(): number {
+    return this.filter().trim() ? 1 : 0;
+  }
+
+  clearFilters(): void {
+    if (this.isContextLocked) return;
+    this.filter.set('');
+  }
+
   onFilterChange(value: string): void {
     if (this.isContextLocked) {
       return;

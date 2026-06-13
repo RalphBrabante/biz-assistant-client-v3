@@ -464,6 +464,42 @@ export class SalesInvoicesPageComponent {
     this.load();
   }
 
+  get hasActiveFilters(): boolean {
+    return !!(
+      this.searchQuery.trim() ||
+      this.statusFilter ||
+      this.paymentStatusFilter ||
+      this.issueDateFrom ||
+      this.issueDateTo
+    );
+  }
+
+  get activeFilterCount(): number {
+    let count = 0;
+    if (this.searchQuery.trim()) count++;
+    if (this.statusFilter) count++;
+    if (this.paymentStatusFilter) count++;
+    if (this.issueDateFrom || this.issueDateTo) count++;
+    return count;
+  }
+
+  invoiceStatusLabel(value: string): string {
+    const labels: Record<string, string> = {
+      draft: 'Draft', issued: 'Issued', sent: 'Sent',
+      partially_paid: 'Partially Paid', paid: 'Paid',
+      overdue: 'Overdue', void: 'Void',
+    };
+    return labels[value] || value;
+  }
+
+  paymentStatusLabel(value: string): string {
+    const labels: Record<string, string> = {
+      unpaid: 'Unpaid', partially_paid: 'Partially Paid',
+      paid: 'Paid', refunded: 'Refunded', failed: 'Failed',
+    };
+    return labels[value] || value;
+  }
+
   organizationLabel(row: SalesInvoiceRow): string {
     if (row.organization?.name) return row.organization.name;
     if (row.organization?.legalName) return row.organization.legalName;

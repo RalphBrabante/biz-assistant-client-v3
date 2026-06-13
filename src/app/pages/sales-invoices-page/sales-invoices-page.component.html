@@ -87,103 +87,203 @@
 
 <section class="card border-0 shadow-sm rounded-4 mb-4">
   <div class="card-body p-4">
-    <div class="row g-3 align-items-center">
+
+    <!-- Row 1: Primary filters -->
+    <div class="row g-3 align-items-end">
+
+      <!-- Search -->
       <div class="col-12 col-md-4">
-        <label class="form-label fw-semibold">Filter invoices</label>
-        <input
-          type="text"
-          class="form-control"
-          placeholder="Invoice #, status, payment, order"
-          [(ngModel)]="searchQuery"
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Search</label>
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute text-secondary" style="left:0.75rem;top:50%;transform:translateY(-50%);pointer-events:none;"></i>
+          <input
+            type="text"
+            class="form-control ps-5"
+            [class.pe-5]="searchQuery"
+            placeholder="Invoice #, order, notes..."
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="onFilterChange()"
+          />
+          <button
+            *ngIf="searchQuery"
+            class="btn position-absolute p-0 border-0 bg-transparent text-secondary"
+            style="right:0.75rem;top:50%;transform:translateY(-50%);"
+            type="button"
+            (click)="searchQuery=''; onFilterChange()"
+            title="Clear search"
+          >
+            <i class="bi bi-x-circle-fill"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Invoice Status -->
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Status</label>
+        <select
+          class="form-select"
+          [(ngModel)]="statusFilter"
           (ngModelChange)="onFilterChange()"
-        />
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Status</label>
-        <select class="form-select" [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
-          <option value="">All</option>
-          <option value="draft">draft</option>
-          <option value="issued">issued</option>
-          <option value="sent">sent</option>
-          <option value="partially_paid">partially_paid</option>
-          <option value="paid">paid</option>
-          <option value="overdue">overdue</option>
-          <option value="void">void</option>
+          [class.border-primary]="statusFilter"
+        >
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="issued">Issued</option>
+          <option value="sent">Sent</option>
+          <option value="partially_paid">Partially Paid</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+          <option value="void">Void</option>
         </select>
       </div>
+
+      <!-- Payment Status -->
       <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Payment</label>
-        <select class="form-select" [(ngModel)]="paymentStatusFilter" (ngModelChange)="onFilterChange()">
-          <option value="">All</option>
-          <option value="unpaid">unpaid</option>
-          <option value="partially_paid">partially_paid</option>
-          <option value="paid">paid</option>
-          <option value="refunded">refunded</option>
-          <option value="failed">failed</option>
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Payment</label>
+        <select
+          class="form-select"
+          [(ngModel)]="paymentStatusFilter"
+          (ngModelChange)="onFilterChange()"
+          [class.border-primary]="paymentStatusFilter"
+        >
+          <option value="">All Payments</option>
+          <option value="unpaid">Unpaid</option>
+          <option value="partially_paid">Partially Paid</option>
+          <option value="paid">Paid</option>
+          <option value="refunded">Refunded</option>
+          <option value="failed">Failed</option>
         </select>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Issue Date From</label>
-        <input type="date" class="form-control" [(ngModel)]="issueDateFrom" (ngModelChange)="onFilterChange()" />
+
+      <!-- Issue Date range (inline) -->
+      <div class="col-12 col-md-4">
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Issue Date</label>
+        <div class="input-group">
+          <input
+            type="date"
+            class="form-control"
+            [(ngModel)]="issueDateFrom"
+            (ngModelChange)="onFilterChange()"
+            [class.border-primary]="issueDateFrom"
+            title="From date"
+          />
+          <span class="input-group-text bg-white text-secondary small px-2">to</span>
+          <input
+            type="date"
+            class="form-control"
+            [(ngModel)]="issueDateTo"
+            (ngModelChange)="onFilterChange()"
+            [class.border-primary]="issueDateTo"
+            title="To date"
+          />
+        </div>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Issue Date To</label>
-        <input type="date" class="form-control" [(ngModel)]="issueDateTo" (ngModelChange)="onFilterChange()" />
+
+    </div>
+
+    <!-- Row 2: Secondary controls -->
+    <div class="row g-3 align-items-center mt-1">
+
+      <!-- Sort: select + direction toggle as one control -->
+      <div class="col-12 col-md-4">
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0 text-secondary px-3">
+            <i class="bi bi-arrow-down-up small"></i>
+          </span>
+          <select class="form-select border-start-0" [ngModel]="sortBy" (ngModelChange)="setSort($event)">
+            <option value="createdAt">Date Created</option>
+            <option value="updatedAt">Last Updated</option>
+            <option value="invoiceNumber">Invoice Number</option>
+            <option value="issueDate">Issue Date</option>
+            <option value="dueDate">Due Date</option>
+            <option value="status">Status</option>
+            <option value="paymentStatus">Payment Status</option>
+            <option value="amount">Amount</option>
+            <option value="totalAmount">Total</option>
+          </select>
+          <button
+            class="btn btn-outline-secondary"
+            type="button"
+            (click)="toggleSortDirection()"
+            appTooltip
+            [title]="sortDirection === 'asc' ? 'Ascending — click to reverse' : 'Descending — click to reverse'"
+          >
+            <i class="bi" [ngClass]="sortIcon()"></i>
+          </button>
+        </div>
       </div>
+
+      <!-- Rows per page -->
       <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Sort By</label>
-        <select class="form-select" [ngModel]="sortBy" (ngModelChange)="setSort($event)">
-          <option value="createdAt">Created</option>
-          <option value="updatedAt">Updated</option>
-          <option value="invoiceNumber">Invoice #</option>
-          <option value="issueDate">Issue Date</option>
-          <option value="dueDate">Due Date</option>
-          <option value="status">Status</option>
-          <option value="paymentStatus">Payment</option>
-          <option value="amount">Amount</option>
-          <option value="totalAmount">Total</option>
-        </select>
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0 text-secondary small px-2">Show</span>
+          <select class="form-select border-start-0" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+            <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+          </select>
+        </div>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Sort Direction</label>
-        <button class="btn btn-outline-secondary w-100" type="button" (click)="toggleSortDirection()">
-          <i class="bi" [ngClass]="sortIcon()"></i>
-          {{ sortDirection === 'asc' ? 'Ascending' : 'Descending' }}
-        </button>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Rows per page</label>
-        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
-          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
-        </select>
-      </div>
+
+      <!-- View toggle -->
       <div class="col-6 col-md-2">
         <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table view" aria-label="Table view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view">
             <i class="bi bi-table"></i>
           </button>
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="viewMode = 'card'" title="Card view" aria-label="Card view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view">
             <i class="bi bi-grid-3x2-gap"></i>
           </button>
         </div>
       </div>
-      <div class="col-6 col-md-2">
-        <div class="stat-chip">
-          <div class="stat-label">Total Invoices</div>
-          <div class="stat-value">{{ total }}</div>
+
+      <!-- Stats + Clear button -->
+      <div class="col-12 col-md-4 d-flex align-items-center justify-content-between justify-content-md-end gap-3">
+        <div class="small text-secondary lh-sm">
+          <span class="fw-semibold text-body">{{ total }}</span> invoices &nbsp;&middot;&nbsp;
+          Page <span class="fw-semibold text-body">{{ page }}</span> / <span class="fw-semibold text-body">{{ totalPages }}</span>
         </div>
-      </div>
-      <div class="col-6 col-md-2">
-        <div class="stat-chip">
-          <div class="stat-label">Page</div>
-          <div class="stat-value">{{ page }} / {{ totalPages }}</div>
-        </div>
-      </div>
-      <div class="col-12 col-md-2 d-flex align-items-end">
-        <button class="btn btn-outline-secondary w-100" type="button" (click)="clearFilters()">
-          <i class="bi bi-funnel me-1"></i>Clear Filters
+        <button
+          class="btn btn-sm d-flex align-items-center gap-2"
+          [class.btn-outline-secondary]="!hasActiveFilters"
+          [class.btn-outline-danger]="hasActiveFilters"
+          type="button"
+          (click)="clearFilters()"
+          [disabled]="!hasActiveFilters"
+        >
+          <i class="bi bi-x-circle"></i>
+          Clear
+          <span *ngIf="activeFilterCount > 0" class="badge text-bg-danger rounded-pill lh-1">{{ activeFilterCount }}</span>
         </button>
       </div>
+
+    </div>
+
+    <!-- Active filter chips -->
+    <div *ngIf="hasActiveFilters" class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
+      <span class="small text-secondary fw-semibold me-1">Active:</span>
+
+      <span *ngIf="searchQuery.trim()" class="badge rounded-pill border fw-normal text-body bg-white d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-search small text-secondary"></i>
+        "{{ searchQuery.trim() }}"
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="searchQuery=''; onFilterChange()" aria-label="Remove search filter"></button>
+      </span>
+
+      <span *ngIf="statusFilter" class="badge rounded-pill border fw-normal text-body bg-white d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-tag small text-secondary"></i>
+        {{ invoiceStatusLabel(statusFilter) }}
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="statusFilter=''; onFilterChange()" aria-label="Remove status filter"></button>
+      </span>
+
+      <span *ngIf="paymentStatusFilter" class="badge rounded-pill border fw-normal text-body bg-white d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-credit-card small text-secondary"></i>
+        {{ paymentStatusLabel(paymentStatusFilter) }}
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="paymentStatusFilter=''; onFilterChange()" aria-label="Remove payment filter"></button>
+      </span>
+
+      <span *ngIf="issueDateFrom || issueDateTo" class="badge rounded-pill border fw-normal text-body bg-white d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-calendar3 small text-secondary"></i>
+        {{ issueDateFrom || '…' }} → {{ issueDateTo || '…' }}
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="issueDateFrom=''; issueDateTo=''; onFilterChange()" aria-label="Remove date filter"></button>
+      </span>
     </div>
 
     <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
@@ -210,6 +310,7 @@
         </ul>
       </div>
     </div>
+
   </div>
 </section>
 

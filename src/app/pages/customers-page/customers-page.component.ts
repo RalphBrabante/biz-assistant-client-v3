@@ -404,7 +404,7 @@ export class CustomersPageComponent {
       city: row.city || '',
       state: row.state || '',
       postalCode: row.postalCode || '',
-      country: row.country || 'United States',
+      country: row.country || 'Philippines',
       creditLimit: row.creditLimit ?? 0,
       paymentTermsDays: row.paymentTermsDays ?? 30,
       status: row.status || 'active',
@@ -581,6 +581,18 @@ export class CustomersPageComponent {
     this.persistTablePreferences();
   }
 
+  get hasActiveFilters(): boolean {
+    return !!this.filter().trim();
+  }
+
+  get activeFilterCount(): number {
+    return this.filter().trim() ? 1 : 0;
+  }
+
+  clearFilters(): void {
+    this.filter.set('');
+  }
+
   onFilterChange(value: string): void {
     if (this.isContextLocked) return;
     this.filter.set(value);
@@ -665,7 +677,7 @@ export class CustomersPageComponent {
       city: '',
       state: '',
       postalCode: '',
-      country: 'United States',
+      country: 'Philippines',
       creditLimit: 0,
       paymentTermsDays: 30,
       status: 'active',

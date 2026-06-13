@@ -18,45 +18,54 @@
 
 <section class="card border-0 shadow-sm rounded-4 mb-4">
   <div class="card-body p-4">
-    <div class="row g-3 align-items-center">
-      <div class="col-12 col-md-6">
-        <label class="form-label fw-semibold">Filter users</label>
-        <input
-          type="text"
-          class="form-control"
-          placeholder="Search by name, email, role, status"
-          [ngModel]="filter()"
-          (ngModelChange)="onFilterChange($event)"
-        />
+
+    <!-- Row 1: Search -->
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Search</label>
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute text-secondary" style="left:0.75rem;top:50%;transform:translateY(-50%);pointer-events:none;"></i>
+          <input type="text" class="form-control ps-5" [class.pe-5]="filter()" placeholder="Name, email, role..." [ngModel]="filter()" (ngModelChange)="onFilterChange($event)" />
+          <button *ngIf="filter()" class="btn position-absolute p-0 border-0 bg-transparent text-secondary" style="right:0.75rem;top:50%;transform:translateY(-50%);" type="button" (click)="onFilterChange('')" title="Clear search"><i class="bi bi-x-circle-fill"></i></button>
+        </div>
       </div>
+    </div>
+
+    <!-- Row 2: Secondary controls -->
+    <div class="row g-3 align-items-center mt-1">
       <div class="col-6 col-md-2">
-        <label class="form-label fw-semibold">Rows per page</label>
-        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
-          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
-        </select>
+        <div class="input-group">
+          <span class="input-group-text border-end-0 text-secondary small px-2">Show</span>
+          <select class="form-select border-start-0" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+            <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+          </select>
+        </div>
       </div>
       <div class="col-6 col-md-2">
         <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view">
-            <i class="bi bi-table"></i>
-          </button>
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view">
-            <i class="bi bi-grid-3x2-gap"></i>
-          </button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view"><i class="bi bi-table"></i></button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view"><i class="bi bi-grid-3x2-gap"></i></button>
         </div>
       </div>
-      <div class="col-6 col-md-2">
-        <div class="stat-chip">
-          <div class="stat-label">Total Users</div>
-          <div class="stat-value">{{ total }}</div>
+      <div class="col-12 col-md-4 d-flex align-items-center justify-content-between justify-content-md-end gap-3">
+        <div class="small text-secondary lh-sm">
+          <span class="fw-semibold text-body">{{ total }}</span> users &nbsp;&middot;&nbsp;
+          Page <span class="fw-semibold text-body">{{ page }}</span> / <span class="fw-semibold text-body">{{ totalPages }}</span>
         </div>
+        <button class="btn btn-sm d-flex align-items-center gap-2" [class.btn-outline-secondary]="!hasActiveFilters" [class.btn-outline-danger]="hasActiveFilters" type="button" (click)="clearFilters()" [disabled]="!hasActiveFilters">
+          <i class="bi bi-x-circle"></i> Clear
+          <span *ngIf="activeFilterCount > 0" class="badge text-bg-danger rounded-pill lh-1">{{ activeFilterCount }}</span>
+        </button>
       </div>
-      <div class="col-6 col-md-2">
-        <div class="stat-chip">
-          <div class="stat-label">Page</div>
-          <div class="stat-value">{{ page }} / {{ totalPages }}</div>
-        </div>
-      </div>
+    </div>
+
+    <!-- Active filter chips -->
+    <div *ngIf="hasActiveFilters" class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
+      <span class="small text-secondary fw-semibold me-1">Active:</span>
+      <span *ngIf="filter().trim()" class="badge rounded-pill border fw-normal text-body bg-body d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-search small text-secondary"></i> "{{ filter().trim() }}"
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="onFilterChange('')"></button>
+      </span>
     </div>
 
     <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>

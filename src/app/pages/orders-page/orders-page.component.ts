@@ -200,6 +200,39 @@ export class OrdersPageComponent {
     this.load();
   }
 
+  get hasActiveFilters(): boolean {
+    return !!(this.searchQuery.trim() || this.statusFilter || this.paymentFilter);
+  }
+
+  get activeFilterCount(): number {
+    let count = 0;
+    if (this.searchQuery.trim()) count++;
+    if (this.statusFilter) count++;
+    if (this.paymentFilter) count++;
+    return count;
+  }
+
+  clearFilters(): void {
+    this.searchQuery = '';
+    this.statusFilter = '';
+    this.paymentFilter = '';
+    this.page = 1;
+    this.load();
+  }
+
+  orderStatusLabel(value: string): string {
+    const labels: Record<string, string> = {
+      pending: 'Pending', confirmed: 'Confirmed', processing: 'Processing',
+      fulfilled: 'Fulfilled', completed: 'Completed', refunded: 'Refunded', cancelled: 'Cancelled',
+    };
+    return labels[value] || value;
+  }
+
+  orderPaymentLabel(value: string): string {
+    const labels: Record<string, string> = { unpaid: 'Unpaid', partial: 'Partial', paid: 'Paid', refunded: 'Refunded' };
+    return labels[value] || value;
+  }
+
   onPageSizeChange(value: string): void {
     const parsed = Number(value);
     this.pageSize = Number.isFinite(parsed) ? parsed : 20;

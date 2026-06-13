@@ -271,6 +271,18 @@ export class UsersPageComponent {
     this.persistTablePreferences();
   }
 
+  get hasActiveFilters(): boolean {
+    return !!this.filter().trim();
+  }
+
+  get activeFilterCount(): number {
+    return this.filter().trim() ? 1 : 0;
+  }
+
+  clearFilters(): void {
+    this.filter.set('');
+  }
+
   onFilterChange(value: string): void {
     this.filter.set(value);
     this.page = 1;

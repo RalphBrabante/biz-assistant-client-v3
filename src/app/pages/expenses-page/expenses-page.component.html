@@ -87,92 +87,98 @@
 
 <section class="card border-0 shadow-sm rounded-4 mb-4">
   <div class="card-body p-4">
-    <div class="row g-3 align-items-center">
-      <div class="col-12 col-lg-4">
-        <label class="form-label fw-semibold">Search</label>
-        <input
-          type="text"
-          class="form-control"
-          placeholder="Search by expense #, category, status, vendor"
-          [(ngModel)]="searchQuery"
-          (keyup.enter)="applyFilters()"
-        />
+
+    <!-- Row 1: Primary filters -->
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Search</label>
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute text-secondary" style="left:0.75rem;top:50%;transform:translateY(-50%);pointer-events:none;"></i>
+          <input type="text" class="form-control ps-5" [class.pe-5]="searchQuery" placeholder="Expense #, vendor, category..." [(ngModel)]="searchQuery" (keyup.enter)="applyFilters()" />
+          <button *ngIf="searchQuery" class="btn position-absolute p-0 border-0 bg-transparent text-secondary" style="right:0.75rem;top:50%;transform:translateY(-50%);" type="button" (click)="searchQuery=''; applyFilters()" title="Clear search"><i class="bi bi-x-circle-fill"></i></button>
+        </div>
       </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <label class="form-label fw-semibold">Status</label>
-        <select class="form-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()">
-          <option value="">All</option>
-          <option value="draft">draft</option>
-          <option value="submitted">submitted</option>
-          <option value="approved">approved</option>
-          <option value="paid">paid</option>
-          <option value="cancelled">cancelled</option>
-        </select>
-      </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <label class="form-label fw-semibold">Payment</label>
-        <select class="form-select" [(ngModel)]="paymentMethodFilter" (ngModelChange)="applyFilters()">
-          <option value="">All</option>
-          <option value="cash">cash</option>
-          <option value="bank_transfer">bank_transfer</option>
-          <option value="check">check</option>
-          <option value="card">card</option>
-          <option value="other">other</option>
-        </select>
-      </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <label class="form-label fw-semibold">From</label>
-        <input type="date" class="form-control" [(ngModel)]="expenseDateFrom" (change)="applyFilters()" />
-      </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <label class="form-label fw-semibold">To</label>
-        <input type="date" class="form-control" [(ngModel)]="expenseDateTo" (change)="applyFilters()" />
-      </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <label class="form-label fw-semibold">Rows per page</label>
-        <select class="form-select" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
-          <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Status</label>
+        <select class="form-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()" [class.border-primary]="statusFilter">
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="submitted">Submitted</option>
+          <option value="approved">Approved</option>
+          <option value="paid">Paid</option>
+          <option value="cancelled">Cancelled</option>
         </select>
       </div>
       <div class="col-6 col-md-2">
-        <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view">
-            <i class="bi bi-table"></i>
-          </button>
-          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view">
-            <i class="bi bi-grid-3x2-gap"></i>
-          </button>
-        </div>
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Payment</label>
+        <select class="form-select" [(ngModel)]="paymentMethodFilter" (ngModelChange)="applyFilters()" [class.border-primary]="paymentMethodFilter">
+          <option value="">All Methods</option>
+          <option value="cash">Cash</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="check">Check</option>
+          <option value="card">Card</option>
+          <option value="other">Other</option>
+        </select>
       </div>
-      <div class="col-6 col-md-2 d-flex align-items-end gap-2">
-        <button
-          class="btn btn-outline-primary table-tool-icon-btn"
-          type="button"
-          (click)="applyFilters()"
-          appTooltip
-          title="Apply filters"
-          aria-label="Apply filters"
-        >
-          <i class="bi bi-funnel"></i>
-        </button>
-        <button
-          class="btn btn-outline-secondary table-tool-icon-btn"
-          type="button"
-          (click)="clearFilters()"
-          appTooltip
-          title="Clear filters"
-          aria-label="Clear filters"
-        >
-          <i class="bi bi-arrow-counterclockwise"></i>
-        </button>
-      </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <div class="stat-chip">
-          <div class="stat-label">Total Expenses</div>
-          <div class="stat-value">{{ total }}</div>
+      <div class="col-12 col-md-4">
+        <label class="form-label small fw-semibold text-uppercase text-secondary mb-1">Expense Date</label>
+        <div class="input-group">
+          <input type="date" class="form-control" [(ngModel)]="expenseDateFrom" (change)="applyFilters()" [class.border-primary]="expenseDateFrom" title="From date" />
+          <span class="input-group-text text-secondary small px-2">to</span>
+          <input type="date" class="form-control" [(ngModel)]="expenseDateTo" (change)="applyFilters()" [class.border-primary]="expenseDateTo" title="To date" />
         </div>
       </div>
     </div>
+
+    <!-- Row 2: Secondary controls -->
+    <div class="row g-3 align-items-center mt-1">
+      <div class="col-6 col-md-2">
+        <div class="input-group">
+          <span class="input-group-text border-end-0 text-secondary small px-2">Show</span>
+          <select class="form-select border-start-0" [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)">
+            <option *ngFor="let option of pageSizeOptions" [value]="option">{{ option }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="btn-group w-100 view-toggle-group" role="group" aria-label="Toggle table or card view">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'table'" (click)="setViewMode('table')" title="Table view" aria-label="Table view"><i class="bi bi-table"></i></button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="viewMode === 'card'" (click)="setViewMode('card')" title="Card view" aria-label="Card view"><i class="bi bi-grid-3x2-gap"></i></button>
+        </div>
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-center justify-content-between justify-content-md-end gap-3">
+        <div class="small text-secondary lh-sm">
+          <span class="fw-semibold text-body">{{ total }}</span> expenses &nbsp;&middot;&nbsp;
+          Page <span class="fw-semibold text-body">{{ page }}</span> / <span class="fw-semibold text-body">{{ totalPages }}</span>
+        </div>
+        <button class="btn btn-sm d-flex align-items-center gap-2" [class.btn-outline-secondary]="!hasActiveFilters" [class.btn-outline-danger]="hasActiveFilters" type="button" (click)="clearFilters()" [disabled]="!hasActiveFilters">
+          <i class="bi bi-x-circle"></i> Clear
+          <span *ngIf="activeFilterCount > 0" class="badge text-bg-danger rounded-pill lh-1">{{ activeFilterCount }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active filter chips -->
+    <div *ngIf="hasActiveFilters" class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
+      <span class="small text-secondary fw-semibold me-1">Active:</span>
+      <span *ngIf="searchQuery.trim()" class="badge rounded-pill border fw-normal text-body bg-body d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-search small text-secondary"></i> "{{ searchQuery.trim() }}"
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="searchQuery=''; applyFilters()"></button>
+      </span>
+      <span *ngIf="statusFilter" class="badge rounded-pill border fw-normal text-body bg-body d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-tag small text-secondary"></i> {{ expenseStatusLabel(statusFilter) }}
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="statusFilter=''; applyFilters()"></button>
+      </span>
+      <span *ngIf="paymentMethodFilter" class="badge rounded-pill border fw-normal text-body bg-body d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-credit-card small text-secondary"></i> {{ expensePaymentMethodLabel(paymentMethodFilter) }}
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="paymentMethodFilter=''; applyFilters()"></button>
+      </span>
+      <span *ngIf="expenseDateFrom || expenseDateTo" class="badge rounded-pill border fw-normal text-body bg-body d-inline-flex align-items-center gap-1 py-1 px-2">
+        <i class="bi bi-calendar3 small text-secondary"></i> {{ expenseDateFrom || '…' }} → {{ expenseDateTo || '…' }}
+        <button type="button" class="btn-close ms-1" style="font-size:0.55rem;" (click)="expenseDateFrom=''; expenseDateTo=''; applyFilters()"></button>
+      </span>
+    </div>
+
     <div *ngIf="message()" class="alert alert-success mt-3 mb-0">{{ message() }}</div>
     <div *ngIf="error()" class="alert alert-danger mt-3 mb-0">{{ error() }}</div>
     <div *ngIf="importSummary() as summary" class="alert alert-info mt-3 mb-0">
@@ -373,77 +379,211 @@
           {{ createModalError() }}
         </div>
         <form class="row g-3" [formGroup]="createExpenseForm" (ngSubmit)="createExpense()">
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Vendor Search <span class="text-danger">*</span></label>
+
+          <!-- ── Vendor & Classification ──────────────────────────── -->
+          <div class="col-12">
+            <div class="d-flex align-items-center gap-2 pb-2 border-bottom">
+              <i class="bi bi-building small text-secondary"></i>
+              <span class="small fw-semibold text-uppercase text-secondary">Vendor & Classification</span>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Vendor <span class="text-danger">*</span></label>
             <input type="hidden" formControlName="vendorId" />
-            <div *ngIf="!selectedCreateVendor(); else selectedVendorBlock">
-              <input
-                class="form-control"
-                [ngModel]="vendorSearch()"
-                (ngModelChange)="onVendorSearchChange($event)"
-                [ngModelOptions]="{ standalone: true }"
-                placeholder="Search vendor name or TIN"
-              />
-              <div class="form-text">Type at least 2 characters to search vendors.</div>
-              <div class="list-group mt-2 shadow-sm" *ngIf="vendorSearch().trim() && vendors().length > 0">
-                <button
-                  *ngFor="let vendor of vendors()"
-                  type="button"
-                  class="list-group-item list-group-item-action"
-                  (click)="selectVendor(vendor)"
-                >
-                  <div class="fw-semibold">{{ vendor.name || vendor.legalName || 'Unnamed Vendor' }}</div>
-                  <div class="small text-secondary">TIN: {{ vendor.taxId || '-' }}</div>
-                </button>
+
+            <!-- Search input + dropdown overlay -->
+            <div class="position-relative" *ngIf="!selectedCreateVendor(); else selectedVendorBlock">
+              <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-secondary px-3">
+                  <span *ngIf="loadingVendors()" class="spinner-border spinner-border-sm" role="status" aria-label="Searching"></span>
+                  <i *ngIf="!loadingVendors()" class="bi bi-search"></i>
+                </span>
+                <input
+                  type="text"
+                  class="form-control border-start-0 ps-1"
+                  [ngModel]="vendorSearch()"
+                  (ngModelChange)="onVendorSearchChange($event)"
+                  (focus)="vendorDropdownOpen.set(true)"
+                  (blur)="onVendorSearchBlur()"
+                  [ngModelOptions]="{ standalone: true }"
+                  placeholder="Search by name or TIN..."
+                  autocomplete="off"
+                />
               </div>
-              <div class="form-text" *ngIf="loadingVendors()">Loading vendors...</div>
-              <div class="form-text text-danger" *ngIf="vendorSearch().trim() && !loadingVendors() && vendors().length === 0">
-                No vendors found.
+
+              <!-- Dropdown panel -->
+              <div
+                *ngIf="vendorDropdownOpen() && vendorSearch().trim()"
+                class="position-absolute w-100 bg-white border rounded-3 shadow mt-1"
+                style="z-index: 1060; top: 100%; left: 0; max-height: 264px; overflow-y: auto;"
+              >
+                <!-- Loading -->
+                <div *ngIf="loadingVendors()" class="d-flex align-items-center gap-2 px-3 py-3 text-secondary small">
+                  <span class="spinner-border spinner-border-sm flex-shrink-0" role="status"></span>
+                  Searching vendors...
+                </div>
+
+                <!-- Results -->
+                <ng-container *ngIf="!loadingVendors()">
+                  <div *ngIf="vendors().length > 0" class="list-group list-group-flush rounded-top-3">
+                    <button
+                      *ngFor="let vendor of vendors()"
+                      type="button"
+                      class="list-group-item list-group-item-action border-0 px-3 py-2"
+                      (mousedown)="selectVendor(vendor)"
+                    >
+                      <div class="fw-semibold">{{ vendor.name || vendor.legalName || 'Unnamed Vendor' }}</div>
+                      <div class="small text-secondary">
+                        TIN: {{ vendor.taxId || '—' }}
+                        <span *ngIf="vendor.category"> &middot; {{ vendor.category }}</span>
+                      </div>
+                    </button>
+                  </div>
+
+                  <!-- No results -->
+                  <div *ngIf="vendors().length === 0 && vendorSearch().trim().length >= 2" class="px-3 py-3 text-secondary small text-center">
+                    No vendors found for "{{ vendorSearch().trim() }}"
+                  </div>
+                  <div *ngIf="vendorSearch().trim().length < 2" class="px-3 py-3 text-secondary small text-center">
+                    Keep typing to search...
+                  </div>
+                </ng-container>
+
+                <!-- Create new vendor footer -->
+                <div class="border-top px-2 py-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary w-100"
+                    (mousedown)="openVendorCreateModal()"
+                  >
+                    <i class="bi bi-plus-circle me-1"></i>Create New Vendor
+                  </button>
+                </div>
               </div>
-              <div class="mt-2">
-                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openVendorCreateModal()">
-                  <i class="bi bi-plus-lg me-1"></i>Create New Vendor
-                </button>
+
+              <!-- Hint shown when dropdown is closed -->
+              <div class="form-text" *ngIf="!vendorDropdownOpen()">
+                Type at least 2 characters to search.
               </div>
             </div>
+
             <div class="text-danger small mt-1" *ngIf="controlHasError('vendorId', 'required')">
               Vendor is required.
             </div>
+
+            <!-- Selected vendor card -->
             <ng-template #selectedVendorBlock>
-              <div class="alert alert-light border mt-2 mb-0 py-2 d-flex justify-content-between align-items-start gap-2">
-                <div>
-                  <div><strong>Selected:</strong> {{ selectedCreateVendor()?.name || selectedCreateVendor()?.legalName || '-' }}</div>
-                  <div><strong>TIN:</strong> {{ selectedCreateVendor()?.taxId || '-' }}</div>
+              <div class="d-flex align-items-center gap-3 px-3 py-2 rounded-3 border bg-light">
+                <div class="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width:36px;height:36px;">
+                  <i class="bi bi-building text-primary small"></i>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="fw-semibold text-truncate">{{ selectedCreateVendor()?.name || selectedCreateVendor()?.legalName || '—' }}</div>
+                  <div class="small text-secondary">TIN: {{ selectedCreateVendor()?.taxId || '—' }}</div>
                 </div>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn btn-sm btn-outline-secondary flex-shrink-0"
                   (click)="clearSelectedVendor()"
                   appTooltip
                   title="Change vendor"
                 >
-                  <i class="bi bi-x-lg"></i>
+                  <i class="bi bi-arrow-repeat me-1"></i>Change
                 </button>
               </div>
             </ng-template>
           </div>
+
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
-            <input class="form-control" formControlName="category" />
+            <input class="form-control" formControlName="category" placeholder="e.g. Office Supplies" />
             <div class="text-danger small mt-1" *ngIf="controlHasError('category', 'required')">
               Category is required.
             </div>
           </div>
+
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
             <select class="form-select" formControlName="status">
-              <option value="draft">draft</option>
-              <option value="submitted">submitted</option>
-              <option value="approved">approved</option>
-              <option value="paid">paid</option>
-              <option value="cancelled">cancelled</option>
+              <option value="draft">Draft</option>
+              <option value="submitted">Submitted</option>
+              <option value="approved">Approved</option>
+              <option value="paid">Paid</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
+
+          <!-- ── Date & Payment ───────────────────────────────────── -->
+          <div class="col-12 mt-2">
+            <div class="d-flex align-items-center gap-2 pb-2 border-bottom">
+              <i class="bi bi-calendar3 small text-secondary"></i>
+              <span class="small fw-semibold text-uppercase text-secondary">Date & Payment</span>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Expense Date <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" formControlName="expenseDate" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('expenseDate', 'required')">
+              Expense date is required.
+            </div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Due Date</label>
+            <input type="date" class="form-control" formControlName="dueDate" />
+            <div class="text-danger small mt-1" *ngIf="hasCreateFormError('invalidDateRange')">
+              Due date must be on or after expense date.
+            </div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Payment Method</label>
+            <select class="form-select" formControlName="paymentMethod">
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="cash">Cash</option>
+              <option value="credit_card">Credit Card</option>
+              <option value="check">Check</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <!-- ── Amounts & Tax ────────────────────────────────────── -->
+          <div class="col-12 mt-2">
+            <div class="d-flex align-items-center gap-2 pb-2 border-bottom">
+              <i class="bi bi-cash-stack small text-secondary"></i>
+              <span class="small fw-semibold text-uppercase text-secondary">Amounts & Tax</span>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Amount <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control" formControlName="amount" placeholder="0.00" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('amount', 'required') || controlHasError('amount', 'min')">
+              Amount must be greater than 0.
+            </div>
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Discount Amount</label>
+            <input type="number" step="0.01" class="form-control" formControlName="discountAmount" placeholder="0.00" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('discountAmount', 'min')">
+              Discount amount cannot be negative.
+            </div>
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">VAT Exempt Amount</label>
+            <input type="number" step="0.01" class="form-control" formControlName="vatExemptAmount" placeholder="0.00" />
+            <div class="text-danger small mt-1" *ngIf="controlHasError('vatExemptAmount', 'min')">
+              VAT exempt amount cannot be negative.
+            </div>
+            <div class="text-danger small mt-1" *ngIf="hasCreateFormError('vatExemptTooHigh')">
+              VAT exempt amount cannot be greater than amount.
+            </div>
+          </div>
+
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Withholding Tax Type</label>
             <select class="form-select" formControlName="withholdingTaxTypeId">
@@ -453,58 +593,17 @@
               </option>
             </select>
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Expense Date <span class="text-danger">*</span></label>
-            <input type="date" class="form-control" formControlName="expenseDate" />
-            <div class="text-danger small mt-1" *ngIf="controlHasError('expenseDate', 'required')">
-              Expense date is required.
+
+          <!-- ── Attachment & Notes ───────────────────────────────── -->
+          <div class="col-12 mt-2">
+            <div class="d-flex align-items-center gap-2 pb-2 border-bottom">
+              <i class="bi bi-paperclip small text-secondary"></i>
+              <span class="small fw-semibold text-uppercase text-secondary">Attachment & Notes</span>
             </div>
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Due Date</label>
-            <input type="date" class="form-control" formControlName="dueDate" />
-            <div class="text-danger small mt-1" *ngIf="hasCreateFormError('invalidDateRange')">
-              Due date must be on or after expense date.
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Amount <span class="text-danger">*</span></label>
-            <input type="number" step="0.01" class="form-control" formControlName="amount" />
-            <div class="text-danger small mt-1" *ngIf="controlHasError('amount', 'required') || controlHasError('amount', 'min')">
-              Amount must be greater than 0.
-            </div>
-          </div>
-          <div class="col-12 col-md-3 d-flex align-items-end">
-            <div class="form-check">
-              <input
-                id="applyVatCheckbox"
-                class="form-check-input"
-                type="checkbox"
-                formControlName="applyVat"
-                (change)="onApplyVatChange($any($event.target).checked)"
-              />
-              <label class="form-check-label fw-semibold" for="applyVatCheckbox">Apply VAT</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Discount Amount</label>
-            <input type="number" step="0.01" class="form-control" formControlName="discountAmount" />
-            <div class="text-danger small mt-1" *ngIf="controlHasError('discountAmount', 'min')">
-              Discount amount cannot be negative.
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Payment Method</label>
-            <select class="form-select" formControlName="paymentMethod">
-              <option value="bank_transfer">bank_transfer</option>
-              <option value="cash">cash</option>
-              <option value="credit_card">credit_card</option>
-              <option value="check">check</option>
-              <option value="other">other</option>
-            </select>
-          </div>
+
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Expense File (Image)</label>
+            <label class="form-label fw-semibold">Expense Receipt</label>
             <input
               type="file"
               class="form-control"
@@ -519,20 +618,12 @@
               Attachment must be 5MB or below.
             </div>
           </div>
+
           <div class="col-12">
             <label class="form-label fw-semibold">Notes</label>
-            <textarea rows="2" class="form-control" formControlName="notes"></textarea>
+            <textarea rows="2" class="form-control" formControlName="notes" placeholder="Optional notes about this expense..."></textarea>
           </div>
-          <div class="col-12 col-md-3" *ngIf="createExpenseForm.get('applyVat')?.value">
-            <label class="form-label fw-semibold">VAT Exempt Amount <span class="text-danger">*</span></label>
-            <input type="number" step="0.01" class="form-control" formControlName="vatExemptAmount" />
-            <div class="text-danger small mt-1" *ngIf="controlHasError('vatExemptAmount', 'min')">
-              VAT exempt amount cannot be negative.
-            </div>
-            <div class="text-danger small mt-1" *ngIf="hasCreateFormError('vatExemptTooHigh')">
-              VAT exempt amount cannot be greater than amount.
-            </div>
-          </div>
+
         </form>
       </div>
       <div class="modal-footer border-0 pt-0">
