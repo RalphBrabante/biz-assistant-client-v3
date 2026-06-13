@@ -224,6 +224,12 @@
         </tr>
       </thead>
       <tbody>
+        <tr *ngIf="loading()">
+          <td [attr.colspan]="isSuperuser ? 11 : 10" class="text-center py-5 border-0">
+            <span class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></span>
+            <span class="text-secondary small">Loading...</span>
+          </td>
+        </tr>
         <tr *ngIf="!loading() && rows().length === 0">
           <td [attr.colspan]="isSuperuser ? 11 : 10" class="text-center text-secondary py-4">No expenses found.</td>
         </tr>
@@ -295,11 +301,14 @@
         <h5 class="modal-title">Edit Expense</h5>
         <button type="button" class="btn-close" (click)="cancelEdit()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="editModalError()" class="alert alert-danger py-2">
           {{ editModalError() }}
         </div>
-        <div class="row g-3">
+        <div class="row g-3" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
           <div class="col-12 col-md-3">
             <label class="form-label">Vendor ID</label>
             <input class="form-control" [(ngModel)]="editForm['vendorId']" />
@@ -374,11 +383,14 @@
         <h5 class="modal-title">Create Expense</h5>
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="createModalError()" class="alert alert-danger py-2">
           {{ createModalError() }}
         </div>
-        <form class="row g-3" [formGroup]="createExpenseForm" (ngSubmit)="createExpense()">
+        <form class="row g-3" [formGroup]="createExpenseForm" (ngSubmit)="createExpense()" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
 
           <!-- ── Vendor & Classification ──────────────────────────── -->
           <div class="col-12">
@@ -650,9 +662,12 @@
         <h5 class="modal-title">Create Vendor</h5>
         <button type="button" class="btn-close" (click)="closeVendorCreateModal()" [disabled]="creatingVendor()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="creatingVendor()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="vendorCreateError()" class="alert alert-danger py-2 mb-3">{{ vendorCreateError() }}</div>
-        <form class="row g-3" [formGroup]="vendorCreateForm" (ngSubmit)="createVendorFromModal()">
+        <form class="row g-3" [formGroup]="vendorCreateForm" (ngSubmit)="createVendorFromModal()" [class.pe-none]="creatingVendor()" [class.opacity-50]="creatingVendor()">
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
             <input class="form-control" formControlName="name" />

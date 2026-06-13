@@ -399,21 +399,23 @@
                 Sales Invoice ID
                 <span class="text-danger" *ngIf="isCompleteFieldRequired('salesInvoiceId')">*</span>
               </label>
-              <input
-                type="text"
-                class="form-control"
-                [class.is-invalid]="shouldShowCompleteFieldError('salesInvoiceId')"
-                placeholder="9999"
-                formControlName="salesInvoiceId"
-                inputmode="numeric"
-                maxlength="4"
-                pattern="[0-9]{4}"
-                (input)="onCompletionSalesInvoiceIdInput($event)"
-                (blur)="onCompletionSalesInvoiceIdBlur()"
-                [disabled]="saving"
-              />
-              <div class="invalid-feedback d-block" *ngIf="shouldShowCompleteFieldError('salesInvoiceId')">
-                {{ getCompleteFieldError('salesInvoiceId') }}
+              <div class="position-relative">
+                <input
+                  type="text"
+                  class="form-control"
+                  [class.is-invalid]="shouldShowCompleteFieldError('salesInvoiceId')"
+                  placeholder="9999"
+                  formControlName="salesInvoiceId"
+                  inputmode="numeric"
+                  maxlength="4"
+                  pattern="[0-9]{4}"
+                  (input)="onCompletionSalesInvoiceIdInput($event)"
+                  (blur)="onCompletionSalesInvoiceIdBlur()"
+                  [disabled]="saving"
+                />
+                <div *ngIf="shouldShowCompleteFieldError('salesInvoiceId')" class="field-validation-icon" appTooltip [attr.title]="getCompleteFieldError('salesInvoiceId')">
+                  <i class="bi bi-exclamation-circle-fill text-danger"></i>
+                </div>
               </div>
             </div>
             <div class="col-12">
@@ -421,15 +423,17 @@
                 Issue Date
                 <span class="text-danger" *ngIf="isCompleteFieldRequired('salesInvoiceIssueDate')">*</span>
               </label>
-              <input
-                type="date"
-                class="form-control"
-                [class.is-invalid]="shouldShowCompleteFieldError('salesInvoiceIssueDate')"
-                formControlName="salesInvoiceIssueDate"
-                [disabled]="saving"
-              />
-              <div class="invalid-feedback d-block" *ngIf="shouldShowCompleteFieldError('salesInvoiceIssueDate')">
-                {{ getCompleteFieldError('salesInvoiceIssueDate') }}
+              <div class="position-relative">
+                <input
+                  type="date"
+                  class="form-control"
+                  [class.is-invalid]="shouldShowCompleteFieldError('salesInvoiceIssueDate')"
+                  formControlName="salesInvoiceIssueDate"
+                  [disabled]="saving"
+                />
+                <div *ngIf="shouldShowCompleteFieldError('salesInvoiceIssueDate')" class="field-validation-icon" appTooltip [attr.title]="getCompleteFieldError('salesInvoiceIssueDate')">
+                  <i class="bi bi-exclamation-circle-fill text-danger"></i>
+                </div>
               </div>
             </div>
             <div class="col-12">
@@ -437,15 +441,17 @@
                 Due Date
                 <span class="text-danger" *ngIf="isCompleteFieldRequired('dueDate')">*</span>
               </label>
-              <input
-                type="date"
-                class="form-control"
-                [class.is-invalid]="shouldShowCompleteFieldError('dueDate')"
-                formControlName="dueDate"
-                [disabled]="saving"
-              />
-              <div class="invalid-feedback d-block" *ngIf="shouldShowCompleteFieldError('dueDate')">
-                {{ getCompleteFieldError('dueDate') }}
+              <div class="position-relative">
+                <input
+                  type="date"
+                  class="form-control"
+                  [class.is-invalid]="shouldShowCompleteFieldError('dueDate')"
+                  formControlName="dueDate"
+                  [disabled]="saving"
+                />
+                <div *ngIf="shouldShowCompleteFieldError('dueDate')" class="field-validation-icon" appTooltip [attr.title]="getCompleteFieldError('dueDate')">
+                  <i class="bi bi-exclamation-circle-fill text-danger"></i>
+                </div>
               </div>
             </div>
           </div>

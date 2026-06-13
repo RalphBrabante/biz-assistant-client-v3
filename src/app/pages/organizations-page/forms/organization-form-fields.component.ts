@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { AbstractControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TooltipDirective } from '../../../shared/tooltip.directive';
 
 interface TaxTypeOption {
   id: string;
@@ -17,7 +18,7 @@ interface CurrencyOption {
 @Component({
   selector: 'app-organization-form-fields',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './organization-form-fields.component.html',
 })
 export class OrganizationFormFieldsComponent {

@@ -679,3 +679,61 @@ body {
 [data-bs-theme='dark'] .border-top {
   border-top-color: #2d415f !important;
 }
+
+/* Form / modal loading overlay */
+.modal-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.82);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  backdrop-filter: blur(2px);
+}
+
+/* Disable visual style for fieldset during submission */
+fieldset[disabled] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Form field validation icon + tooltip — replaces Bootstrap's built-in bg-image icons */
+.form-control.is-invalid {
+  background-image: none;
+  padding-right: 0.75rem;
+}
+.form-select.is-invalid {
+  background-image: var(--bs-form-select-bg-img);
+  padding-right: 2.25rem;
+}
+.field-validation-icon {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: auto;
+  z-index: 5;
+  line-height: 1;
+  font-size: 0.875rem;
+}
+.field-validation-icon-select {
+  position: absolute;
+  right: 2.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: auto;
+  z-index: 5;
+  line-height: 1;
+  font-size: 0.875rem;
+}
+.field-validation-icon-textarea {
+  position: absolute;
+  right: 0.65rem;
+  top: 0.65rem;
+  pointer-events: auto;
+  z-index: 5;
+  line-height: 1;
+  font-size: 0.875rem;
+}

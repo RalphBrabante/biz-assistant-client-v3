@@ -4,6 +4,7 @@ import { AbstractControl, FormsModule, ReactiveFormsModule, Validators, FormBuil
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { ConfirmDialogService } from '../../core/confirm-dialog.service';
+import { TooltipDirective } from '../../shared/tooltip.directive';
 import { ApiResponse } from '../../core/types';
 
 interface ItemRow {
@@ -115,7 +116,7 @@ interface WithholdingTaxTypeOption {
 @Component({
   selector: 'app-order-preview-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './order-preview-page.component.html',
 })
 export class OrderPreviewPageComponent {

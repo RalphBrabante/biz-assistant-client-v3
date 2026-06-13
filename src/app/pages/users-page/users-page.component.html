@@ -89,6 +89,12 @@
         </tr>
       </thead>
       <tbody>
+        <tr *ngIf="loading()">
+          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center py-5 border-0">
+            <span class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></span>
+            <span class="text-secondary small">Loading...</span>
+          </td>
+        </tr>
         <tr *ngIf="!loading() && filteredRows().length === 0">
           <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center text-secondary py-4">No users found.</td>
         </tr>
@@ -168,11 +174,14 @@
         <h5 class="modal-title">Create New User</h5>
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="createModalError()" class="alert alert-danger mb-3">
           {{ createModalError() }}
         </div>
-        <form class="row g-3" [formGroup]="createUserForm" (ngSubmit)="createUser()">
+        <form class="row g-3" [formGroup]="createUserForm" (ngSubmit)="createUser()" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">First Name</label>
             <input class="form-control" formControlName="firstName" />

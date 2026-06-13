@@ -147,9 +147,12 @@
         <h5 class="modal-title">Create New License</h5>
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="createModalError()" class="alert alert-danger">{{ createModalError() }}</div>
-        <form class="row g-3" [formGroup]="createLicenseForm" (ngSubmit)="createLicense()">
+        <form class="row g-3" [formGroup]="createLicenseForm" (ngSubmit)="createLicense()" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Assign Organization</label>
             <select class="form-select" formControlName="organizationId">

@@ -206,6 +206,12 @@
         </tr>
       </thead>
       <tbody>
+        <tr *ngIf="loading()">
+          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center py-5 border-0">
+            <span class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></span>
+            <span class="text-secondary small">Loading...</span>
+          </td>
+        </tr>
         <tr *ngIf="!loading() && rows().length === 0">
           <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center text-secondary py-4">No items found.</td>
         </tr>
@@ -287,61 +293,104 @@
         <h5 class="modal-title">Create New Item</h5>
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="createModalError()" class="alert alert-danger py-2">{{ createModalError() }}</div>
-        <form class="row g-3" [formGroup]="createItemForm" (ngSubmit)="createItem()" novalidate>
+        <form class="row g-3" [formGroup]="createItemForm" (ngSubmit)="createItem()" novalidate [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Name <span *ngIf="isCreateFieldRequired('name')" class="text-danger">*</span></label>
-            <input class="form-control" formControlName="name" [class.is-invalid]="shouldShowCreateFieldError('name')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('name') }}</div>
+            <div class="position-relative">
+              <input class="form-control" formControlName="name" [class.is-invalid]="shouldShowCreateFieldError('name')" />
+              <div *ngIf="shouldShowCreateFieldError('name')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('name')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">SKU <span *ngIf="isCreateFieldRequired('sku')" class="text-danger">*</span></label>
-            <input class="form-control" formControlName="sku" [class.is-invalid]="shouldShowCreateFieldError('sku')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('sku') }}</div>
+            <div class="position-relative">
+              <input class="form-control" formControlName="sku" [class.is-invalid]="shouldShowCreateFieldError('sku')" />
+              <div *ngIf="shouldShowCreateFieldError('sku')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('sku')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
 
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Type <span *ngIf="isCreateFieldRequired('type')" class="text-danger">*</span></label>
-            <input class="form-control" formControlName="type" [class.is-invalid]="shouldShowCreateFieldError('type')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('type') }}</div>
+            <div class="position-relative">
+              <input class="form-control" formControlName="type" [class.is-invalid]="shouldShowCreateFieldError('type')" />
+              <div *ngIf="shouldShowCreateFieldError('type')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('type')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Category <span *ngIf="isCreateFieldRequired('category')" class="text-danger">*</span></label>
-            <input class="form-control" formControlName="category" [class.is-invalid]="shouldShowCreateFieldError('category')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('category') }}</div>
+            <div class="position-relative">
+              <input class="form-control" formControlName="category" [class.is-invalid]="shouldShowCreateFieldError('category')" />
+              <div *ngIf="shouldShowCreateFieldError('category')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('category')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Unit <span *ngIf="isCreateFieldRequired('unit')" class="text-danger">*</span></label>
-            <input class="form-control" formControlName="unit" [class.is-invalid]="shouldShowCreateFieldError('unit')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('unit') }}</div>
+            <div class="position-relative">
+              <input class="form-control" formControlName="unit" [class.is-invalid]="shouldShowCreateFieldError('unit')" />
+              <div *ngIf="shouldShowCreateFieldError('unit')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('unit')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
 
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Price <span *ngIf="isCreateFieldRequired('price')" class="text-danger">*</span></label>
-            <input type="number" step="0.01" class="form-control" formControlName="price" [class.is-invalid]="shouldShowCreateFieldError('price')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('price') }}</div>
+            <div class="position-relative">
+              <input type="number" step="0.01" class="form-control" formControlName="price" [class.is-invalid]="shouldShowCreateFieldError('price')" />
+              <div *ngIf="shouldShowCreateFieldError('price')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('price')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Cost <span *ngIf="isCreateFieldRequired('cost')" class="text-danger">*</span></label>
-            <input type="number" step="0.01" class="form-control" formControlName="cost" [class.is-invalid]="shouldShowCreateFieldError('cost')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('cost') }}</div>
+            <div class="position-relative">
+              <input type="number" step="0.01" class="form-control" formControlName="cost" [class.is-invalid]="shouldShowCreateFieldError('cost')" />
+              <div *ngIf="shouldShowCreateFieldError('cost')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('cost')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Discounted Price <span *ngIf="isCreateFieldRequired('discountedPrice')" class="text-danger">*</span></label>
-            <input type="number" step="0.01" class="form-control" formControlName="discountedPrice" [class.is-invalid]="shouldShowCreateFieldError('discountedPrice')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('discountedPrice') }}</div>
+            <div class="position-relative">
+              <input type="number" step="0.01" class="form-control" formControlName="discountedPrice" [class.is-invalid]="shouldShowCreateFieldError('discountedPrice')" />
+              <div *ngIf="shouldShowCreateFieldError('discountedPrice')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('discountedPrice')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold">Stock <span *ngIf="isCreateFieldRequired('stock')" class="text-danger">*</span></label>
-            <input type="number" class="form-control" formControlName="stock" [class.is-invalid]="shouldShowCreateFieldError('stock')" />
-            <div class="invalid-feedback">{{ getCreateFieldError('stock') }}</div>
+            <div class="position-relative">
+              <input type="number" class="form-control" formControlName="stock" [class.is-invalid]="shouldShowCreateFieldError('stock')" />
+              <div *ngIf="shouldShowCreateFieldError('stock')" class="field-validation-icon" appTooltip [attr.title]="getCreateFieldError('stock')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
 
           <div class="col-12">
             <label class="form-label fw-semibold">Description <span *ngIf="isCreateFieldRequired('description')" class="text-danger">*</span></label>
-            <textarea rows="2" class="form-control" formControlName="description" [class.is-invalid]="shouldShowCreateFieldError('description')"></textarea>
-            <div class="invalid-feedback">{{ getCreateFieldError('description') }}</div>
+            <div class="position-relative">
+              <textarea rows="2" class="form-control" formControlName="description" [class.is-invalid]="shouldShowCreateFieldError('description')"></textarea>
+              <div *ngIf="shouldShowCreateFieldError('description')" class="field-validation-icon-textarea" appTooltip [attr.title]="getCreateFieldError('description')">
+                <i class="bi bi-exclamation-circle-fill text-danger"></i>
+              </div>
+            </div>
           </div>
 
           <div class="col-12 col-md-4 d-flex align-items-end">
@@ -377,8 +426,11 @@
         <h5 class="modal-title">Edit Item</h5>
         <button type="button" class="btn-close" (click)="closeEditModal()"></button>
       </div>
-      <div class="modal-body pt-3">
-        <div class="row g-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+        <div class="row g-3" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
           <div class="col-12 col-md-4">
             <label class="form-label fw-semibold">Organization</label>
             <ng-container *ngIf="isSuperuser; else fixedOrgField">

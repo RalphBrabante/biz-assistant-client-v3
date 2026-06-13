@@ -199,7 +199,8 @@ export class AppShellComponent {
     if (selected) {
       return selected;
     }
-    return String(this.auth.currentUser()?.organizationId || '').trim();
+    // Superuser with no stored selection defaults to all organizations
+    return this.organizationContext.ALL_ORGANIZATIONS;
   }
 
   ngOnInit(): void {

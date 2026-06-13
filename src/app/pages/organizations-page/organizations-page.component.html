@@ -141,11 +141,14 @@
         <h5 class="modal-title">Create New Organization</h5>
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="createModalError()" class="alert alert-danger mb-3">
           {{ createModalError() }}
         </div>
-        <form [formGroup]="createOrganizationForm" (ngSubmit)="createOrganization()" novalidate>
+        <form [formGroup]="createOrganizationForm" (ngSubmit)="createOrganization()" novalidate [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
           <app-organization-form-fields [form]="createOrganizationForm" [countryOptions]="countryOptions" [currencyOptions]="currencyOptions" [taxTypes]="taxTypes()" (taxIdInput)="onCreateTaxIdInput($event)"></app-organization-form-fields>
         </form>
       </div>
@@ -172,11 +175,14 @@
         <h5 class="modal-title">Edit Organization</h5>
         <button type="button" class="btn-close" (click)="closeEditModal()"></button>
       </div>
-      <div class="modal-body pt-3">
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="submitting()" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
         <div *ngIf="editModalError()" class="alert alert-danger mb-3">
           {{ editModalError() }}
         </div>
-        <form [formGroup]="editOrganizationForm" (ngSubmit)="saveEdit()" novalidate>
+        <form [formGroup]="editOrganizationForm" (ngSubmit)="saveEdit()" novalidate [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
           <app-organization-form-fields [form]="editOrganizationForm" [countryOptions]="countryOptions" [currencyOptions]="currencyOptions" [taxTypes]="taxTypes()" (taxIdInput)="onEditTaxIdInput($event)"></app-organization-form-fields>
         </form>
       </div>

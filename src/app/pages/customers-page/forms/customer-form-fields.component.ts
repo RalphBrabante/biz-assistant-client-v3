@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { AbstractControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TooltipDirective } from '../../../shared/tooltip.directive';
 
 @Component({
   selector: 'app-customer-form-fields',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './customer-form-fields.component.html',
 })
 export class CustomerFormFieldsComponent {

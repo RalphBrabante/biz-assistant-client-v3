@@ -23,10 +23,11 @@ export class OrganizationContextService {
     }
 
     const selected = String(this.selectedOrganizationId() || '').trim();
-    if (selected === this.ALL_ORGANIZATIONS) {
+    // No stored selection or explicit __all__ → all organizations
+    if (!selected || selected === this.ALL_ORGANIZATIONS) {
       return '';
     }
-    return selected || userOrgId;
+    return selected;
   }
 
   shouldApplySuperuserScope(): boolean {
@@ -41,7 +42,9 @@ export class OrganizationContextService {
     if (!this.isSuperuser()) {
       return false;
     }
-    return String(this.selectedOrganizationId() || '').trim() === this.ALL_ORGANIZATIONS;
+    const selected = String(this.selectedOrganizationId() || '').trim();
+    // No stored selection defaults to all organizations for superusers
+    return !selected || selected === this.ALL_ORGANIZATIONS;
   }
 
   setSelectedOrganizationId(organizationId: string): void {
@@ -60,6 +63,14 @@ export class OrganizationContextService {
   }
 
   private readStoredSelection(): string {
-    return String(localStorage.getItem(this.storageKey) || '').trim();
+    const stored = String(localStorage.getItem(this.storageKey) || '').trim();
+    if (stored) {
+      return stored;
+    }
+    // No stored selection: superusers default to all organizations
+    const roleCodes = (this.auth.currentUser()?.roleCodes || []).map((c) =>
+      String(c || '').toLowerCase()
+    );
+    return roleCodes.includes('superuser') ? this.ALL_ORGANIZATIONS : '';
   }
 }

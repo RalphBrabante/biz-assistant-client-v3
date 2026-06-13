@@ -1,105 +1,177 @@
 <div class="row g-3" [formGroup]="form">
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Name <span *ngIf="isRequired('name')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="name" [class.is-invalid]="hasError('name')" />
-    <div class="invalid-feedback">{{ error('name') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="name" [class.is-invalid]="hasError('name')" />
+      <div *ngIf="hasError('name')" class="field-validation-icon" appTooltip [attr.title]="error('name')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Legal Name <span *ngIf="isRequired('legalName')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="legalName" [class.is-invalid]="hasError('legalName')" />
-    <div class="invalid-feedback">{{ error('legalName') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="legalName" [class.is-invalid]="hasError('legalName')" />
+      <div *ngIf="hasError('legalName')" class="field-validation-icon" appTooltip [attr.title]="error('legalName')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Tax ID <span *ngIf="isRequired('taxId')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="taxId" placeholder="499-531-238-00000" inputmode="numeric" [class.is-invalid]="hasError('taxId')" (input)="taxIdInput.emit($event)" />
-    <div class="invalid-feedback">{{ error('taxId') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="taxId" placeholder="499-531-238-00000" inputmode="numeric" [class.is-invalid]="hasError('taxId')" (input)="taxIdInput.emit($event)" />
+      <div *ngIf="hasError('taxId')" class="field-validation-icon" appTooltip [attr.title]="error('taxId')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
 
   <div class="col-12 col-md-8">
     <label class="form-label fw-semibold">Address Line 1 <span *ngIf="isRequired('addressLine1')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="addressLine1" [class.is-invalid]="hasError('addressLine1')" />
-    <div class="invalid-feedback">{{ error('addressLine1') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="addressLine1" [class.is-invalid]="hasError('addressLine1')" />
+      <div *ngIf="hasError('addressLine1')" class="field-validation-icon" appTooltip [attr.title]="error('addressLine1')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Address Line 2 <span *ngIf="isRequired('addressLine2')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="addressLine2" [class.is-invalid]="hasError('addressLine2')" />
-    <div class="invalid-feedback">{{ error('addressLine2') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="addressLine2" [class.is-invalid]="hasError('addressLine2')" />
+      <div *ngIf="hasError('addressLine2')" class="field-validation-icon" appTooltip [attr.title]="error('addressLine2')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
 
   <div class="col-12 col-md-3">
     <label class="form-label fw-semibold">City <span *ngIf="isRequired('city')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="city" [class.is-invalid]="hasError('city')" />
-    <div class="invalid-feedback">{{ error('city') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="city" [class.is-invalid]="hasError('city')" />
+      <div *ngIf="hasError('city')" class="field-validation-icon" appTooltip [attr.title]="error('city')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-3">
     <label class="form-label fw-semibold">State <span *ngIf="isRequired('state')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="state" [class.is-invalid]="hasError('state')" />
-    <div class="invalid-feedback">{{ error('state') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="state" [class.is-invalid]="hasError('state')" />
+      <div *ngIf="hasError('state')" class="field-validation-icon" appTooltip [attr.title]="error('state')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-3">
     <label class="form-label fw-semibold">Postal Code <span *ngIf="isRequired('postalCode')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="postalCode" [class.is-invalid]="hasError('postalCode')" />
-    <div class="invalid-feedback">{{ error('postalCode') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="postalCode" [class.is-invalid]="hasError('postalCode')" />
+      <div *ngIf="hasError('postalCode')" class="field-validation-icon" appTooltip [attr.title]="error('postalCode')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-3">
     <label class="form-label fw-semibold">Country <span *ngIf="isRequired('country')" class="text-danger">*</span></label>
-    <select class="form-select" formControlName="country" [class.is-invalid]="hasError('country')">
-      <option *ngFor="let country of countryOptions" [value]="country">{{ country }}</option>
-    </select>
-    <div class="invalid-feedback">{{ error('country') }}</div>
+    <div class="position-relative">
+      <select class="form-select" formControlName="country" [class.is-invalid]="hasError('country')">
+        <option *ngFor="let country of countryOptions" [value]="country">{{ country }}</option>
+      </select>
+      <div *ngIf="hasError('country')" class="field-validation-icon-select" appTooltip [attr.title]="error('country')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-3">
     <label class="form-label fw-semibold">Currency <span *ngIf="isRequired('currency')" class="text-danger">*</span></label>
-    <select class="form-select" formControlName="currency" [class.is-invalid]="hasError('currency')">
-      <option *ngFor="let currency of currencyOptions" [value]="currency.code">{{ currency.label }}</option>
-    </select>
-    <div class="invalid-feedback">{{ error('currency') }}</div>
+    <div class="position-relative">
+      <select class="form-select" formControlName="currency" [class.is-invalid]="hasError('currency')">
+        <option *ngFor="let currency of currencyOptions" [value]="currency.code">{{ currency.label }}</option>
+      </select>
+      <div *ngIf="hasError('currency')" class="field-validation-icon-select" appTooltip [attr.title]="error('currency')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-3">
     <label class="form-label fw-semibold">Tax Type <span *ngIf="isRequired('taxTypeId')" class="text-danger">*</span></label>
-    <select class="form-select" formControlName="taxTypeId" [class.is-invalid]="hasError('taxTypeId')">
-      <option value="">Select tax type</option>
-      <option *ngFor="let taxType of taxTypes" [value]="taxType.id">{{ taxType.code }} - {{ taxType.name }} ({{ taxType.percentage }}%)</option>
-    </select>
-    <div class="invalid-feedback">{{ error('taxTypeId') }}</div>
+    <div class="position-relative">
+      <select class="form-select" formControlName="taxTypeId" [class.is-invalid]="hasError('taxTypeId')">
+        <option value="">Select tax type</option>
+        <option *ngFor="let taxType of taxTypes" [value]="taxType.id">{{ taxType.code }} - {{ taxType.name }} ({{ taxType.percentage }}%)</option>
+      </select>
+      <div *ngIf="hasError('taxTypeId')" class="field-validation-icon-select" appTooltip [attr.title]="error('taxTypeId')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
 
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Contact Name <span *ngIf="isRequired('contactName')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="contactName" [class.is-invalid]="hasError('contactName')" />
-    <div class="invalid-feedback">{{ error('contactName') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="contactName" [class.is-invalid]="hasError('contactName')" />
+      <div *ngIf="hasError('contactName')" class="field-validation-icon" appTooltip [attr.title]="error('contactName')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Contact Email <span *ngIf="isRequired('contactEmail')" class="text-danger">*</span></label>
-    <input type="email" class="form-control" formControlName="contactEmail" [class.is-invalid]="hasError('contactEmail')" />
-    <div class="invalid-feedback">{{ error('contactEmail') }}</div>
+    <div class="position-relative">
+      <input type="email" class="form-control" formControlName="contactEmail" [class.is-invalid]="hasError('contactEmail')" />
+      <div *ngIf="hasError('contactEmail')" class="field-validation-icon" appTooltip [attr.title]="error('contactEmail')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Phone <span *ngIf="isRequired('phone')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="phone" [class.is-invalid]="hasError('phone')" />
-    <div class="invalid-feedback">{{ error('phone') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="phone" [class.is-invalid]="hasError('phone')" />
+      <div *ngIf="hasError('phone')" class="field-validation-icon" appTooltip [attr.title]="error('phone')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
 
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Website <span *ngIf="isRequired('website')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="website" [class.is-invalid]="hasError('website')" />
-    <div class="invalid-feedback">{{ error('website') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="website" [class.is-invalid]="hasError('website')" />
+      <div *ngIf="hasError('website')" class="field-validation-icon" appTooltip [attr.title]="error('website')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Industry <span *ngIf="isRequired('industry')" class="text-danger">*</span></label>
-    <input class="form-control" formControlName="industry" [class.is-invalid]="hasError('industry')" />
-    <div class="invalid-feedback">{{ error('industry') }}</div>
+    <div class="position-relative">
+      <input class="form-control" formControlName="industry" [class.is-invalid]="hasError('industry')" />
+      <div *ngIf="hasError('industry')" class="field-validation-icon" appTooltip [attr.title]="error('industry')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">Employee Count <span *ngIf="isRequired('employeeCount')" class="text-danger">*</span></label>
-    <input type="number" class="form-control" formControlName="employeeCount" [class.is-invalid]="hasError('employeeCount')" />
-    <div class="invalid-feedback">{{ error('employeeCount') }}</div>
+    <div class="position-relative">
+      <input type="number" class="form-control" formControlName="employeeCount" [class.is-invalid]="hasError('employeeCount')" />
+      <div *ngIf="hasError('employeeCount')" class="field-validation-icon" appTooltip [attr.title]="error('employeeCount')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
 
   <div class="col-12">
     <label class="form-label fw-semibold">Notes <span *ngIf="isRequired('notes')" class="text-danger">*</span></label>
-    <textarea rows="2" class="form-control" formControlName="notes" [class.is-invalid]="hasError('notes')"></textarea>
-    <div class="invalid-feedback">{{ error('notes') }}</div>
+    <div class="position-relative">
+      <textarea rows="2" class="form-control" formControlName="notes" [class.is-invalid]="hasError('notes')"></textarea>
+      <div *ngIf="hasError('notes')" class="field-validation-icon-textarea" appTooltip [attr.title]="error('notes')">
+        <i class="bi bi-exclamation-circle-fill text-danger"></i>
+      </div>
+    </div>
   </div>
 
   <div class="col-12 col-md-4 d-flex align-items-end">
