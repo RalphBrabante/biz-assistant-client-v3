@@ -72,21 +72,40 @@
   </div>
 </section>
 
-<section class="row g-4">
-  <div class="col-12" *ngIf="canViewReports && canViewFinancialCharts">
-    <article class="card border-0 shadow-sm rounded-4">
-      <div class="card-body p-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-          <div>
-            <h2 class="h5 mb-1">Yearly Sales vs Expenses</h2>
-            <div class="small text-secondary">Quarterly totals for {{ selectedYear }}</div>
+<!-- Sales vs Expenses Chart -->
+<section class="mb-4" *ngIf="canViewReports && canViewFinancialCharts">
+  <article class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+
+      <!-- Chart header -->
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+        <div>
+          <h2 class="h5 mb-1">Sales vs Expenses</h2>
+          <div class="small text-secondary">
+            {{ chartView === 'monthly' ? 'Monthly' : 'Quarterly' }} totals for {{ selectedYear }}
           </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <!-- Monthly / Quarterly toggle -->
+          <div class="btn-group btn-group-sm" role="group" aria-label="Chart view">
+            <button type="button" class="btn btn-outline-secondary"
+              [class.active]="chartView === 'monthly'"
+              (click)="setChartView('monthly')">
+              <i class="bi bi-bar-chart-steps me-1"></i>Monthly
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+              [class.active]="chartView === 'quarterly'"
+              (click)="setChartView('quarterly')">
+              <i class="bi bi-bar-chart me-1"></i>Quarterly
+            </button>
+          </div>
+          <!-- Year selector -->
           <div class="d-flex align-items-center gap-2">
             <label for="dashboardYear" class="small text-secondary mb-0">Year</label>
             <select
               id="dashboardYear"
               class="form-select form-select-sm"
-              style="width: 120px;"
+              style="width: 100px;"
               [value]="selectedYear"
               (change)="onYearChange($any($event.target).value)"
             >
@@ -94,33 +113,49 @@
             </select>
           </div>
         </div>
+      </div>
 
-        <div class="row g-3 mb-3">
-          <div class="col-12 col-md-6">
-            <div class="bg-success-subtle rounded-3 p-3">
-              <div class="small text-secondary text-uppercase">Yearly Sales</div>
-              <div class="h5 mb-0 text-success">{{ toCurrency(yearlySalesTotal, yearlyCurrency) }}</div>
+      <!-- Summary totals -->
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-6">
+          <div class="bg-success-subtle rounded-3 p-3">
+            <div class="small text-secondary text-uppercase">
+              Total Sales <span class="text-muted">({{ selectedYear }})</span>
             </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <div class="bg-danger-subtle rounded-3 p-3">
-              <div class="small text-secondary text-uppercase">Yearly Expenses</div>
-              <div class="h5 mb-0 text-danger">{{ toCurrency(yearlyExpenseTotal, yearlyCurrency) }}</div>
-            </div>
+            <div class="h5 mb-0 text-success">{{ toCurrency(yearlySalesTotal, orgCurrency) }}</div>
           </div>
         </div>
+        <div class="col-12 col-md-6">
+          <div class="bg-danger-subtle rounded-3 p-3">
+            <div class="small text-secondary text-uppercase">
+              Total Expenses <span class="text-muted">({{ selectedYear }})</span>
+            </div>
+            <div class="h5 mb-0 text-danger">{{ toCurrency(yearlyExpenseTotal, orgCurrency) }}</div>
+          </div>
+        </div>
+      </div>
 
-        <div *ngIf="chartError" class="alert alert-danger py-2">{{ chartError }}</div>
-        <div class="position-relative" style="height: 320px;">
-          <canvas #yearlyReportChart aria-label="Yearly sales and expenses chart"></canvas>
-          <div *ngIf="chartLoading" class="position-absolute top-50 start-50 translate-middle small text-secondary">
+      <!-- Chart canvas -->
+      <div *ngIf="chartError" class="alert alert-danger py-2">{{ chartError }}</div>
+      <div class="position-relative" style="height: 340px;">
+        <canvas #salesExpenseChart aria-label="Sales and expenses chart"></canvas>
+        <div *ngIf="chartLoading"
+          class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-body bg-opacity-75 rounded-3">
+          <div class="d-flex align-items-center gap-2 text-secondary small">
+            <div class="spinner-border spinner-border-sm" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
             Loading chart data...
           </div>
         </div>
       </div>
-    </article>
-  </div>
 
+    </div>
+  </article>
+</section>
+
+<!-- Orders by Status + System Health -->
+<section class="row g-4">
   <div class="col-12 col-xl-7" *ngIf="canViewOrders">
     <article class="card border-0 shadow-sm rounded-4 h-100">
       <div class="card-body p-4">

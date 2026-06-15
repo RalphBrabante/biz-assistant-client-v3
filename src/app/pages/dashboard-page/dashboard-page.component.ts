@@ -3,6 +3,7 @@ import {
   AfterViewInit,
   Component,
   OnDestroy,
+  OnInit,
   ViewChild,
   ElementRef,
   inject,
@@ -39,19 +40,34 @@ interface ExpenseDashboardRow {
   currency?: string;
 }
 
+interface MonthlyDataPoint {
+  month: number;
+  monthName: string;
+  sales: number;
+  expenses: number;
+}
+
+interface MonthlySummaryResponse {
+  year: number;
+  currency: string;
+  totalSales: number;
+  totalExpenses: number;
+  months: MonthlyDataPoint[];
+}
+
 @Component({
   selector: 'app-dashboard-page',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './dashboard-page.component.html',
 })
-export class DashboardPageComponent implements AfterViewInit, OnDestroy {
+export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly organizationContext = inject(OrganizationContextService);
 
-  @ViewChild('yearlyReportChart') yearlyReportChartRef?: ElementRef<HTMLCanvasElement>;
-  private yearlyChart: Chart<'bar', number[], string> | null = null;
+  @ViewChild('salesExpenseChart') salesExpenseChartRef?: ElementRef<HTMLCanvasElement>;
+  private salesExpenseChart: Chart<'bar', number[], string> | null = null;
 
   loading = false;
   error = '';
@@ -62,9 +78,9 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
   selectedYear = new Date().getFullYear();
   chartLoading = false;
   chartError = '';
+  chartView: 'monthly' | 'quarterly' = 'monthly';
   yearlySalesTotal = 0;
   yearlyExpenseTotal = 0;
-  yearlyCurrency = 'USD';
   readonly availableYears = Array.from({ length: 8 }, (_v, index) => new Date().getFullYear() - index);
 
   get canViewItems(): boolean {
@@ -117,8 +133,8 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     return roleCodes.includes('superuser');
   }
 
-  get currentOrganizationCurrency(): string {
-    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
+  get orgCurrency(): string {
+    return this.normalizeCurrencyCode(this.auth.currentUser()?.currency || 'USD');
   }
 
   private get orgParamValue(): string {
@@ -126,28 +142,24 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     if (!organizationId) {
       return '';
     }
-    // Superuser "all organizations" mode intentionally omits organizationId filter.
     if (this.isSuperuser && !this.organizationContext.shouldApplySuperuserScope()) {
       return '';
     }
     return organizationId;
   }
 
+  ngOnInit(): void {
+    this.refresh();
+  }
+
   ngAfterViewInit(): void {
     if (this.canViewReports && this.canViewFinancialCharts) {
-      this.loadYearlyReportsChart();
+      this.loadChart();
     }
   }
 
   ngOnDestroy(): void {
-    if (this.yearlyChart) {
-      this.yearlyChart.destroy();
-      this.yearlyChart = null;
-    }
-  }
-
-  ngOnInit(): void {
-    this.refresh();
+    this.destroyChart();
   }
 
   refresh(): void {
@@ -206,7 +218,7 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
           : [];
         this.orderStatusMax = Math.max(1, ...this.orderStatusCounts.map((row) => row.value));
         if (this.canViewReports && this.canViewFinancialCharts) {
-          this.loadYearlyReportsChart();
+          this.loadChart();
         }
       },
       error: () => {
@@ -214,6 +226,20 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
         this.error = 'Unable to load dashboard metrics.';
       },
     });
+  }
+
+  setChartView(view: 'monthly' | 'quarterly'): void {
+    if (this.chartView === view) {
+      return;
+    }
+    this.chartView = view;
+    this.loadChart();
+  }
+
+  onYearChange(value: string): void {
+    const parsed = Number(value);
+    this.selectedYear = Number.isInteger(parsed) ? parsed : new Date().getFullYear();
+    this.loadChart();
   }
 
   maxOrderStatusCount(): number {
@@ -228,24 +254,52 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
     return row.label;
   }
 
-  private fetchTotal(endpoint: string) {
-    return this.api.list<unknown>(endpoint).pipe(
-      map((response: ApiResponse<unknown[]>) => Number(response.meta?.total || 0) || 0),
-      catchError(() => of(0))
-    );
+  private loadChart(): void {
+    if (this.chartView === 'monthly') {
+      this.loadMonthlyChart();
+    } else {
+      this.loadQuarterlyChart();
+    }
   }
 
-  onYearChange(value: string): void {
-    const parsed = Number(value);
-    this.selectedYear = Number.isInteger(parsed) ? parsed : new Date().getFullYear();
-    this.loadYearlyReportsChart();
-  }
-
-  private loadYearlyReportsChart(): void {
+  private loadMonthlyChart(): void {
     this.chartLoading = true;
     this.chartError = '';
 
-    // Dashboard chart is derived from live transactional tables (not snapshot report tables).
+    const params = new URLSearchParams({ year: String(this.selectedYear) });
+    if (this.orgParamValue) {
+      params.set('organizationId', this.orgParamValue);
+    }
+
+    this.api.get<MonthlySummaryResponse>(`/api/v1/dashboard/monthly-summary?${params.toString()}`).pipe(
+      map((response) => response.data),
+      catchError(() => of(null))
+    ).subscribe({
+      next: (data) => {
+        this.chartLoading = false;
+        if (!data) {
+          this.chartError = 'Unable to load monthly sales and expense data.';
+          return;
+        }
+        this.yearlySalesTotal = data.totalSales;
+        this.yearlyExpenseTotal = data.totalExpenses;
+        this.renderChart(
+          data.months.map((m) => m.monthName),
+          data.months.map((m) => m.sales),
+          data.months.map((m) => m.expenses)
+        );
+      },
+      error: () => {
+        this.chartLoading = false;
+        this.chartError = 'Unable to load monthly sales and expense data.';
+      },
+    });
+  }
+
+  private loadQuarterlyChart(): void {
+    this.chartLoading = true;
+    this.chartError = '';
+
     const salesParams = new URLSearchParams({
       issueDateFrom: `${this.selectedYear}-01-01`,
       issueDateTo: `${this.selectedYear}-12-31`,
@@ -281,68 +335,53 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
           expenses: [0, 0, 0, 0],
         };
 
-        // Aggregate by quarter client-side so the chart reflects selected year instantly.
         for (const row of sales) {
           const quarter = this.quarterFromDate(row.issueDate);
-          if (!quarter) {
-            continue;
-          }
-          const qIndex = quarter - 1;
-          quarterTotals.sales[qIndex] += Number(row.totalAmount || 0);
+          if (!quarter) continue;
+          quarterTotals.sales[quarter - 1] += Number(row.totalAmount || 0);
         }
-
         for (const row of expenses) {
           const quarter = this.quarterFromDate(row.expenseDate);
-          if (!quarter) {
-            continue;
-          }
-          const qIndex = quarter - 1;
-          quarterTotals.expenses[qIndex] += Number(row.totalAmount || 0);
+          if (!quarter) continue;
+          quarterTotals.expenses[quarter - 1] += Number(row.totalAmount || 0);
         }
 
-        this.yearlySalesTotal = quarterTotals.sales.reduce((sum, value) => sum + value, 0);
-        this.yearlyExpenseTotal = quarterTotals.expenses.reduce((sum, value) => sum + value, 0);
-        this.yearlyCurrency = this.normalizeCurrencyCode(
-          sales[0]?.currency || expenses[0]?.currency || this.currentOrganizationCurrency
-        );
-
-        this.renderYearlyChart(quarterTotals.sales, quarterTotals.expenses);
+        this.yearlySalesTotal = quarterTotals.sales.reduce((sum, v) => sum + v, 0);
+        this.yearlyExpenseTotal = quarterTotals.expenses.reduce((sum, v) => sum + v, 0);
+        this.renderChart(['Q1', 'Q2', 'Q3', 'Q4'], quarterTotals.sales, quarterTotals.expenses);
       },
       error: () => {
         this.chartLoading = false;
-        this.chartError = 'Unable to load yearly sales and expense reports.';
+        this.chartError = 'Unable to load quarterly sales and expense reports.';
       },
     });
   }
 
   private quarterFromDate(value: unknown): number | null {
     const raw = String(value || '').trim();
-    if (!raw) {
-      return null;
-    }
-    const monthToken = raw.split('-')[1];
-    const month = Number(monthToken);
-    if (!Number.isInteger(month) || month < 1 || month > 12) {
-      return null;
-    }
+    if (!raw) return null;
+    const month = Number(raw.split('-')[1]);
+    if (!Number.isInteger(month) || month < 1 || month > 12) return null;
     return Math.floor((month - 1) / 3) + 1;
   }
 
-  private renderYearlyChart(sales: number[], expenses: number[]): void {
-    const canvas = this.yearlyReportChartRef?.nativeElement;
-    if (!canvas) {
-      return;
+  private destroyChart(): void {
+    if (this.salesExpenseChart) {
+      this.salesExpenseChart.destroy();
+      this.salesExpenseChart = null;
     }
+  }
 
-    if (this.yearlyChart) {
-      this.yearlyChart.destroy();
-      this.yearlyChart = null;
-    }
+  private renderChart(labels: string[], sales: number[], expenses: number[]): void {
+    const canvas = this.salesExpenseChartRef?.nativeElement;
+    if (!canvas) return;
 
-    this.yearlyChart = new Chart<'bar', number[], string>(canvas, {
+    this.destroyChart();
+
+    this.salesExpenseChart = new Chart<'bar', number[], string>(canvas, {
       type: 'bar',
       data: {
-        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+        labels,
         datasets: [
           {
             label: 'Sales',
@@ -366,15 +405,12 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            position: 'top',
-          },
+          legend: { position: 'top' },
           tooltip: {
             callbacks: {
               label: (ctx: TooltipItem<'bar'>) => {
                 const value = Number(ctx.raw || 0);
-                const formatted = this.toCurrency(value, this.yearlyCurrency);
-                return `${ctx.dataset.label}: ${formatted}`;
+                return `${ctx.dataset.label}: ${this.toCurrency(value, this.orgCurrency)}`;
               },
             },
           },
@@ -383,10 +419,8 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
           y: {
             beginAtZero: true,
             ticks: {
-              callback: (tickValue: string | number) => {
-                const value = Number(tickValue || 0);
-                return this.toCurrency(value, this.yearlyCurrency, 0, 0);
-              },
+              callback: (tickValue: string | number) =>
+                this.toCurrency(Number(tickValue || 0), this.orgCurrency, 0, 0),
             },
           },
         },
@@ -416,9 +450,13 @@ export class DashboardPageComponent implements AfterViewInit, OnDestroy {
 
   private normalizeCurrencyCode(currency: unknown): string {
     const raw = String(currency || '').trim().toUpperCase();
-    if (/^[A-Z]{3}$/.test(raw)) {
-      return raw;
-    }
-    return 'USD';
+    return /^[A-Z]{3}$/.test(raw) ? raw : 'USD';
+  }
+
+  private fetchTotal(endpoint: string) {
+    return this.api.list<unknown>(endpoint).pipe(
+      map((response: ApiResponse<unknown[]>) => Number(response.meta?.total || 0) || 0),
+      catchError(() => of(0))
+    );
   }
 }
