@@ -737,3 +737,17 @@ fieldset[disabled] {
   line-height: 1;
   font-size: 0.875rem;
 }
+
+.expense-breakdown-popover {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.expense-breakdown-popover.show {
+  display: block;
+}
+.expense-breakdown-cell {
+  cursor: pointer;
+}

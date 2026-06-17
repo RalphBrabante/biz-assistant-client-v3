@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { ConfirmDialogService } from '../../core/confirm-dialog.service';
@@ -556,7 +556,7 @@ export class VendorsPageComponent {
       legalName: [defaults['legalName'], [Validators.maxLength(200)]],
       taxId: [maskedTaxId, [Validators.maxLength(64)]],
       contactPerson: [defaults['contactPerson'], [Validators.maxLength(150)]],
-      contactEmail: [defaults['contactEmail'], [Validators.email]],
+      contactEmail: [defaults['contactEmail'], [this.optionalEmailValidator]],
       phone: [defaults['phone'], [Validators.maxLength(50)]],
       addressLine1: [defaults['addressLine1'], [Validators.maxLength(255)]],
       addressLine2: [defaults['addressLine2'], [Validators.maxLength(255)]],
@@ -589,6 +589,12 @@ export class VendorsPageComponent {
       return;
     }
     this.vendorModalError.set('');
+  }
+
+  private optionalEmailValidator(control: AbstractControl): ValidationErrors | null {
+    const value = String(control.value || '').trim();
+    if (!value) return null;
+    return Validators.email(control);
   }
 
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {

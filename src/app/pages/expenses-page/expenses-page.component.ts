@@ -633,6 +633,37 @@ export class ExpensesPageComponent {
     }
   }
 
+  breakdownRow: ExpenseRow | null = null;
+  breakdownTop = 0;
+  breakdownLeft = 0;
+
+  showBreakdown(event: MouseEvent, row: ExpenseRow): void {
+    const cell = event.currentTarget as HTMLElement;
+    const rect = cell.getBoundingClientRect();
+    this.breakdownTop = rect.top - 8;
+    this.breakdownLeft = rect.right;
+    this.breakdownRow = row;
+
+    requestAnimationFrame(() => {
+      const popover = document.querySelector('.expense-breakdown-popover.show') as HTMLElement;
+      if (!popover) return;
+      const popRect = popover.getBoundingClientRect();
+      this.breakdownTop = rect.top - popRect.height;
+      this.breakdownLeft = rect.right - popRect.width;
+      if (this.breakdownTop < 4) this.breakdownTop = 4;
+      if (this.breakdownLeft < 4) this.breakdownLeft = rect.left;
+    });
+  }
+
+  hideBreakdown(): void {
+    this.breakdownRow = null;
+  }
+
+  computeVatExclusive(row: ExpenseRow): number {
+    const amount = Number(row.amount ?? 0);
+    return +(amount / 1.12).toFixed(2);
+  }
+
   onVendorSearchChange(value: string): void {
     if (this.isContextLocked) return;
     const query = String(value || '');
@@ -949,6 +980,12 @@ export class ExpensesPageComponent {
     );
   }
 
+  private optionalEmailValidator(control: AbstractControl): ValidationErrors | null {
+    const value = String(control.value || '').trim();
+    if (!value) return null;
+    return Validators.email(control);
+  }
+
   private expenseDateRangeValidator(control: AbstractControl): ValidationErrors | null {
     const expenseDate = String(control.get('expenseDate')?.value || '').trim();
     const dueDate = String(control.get('dueDate')?.value || '').trim();
@@ -980,7 +1017,7 @@ export class ExpensesPageComponent {
       legalName: ['', [Validators.maxLength(120)]],
       taxId: ['', [Validators.required, Validators.pattern(/^\d{3}-\d{3}-\d{3}-\d{5}$/)]],
       contactPerson: ['', [Validators.maxLength(120)]],
-      contactEmail: ['', [Validators.email, Validators.maxLength(120)]],
+      contactEmail: ['', [this.optionalEmailValidator, Validators.maxLength(120)]],
       phone: ['', [Validators.maxLength(50)]],
       addressLine1: ['', [Validators.maxLength(255)]],
       addressLine2: ['', [Validators.maxLength(255)]],

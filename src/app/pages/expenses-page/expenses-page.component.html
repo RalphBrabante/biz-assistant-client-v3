@@ -244,7 +244,14 @@
           <td>{{ formatMoney(row.taxableAmount ?? 0, row.currency || currentOrganizationCurrency) }}</td>
           <td>{{ row.status || '-' }}</td>
           <td>{{ row.expenseDate ? (row.expenseDate | date: 'mediumDate') : '-' }}</td>
-          <td>{{ formatMoney(row.totalAmount ?? 0, row.currency || currentOrganizationCurrency) }}</td>
+          <td class="expense-breakdown-cell"
+            (mouseenter)="showBreakdown($event, row)"
+            (mouseleave)="hideBreakdown()">
+            <span class="d-inline-flex align-items-center gap-1">
+              {{ formatMoney(row.totalAmount ?? 0, row.currency || currentOrganizationCurrency) }}
+              <i class="bi bi-info-circle text-secondary small opacity-50"></i>
+            </span>
+          </td>
           <td class="text-end">
             <div class="table-actions-inline">
               <a class="btn btn-sm btn-outline-primary" [routerLink]="['/expenses', row.id]" appTooltip title="Details">
@@ -875,6 +882,51 @@
           {{ submitting() ? 'Importing...' : 'Import Expenses' }}
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shared breakdown popover (positioned via JS) -->
+<div class="expense-breakdown-popover card border-0 shadow-lg rounded-3"
+  [class.show]="breakdownRow"
+  [style.top.px]="breakdownTop"
+  [style.left.px]="breakdownLeft"
+  *ngIf="breakdownRow as r">
+  <div class="card-body p-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <i class="bi bi-receipt text-primary small"></i>
+      <span class="small fw-semibold text-uppercase text-secondary">Tax Breakdown</span>
+    </div>
+    <div class="row g-1 small" style="min-width: 300px;">
+      <div class="col-7 text-secondary">Total on Receipt</div>
+      <div class="col-5 text-end font-monospace">{{ formatMoney(r.amount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
+
+      <div class="col-7 text-secondary">VAT-Exclusive (&divide; 1.12)</div>
+      <div class="col-5 text-end font-monospace">{{ formatMoney(computeVatExclusive(r), r.currency || currentOrganizationCurrency) }}</div>
+
+      <div class="col-7 text-secondary">Less: VAT-Exempt</div>
+      <div class="col-5 text-end font-monospace text-danger">{{ formatMoney(-(r.vatExemptAmount ?? 0), r.currency || currentOrganizationCurrency) }}</div>
+
+      <div class="col-12"><hr class="my-1" /></div>
+
+      <div class="col-7 fw-semibold">Taxable Amount</div>
+      <div class="col-5 text-end font-monospace fw-semibold">{{ formatMoney(r.taxableAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
+
+      <div class="col-7 text-secondary">VAT (12%)</div>
+      <div class="col-5 text-end font-monospace text-success">{{ formatMoney(r.taxAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
+
+      <div class="col-12"><hr class="my-1" /></div>
+
+      <div class="col-7 text-secondary">Discount</div>
+      <div class="col-5 text-end font-monospace text-danger">{{ formatMoney(-(r.discountAmount ?? 0), r.currency || currentOrganizationCurrency) }}</div>
+
+      <div class="col-7 text-secondary">Withholding Tax</div>
+      <div class="col-5 text-end font-monospace text-danger">{{ formatMoney(-(r.withHoldingTaxAmount ?? 0), r.currency || currentOrganizationCurrency) }}</div>
+
+      <div class="col-12"><hr class="my-1" /></div>
+
+      <div class="col-7 fw-bold">Net Amount Payable</div>
+      <div class="col-5 text-end font-monospace fw-bold">{{ formatMoney(r.totalAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
     </div>
   </div>
 </div>
