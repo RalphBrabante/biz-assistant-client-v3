@@ -369,7 +369,7 @@ export class ExpensesPageComponent {
     this.importModalError.set('');
   }
 
-  createExpense(): void {
+  async createExpense(): Promise<void> {
     if (this.isContextLocked) {
       this.createModalError.set('Select a specific organization before creating an expense.');
       return;
@@ -393,6 +393,18 @@ export class ExpensesPageComponent {
       this.createExpenseForm.get('vendorId')?.markAsTouched();
       this.createModalError.set('Please select a vendor from search results.');
       return;
+    }
+
+    const expenseDate = String(this.createExpenseForm.get('expenseDate')?.value || '').trim();
+    if (expenseDate && !this.isInCurrentQuarter(expenseDate)) {
+      const confirmed = await this.confirmDialog.confirm({
+        title: 'Date Outside Current Quarter',
+        message: `The expense date (${expenseDate}) is not within the current quarter. This may affect your quarterly BIR filings. Are you sure you want to proceed?`,
+        confirmText: 'Proceed Anyway',
+        confirmButtonClass: 'btn-warning',
+        iconClass: 'bi-exclamation-triangle',
+      });
+      if (!confirmed) return;
     }
 
     this.submitting.set(true);
@@ -978,6 +990,15 @@ export class ExpensesPageComponent {
         validators: [this.expenseDateRangeValidator, this.vatExemptNotGreaterThanAmountValidator],
       }
     );
+  }
+
+  private isInCurrentQuarter(dateStr: string): boolean {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return true;
+    const now = new Date();
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const dateQuarter = Math.floor(d.getMonth() / 3);
+    return d.getFullYear() === now.getFullYear() && dateQuarter === currentQuarter;
   }
 
   private optionalEmailValidator(control: AbstractControl): ValidationErrors | null {

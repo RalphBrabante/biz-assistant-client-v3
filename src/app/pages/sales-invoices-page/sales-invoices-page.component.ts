@@ -228,7 +228,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     this.importModalError.set('');
   }
 
-  createInvoice(): void {
+  async createInvoice(): Promise<void> {
     if (this.isContextLocked) {
       this.error.set('Select a specific organization before creating a sales invoice.');
       return;
@@ -246,6 +246,18 @@ export class SalesInvoicesPageComponent implements OnDestroy {
       this.createInvoiceForm.markAllAsTouched();
       this.error.set('Please complete all required sales invoice fields.');
       return;
+    }
+
+    const issueDate = String(this.createInvoiceForm.get('issueDate')?.value || '').trim();
+    if (issueDate && !this.isInCurrentQuarter(issueDate)) {
+      const confirmed = await this.confirmDialog.confirm({
+        title: 'Date Outside Current Quarter',
+        message: `The issue date (${issueDate}) is not within the current quarter. This may affect your quarterly BIR filings. Are you sure you want to proceed?`,
+        confirmText: 'Proceed Anyway',
+        confirmButtonClass: 'btn-warning',
+        iconClass: 'bi-exclamation-triangle',
+      });
+      if (!confirmed) return;
     }
 
     this.submitting.set(true);
@@ -658,6 +670,15 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     } else {
       this.createInvoiceForm.patchValue({ scPwdDiscount: 0 });
     }
+  }
+
+  private isInCurrentQuarter(dateStr: string): boolean {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return true;
+    const now = new Date();
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const dateQuarter = Math.floor(d.getMonth() / 3);
+    return d.getFullYear() === now.getFullYear() && dateQuarter === currentQuarter;
   }
 
   private setupInvoiceAutoCompute(): void {
