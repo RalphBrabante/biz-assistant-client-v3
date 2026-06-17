@@ -210,40 +210,32 @@
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
+          <th>Date</th>
           <th *ngIf="isSuperuser">Organization</th>
           <th>Category</th>
           <th>Vendor</th>
-          <th>Tax Type</th>
-          <th>Withholding Type</th>
-          <th>VAT Exempt Amount</th>
-          <th>Taxable Amount</th>
           <th>Status</th>
-          <th>Date</th>
           <th>Total</th>
           <th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngIf="loading()">
-          <td [attr.colspan]="isSuperuser ? 11 : 10" class="text-center py-5 border-0">
+          <td [attr.colspan]="isSuperuser ? 7 : 6" class="text-center py-5 border-0">
             <span class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></span>
             <span class="text-secondary small">Loading...</span>
           </td>
         </tr>
         <tr *ngIf="!loading() && rows().length === 0">
-          <td [attr.colspan]="isSuperuser ? 11 : 10" class="text-center text-secondary py-4">No expenses found.</td>
+          <td [attr.colspan]="isSuperuser ? 7 : 6" class="text-center text-secondary py-4">No expenses found.</td>
         </tr>
 
         <tr *ngFor="let row of rows(); trackBy: trackById">
+          <td>{{ row.expenseDate ? (row.expenseDate | date: 'mediumDate') : '-' }}</td>
           <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
           <td>{{ row.category }}</td>
           <td>{{ vendorLabel(row) }}</td>
-          <td>{{ taxTypeLabel(row) }}</td>
-          <td>{{ withholdingTaxTypeLabel(row) }}</td>
-          <td>{{ formatMoney(row.vatExemptAmount ?? 0, row.currency || currentOrganizationCurrency) }}</td>
-          <td>{{ formatMoney(row.taxableAmount ?? 0, row.currency || currentOrganizationCurrency) }}</td>
           <td>{{ row.status || '-' }}</td>
-          <td>{{ row.expenseDate ? (row.expenseDate | date: 'mediumDate') : '-' }}</td>
           <td class="expense-breakdown-cell"
             (mouseenter)="showBreakdown($event, row)"
             (mouseleave)="hideBreakdown()">
@@ -253,23 +245,29 @@
             </span>
           </td>
           <td class="text-end">
-            <div class="table-actions-inline">
-              <a class="btn btn-sm btn-outline-primary" [routerLink]="['/expenses', row.id]" appTooltip title="Details">
-                <i class="bi bi-eye"></i>
-              </a>
-              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="startEdit(row)" appTooltip title="Edit">
-                <i class="bi bi-pencil-square"></i>
+            <div class="btn-group table-actions-menu">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-three-dots-vertical"></i>
               </button>
-              <button
-                class="btn btn-sm btn-outline-danger"
-                type="button"
-                [disabled]="deletingId() === row.id"
-                (click)="removeExpense(row.id)"
-                appTooltip
-                title="Delete"
-              >
-                <i class="bi bi-trash3"></i>
-              </button>
+              <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                <li>
+                  <a class="dropdown-item d-flex align-items-center gap-2" [routerLink]="['/expenses', row.id]">
+                    <i class="bi bi-eye"></i> View Details
+                  </a>
+                </li>
+                <li>
+                  <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="startEdit(row)">
+                    <i class="bi bi-pencil-square"></i> Edit
+                  </button>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <button class="dropdown-item d-flex align-items-center gap-2 text-danger" type="button"
+                    [disabled]="deletingId() === row.id" (click)="removeExpense(row.id)">
+                    <i class="bi bi-trash3"></i> {{ deletingId() === row.id ? 'Deleting...' : 'Delete' }}
+                  </button>
+                </li>
+              </ul>
             </div>
           </td>
         </tr>
@@ -294,91 +292,6 @@
   </div>
 </section>
 
-<div class="modal-backdrop fade show" *ngIf="isEditModalOpen()"></div>
-<div
-  class="modal fade show"
-  tabindex="-1"
-  [style.display]="isEditModalOpen() ? 'block' : 'none'"
-  [attr.aria-hidden]="!isEditModalOpen()"
-  *ngIf="isEditModalOpen()"
->
-  <div class="modal-dialog modal-dialog-centered modal-xl">
-    <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title">Edit Expense</h5>
-        <button type="button" class="btn-close" (click)="cancelEdit()"></button>
-      </div>
-      <div class="modal-body pt-3 position-relative">
-        <div *ngIf="submitting()" class="modal-loading-overlay">
-          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-        </div>
-        <div *ngIf="editModalError()" class="alert alert-danger py-2">
-          {{ editModalError() }}
-        </div>
-        <div class="row g-3" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
-          <div class="col-12 col-md-3">
-            <label class="form-label">Vendor ID</label>
-            <input class="form-control" [(ngModel)]="editForm['vendorId']" />
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Category</label>
-            <select class="form-select" [(ngModel)]="editForm['category']">
-              <option value="" disabled>Select category</option>
-              <option value="operations">Operations</option>
-              <option value="goods">Goods</option>
-              <option value="others">Others</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Status</label>
-            <select class="form-select" [(ngModel)]="editForm['status']">
-              <option value="draft">draft</option>
-              <option value="submitted">submitted</option>
-              <option value="approved">approved</option>
-              <option value="paid">paid</option>
-              <option value="cancelled">cancelled</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Withholding Tax Type</label>
-            <select class="form-select" [(ngModel)]="editForm['withholdingTaxTypeId']">
-              <option value="">None</option>
-              <option *ngFor="let withholdingTaxType of withholdingTaxTypes()" [value]="withholdingTaxType.id">
-                {{ withholdingTaxType.name }} ({{ withholdingTaxType.percentage }}%)
-              </option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Expense Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editForm['expenseDate']" />
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Due Date</label>
-            <input type="date" class="form-control" [(ngModel)]="editForm['dueDate']" />
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Amount</label>
-            <input type="number" step="0.01" class="form-control" [(ngModel)]="editForm['amount']" />
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">VAT Exempt Amount</label>
-            <input type="number" step="0.01" class="form-control" [(ngModel)]="editForm['vatExemptAmount']" />
-          </div>
-          <div class="col-12">
-            <label class="form-label">Notes</label>
-            <textarea rows="2" class="form-control" [(ngModel)]="editForm['notes']"></textarea>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer border-0 pt-0">
-        <button class="btn btn-outline-secondary" (click)="cancelEdit()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
-        <button class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
-          {{ submitting() ? 'Saving...' : 'Save Expense' }}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 </div>
 
 <div class="modal-backdrop fade show" *ngIf="isCreateModalOpen()"></div>
@@ -392,8 +305,8 @@
   <div class="modal-dialog modal-dialog-centered modal-xl">
     <div class="modal-content border-0 shadow-lg">
       <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title">Create Expense</h5>
-        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
+        <h5 class="modal-title">{{ editingId ? 'Edit Expense' : 'Create Expense' }}</h5>
+        <button type="button" class="btn-close" (click)="editingId ? cancelEdit() : closeCreateModal()"></button>
       </div>
       <div class="modal-body pt-3 position-relative">
         <div *ngIf="submitting()" class="modal-loading-overlay">
@@ -721,9 +634,12 @@
         </form>
       </div>
       <div class="modal-footer border-0 pt-0">
-        <button class="btn btn-outline-secondary" (click)="closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
-        <button class="btn btn-primary" [disabled]="submitting()" (click)="createExpense()">
+        <button class="btn btn-outline-secondary" (click)="editingId ? cancelEdit() : closeCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button *ngIf="!editingId" class="btn btn-primary" [disabled]="submitting()" (click)="createExpense()">
           {{ submitting() ? 'Creating...' : 'Create Expense' }}
+        </button>
+        <button *ngIf="editingId" class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
+          {{ submitting() ? 'Saving...' : 'Save Expense' }}
         </button>
       </div>
     </div>

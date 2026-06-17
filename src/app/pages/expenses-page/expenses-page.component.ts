@@ -106,7 +106,6 @@ export class ExpensesPageComponent {
   readonly submitting = signal(false);
   readonly deletingId = signal('');
   readonly isCreateModalOpen = signal(false);
-  readonly isEditModalOpen = signal(false);
   readonly isImportModalOpen = signal(false);
   readonly exporting = signal(false);
   readonly loadingVendors = signal(false);
@@ -123,7 +122,6 @@ export class ExpensesPageComponent {
   readonly message = signal('');
   readonly error = signal('');
   readonly createModalError = signal('');
-  readonly editModalError = signal('');
   readonly importModalError = signal('');
   readonly importSummary = signal<ExpenseImportSummary | null>(null);
   viewMode: TableViewMode = 'table';
@@ -149,7 +147,6 @@ export class ExpensesPageComponent {
   computedTotalAmount = 0;
   vendorCreateForm: FormGroup = this.newVendorCreateForm();
   editingId = '';
-  editForm: Record<string, unknown> = this.newExpenseForm();
   private readonly vendorSearchInput$ = new Subject<string>();
   private vendorSearchSub?: Subscription;
   private createFile: File | null = null;
@@ -444,10 +441,9 @@ export class ExpensesPageComponent {
 
   startEdit(row: ExpenseRow): void {
     if (this.isContextLocked) return;
-    this.loadWithholdingTaxTypes();
     this.editingId = row.id;
-    this.editForm = {
-      organizationId: row.organizationId || '',
+    this.createExpenseForm = this.newCreateExpenseForm();
+    this.createExpenseForm.patchValue({
       vendorId: row.vendorId || '',
       vendorTaxId: row.vendorTaxId || '',
       expenseNumber: row.expenseNumber || '',
@@ -459,26 +455,40 @@ export class ExpensesPageComponent {
       dueDate: row.dueDate || '',
       status: row.status || 'draft',
       paymentMethod: row.paymentMethod || 'bank_transfer',
-      currency: row.currency || this.currentOrganizationCurrency,
       amount: row.amount ?? 0,
       discountAmount: row.discountAmount ?? 0,
+      serviceCharge: (row as any).serviceCharge ?? 0,
       notes: row.notes || '',
-      updatedBy: this.currentUserId,
-    };
-    this.editModalError.set('');
-    this.isEditModalOpen.set(true);
+    });
+    if (row.vendor) {
+      this.selectedCreateVendor.set(row.vendor as VendorOption);
+      this.vendorSearch.set(row.vendor.name || '');
+    } else {
+      this.selectedCreateVendor.set(null);
+      this.vendorSearch.set('');
+    }
+    this.setupExpenseAutoCompute();
+    this.loadWithholdingTaxTypes();
+    this.createModalError.set('');
+    this.isCreateModalOpen.set(true);
   }
 
   cancelEdit(): void {
     this.editingId = '';
-    this.editForm = this.newExpenseForm();
-    this.editModalError.set('');
-    this.isEditModalOpen.set(false);
+    this.createModalError.set('');
+    this.isCreateModalOpen.set(false);
   }
 
   async saveEdit(): Promise<void> {
     if (this.isContextLocked) return;
     if (!this.editingId) return;
+
+    if (this.createExpenseForm.invalid) {
+      this.createExpenseForm.markAllAsTouched();
+      this.createModalError.set('Please complete all required fields.');
+      return;
+    }
+
     const confirmed = await this.confirmDialog.confirm({
       title: 'Update Expense',
       message: 'Save changes to this expense?',
@@ -486,16 +496,18 @@ export class ExpensesPageComponent {
       confirmButtonClass: 'btn-primary',
       iconClass: 'bi-pencil-square',
     });
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     this.submitting.set(true);
     this.error.set('');
     this.message.set('');
-    this.editModalError.set('');
+    this.createModalError.set('');
 
-    const payload = this.buildPayload(this.editForm);
+    const payload = this.buildPayload({
+      ...this.createExpenseForm.getRawValue(),
+      organizationId: this.currentOrganizationId,
+      updatedBy: this.currentUserId,
+    });
     this.api.update<ExpenseRow>('/api/v1/expenses', this.editingId, payload).subscribe({
       next: (response) => {
         this.submitting.set(false);
@@ -505,7 +517,7 @@ export class ExpensesPageComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.editModalError.set(err?.error?.message || 'Unable to update expense.');
+        this.createModalError.set(err?.error?.message || 'Unable to update expense.');
       },
     });
   }
@@ -943,28 +955,7 @@ export class ExpensesPageComponent {
     return !!control.errors?.[errorCode];
   }
 
-  private newExpenseForm(): Record<string, unknown> {
-    return {
-      organizationId: '',
-      vendorId: '',
-      vendorTaxId: '',
-      expenseNumber: '',
-      vatExemptAmount: 0,
-      withholdingTaxTypeId: '',
-      category: '',
-      description: '',
-      expenseDate: '',
-      dueDate: '',
-      status: 'paid',
-      paymentMethod: 'bank_transfer',
-      currency: this.currentOrganizationCurrency,
-      amount: 0,
-      discountAmount: 0,
-      notes: '',
-      createdBy: '',
-      updatedBy: '',
-    };
-  }
+
 
   private newCreateExpenseForm(): FormGroup {
     return this.fb.group(
@@ -974,9 +965,9 @@ export class ExpensesPageComponent {
         expenseNumber: [''],
         vatExemptAmount: [0, [Validators.min(0)]],
         withholdingTaxTypeId: [''],
-        category: ['', [Validators.required, Validators.maxLength(120)]],
+        category: ['others', [Validators.required, Validators.maxLength(120)]],
         description: ['', [Validators.maxLength(2000)]],
-        expenseDate: ['', [Validators.required]],
+        expenseDate: [new Date().toISOString().slice(0, 10), [Validators.required]],
         dueDate: [''],
         status: ['paid', [Validators.required]],
         paymentMethod: ['bank_transfer', [Validators.required]],
