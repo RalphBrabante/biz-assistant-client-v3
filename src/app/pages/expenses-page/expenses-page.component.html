@@ -234,7 +234,15 @@
           <td>{{ row.expenseDate ? (row.expenseDate | date: 'mediumDate') : '-' }}</td>
           <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
           <td>{{ row.category }}</td>
-          <td>{{ vendorLabel(row) }}</td>
+          <td>
+            <span class="d-inline-flex align-items-center gap-1">
+              {{ vendorLabel(row) }}
+              <i *ngIf="row.vendor" class="bi bi-info-circle text-secondary small opacity-50"
+                style="cursor:pointer;"
+                (mouseenter)="showVendorPopover($event, row)"
+                (mouseleave)="hideVendorPopover()"></i>
+            </span>
+          </td>
           <td>{{ row.status || '-' }}</td>
           <td class="expense-breakdown-cell"
             (mouseenter)="showBreakdown($event, row)"
@@ -843,6 +851,29 @@
 
       <div class="col-7 fw-bold">Net Amount Payable</div>
       <div class="col-5 text-end font-monospace fw-bold">{{ formatMoney(r.totalAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Vendor address popover -->
+<div class="vendor-popover card border-0 shadow-lg rounded-3"
+  [class.show]="vendorPopoverRow"
+  [style.top.px]="vendorPopoverTop"
+  [style.left.px]="vendorPopoverLeft"
+  *ngIf="vendorPopoverRow?.vendor as v">
+  <div class="card-body p-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <i class="bi bi-building text-primary small"></i>
+      <span class="small fw-semibold text-uppercase text-secondary">Vendor Details</span>
+    </div>
+    <div class="small" style="min-width: 240px; max-width: 320px;">
+      <div class="fw-semibold mb-1">{{ v.name }}</div>
+      <div *ngIf="v.taxId" class="text-secondary mb-1"><i class="bi bi-hash me-1"></i>TIN: {{ v.taxId }}</div>
+      <div *ngIf="v.contactPerson" class="text-secondary mb-1"><i class="bi bi-person me-1"></i>{{ v.contactPerson }}</div>
+      <div *ngIf="v.phone" class="text-secondary mb-1"><i class="bi bi-telephone me-1"></i>{{ v.phone }}</div>
+      <div *ngIf="v.contactEmail" class="text-secondary mb-1"><i class="bi bi-envelope me-1"></i>{{ v.contactEmail }}</div>
+      <div *ngIf="vendorAddress(v)" class="text-secondary"><i class="bi bi-geo-alt me-1"></i>{{ vendorAddress(v) }}</div>
+      <div *ngIf="!v.contactPerson && !v.phone && !v.contactEmail && !vendorAddress(v)" class="text-muted fst-italic">No address details available.</div>
     </div>
   </div>
 </div>

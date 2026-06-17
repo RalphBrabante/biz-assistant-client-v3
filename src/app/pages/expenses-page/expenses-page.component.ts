@@ -45,6 +45,16 @@ interface ExpenseRow {
     id: string;
     name?: string;
     taxId?: string;
+    contactPerson?: string;
+    phone?: string;
+    contactEmail?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    barangay?: string;
+    city?: string;
+    province?: string;
+    postalCode?: string;
+    country?: string;
   };
   taxTypeId?: string;
   taxType?: {
@@ -661,6 +671,10 @@ export class ExpensesPageComponent {
   breakdownTop = 0;
   breakdownLeft = 0;
 
+  vendorPopoverRow: ExpenseRow | null = null;
+  vendorPopoverTop = 0;
+  vendorPopoverLeft = 0;
+
   showBreakdown(event: MouseEvent, row: ExpenseRow): void {
     const cell = event.currentTarget as HTMLElement;
     const rect = cell.getBoundingClientRect();
@@ -681,6 +695,36 @@ export class ExpensesPageComponent {
 
   hideBreakdown(): void {
     this.breakdownRow = null;
+  }
+
+  showVendorPopover(event: MouseEvent, row: ExpenseRow): void {
+    const el = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    this.vendorPopoverRow = row;
+    this.vendorPopoverTop = rect.top;
+    this.vendorPopoverLeft = rect.left + rect.width / 2;
+
+    requestAnimationFrame(() => {
+      const popover = document.querySelector('.vendor-popover.show') as HTMLElement;
+      if (!popover) return;
+      const popRect = popover.getBoundingClientRect();
+      this.vendorPopoverTop = rect.top - popRect.height - 6;
+      this.vendorPopoverLeft = rect.left + rect.width / 2 - popRect.width / 2;
+      if (this.vendorPopoverTop < 4) this.vendorPopoverTop = rect.bottom + 6;
+      if (this.vendorPopoverLeft < 4) this.vendorPopoverLeft = 4;
+    });
+  }
+
+  hideVendorPopover(): void {
+    this.vendorPopoverRow = null;
+  }
+
+  vendorAddress(v: ExpenseRow['vendor']): string {
+    if (!v) return '';
+    return [v.addressLine1, v.addressLine2, v.barangay, v.city, v.province, v.postalCode, v.country]
+      .map((s) => (s || '').trim())
+      .filter(Boolean)
+      .join(', ');
   }
 
   computeVatExclusive(row: ExpenseRow): number {

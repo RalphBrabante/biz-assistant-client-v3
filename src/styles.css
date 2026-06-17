@@ -738,6 +738,42 @@ fieldset[disabled] {
   font-size: 0.875rem;
 }
 
+.vendor-popover {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  white-space: normal;
+  pointer-events: none;
+}
+.vendor-popover.show {
+  display: block;
+}
+
+.invoice-breakdown-popover {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.invoice-breakdown-popover.show {
+  display: block;
+}
+.invoice-breakdown-cell {
+  cursor: pointer;
+}
+
+.customer-popover {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  white-space: normal;
+  pointer-events: none;
+}
+.customer-popover.show {
+  display: block;
+}
+
 .expense-breakdown-popover {
   display: none;
   position: fixed;

@@ -21,6 +21,23 @@ interface SalesInvoiceRow {
     legalName?: string;
   };
   orderId?: string;
+  order?: {
+    id: string;
+    customerId?: string;
+    customer?: {
+      id: string;
+      name?: string;
+      contactPerson?: string;
+      email?: string;
+      phone?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    };
+  };
   invoiceNumber: string;
   issueDate: string;
   dueDate?: string;
@@ -33,6 +50,8 @@ interface SalesInvoiceRow {
   subtotalAmount?: number;
   taxAmount?: number;
   discountAmount?: number;
+  scPwdDiscount?: number;
+  serviceCharge?: number;
   totalAmount?: number;
   paidAt?: string;
   notes?: string;
@@ -670,6 +689,72 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     } else {
       this.createInvoiceForm.patchValue({ scPwdDiscount: 0 });
     }
+  }
+
+  breakdownRow: SalesInvoiceRow | null = null;
+  breakdownTop = 0;
+  breakdownLeft = 0;
+  customerPopoverRow: SalesInvoiceRow | null = null;
+  customerPopoverTop = 0;
+  customerPopoverLeft = 0;
+
+  showBreakdown(event: MouseEvent, row: SalesInvoiceRow): void {
+    const el = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    this.breakdownRow = row;
+    this.breakdownTop = rect.top;
+    this.breakdownLeft = rect.right;
+    requestAnimationFrame(() => {
+      const popover = document.querySelector('.invoice-breakdown-popover.show') as HTMLElement;
+      if (!popover) return;
+      const popRect = popover.getBoundingClientRect();
+      this.breakdownTop = rect.top - popRect.height;
+      this.breakdownLeft = rect.right - popRect.width;
+      if (this.breakdownTop < 4) this.breakdownTop = 4;
+      if (this.breakdownLeft < 4) this.breakdownLeft = rect.left;
+    });
+  }
+
+  hideBreakdown(): void {
+    this.breakdownRow = null;
+  }
+
+  showCustomerPopover(event: MouseEvent, row: SalesInvoiceRow): void {
+    const el = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    this.customerPopoverRow = row;
+    this.customerPopoverTop = rect.top;
+    this.customerPopoverLeft = rect.left + rect.width / 2;
+    requestAnimationFrame(() => {
+      const popover = document.querySelector('.customer-popover.show') as HTMLElement;
+      if (!popover) return;
+      const popRect = popover.getBoundingClientRect();
+      this.customerPopoverTop = rect.top - popRect.height - 6;
+      this.customerPopoverLeft = rect.left + rect.width / 2 - popRect.width / 2;
+      if (this.customerPopoverTop < 4) this.customerPopoverTop = rect.bottom + 6;
+      if (this.customerPopoverLeft < 4) this.customerPopoverLeft = 4;
+    });
+  }
+
+  hideCustomerPopover(): void {
+    this.customerPopoverRow = null;
+  }
+
+  customerName(row: SalesInvoiceRow): string {
+    return row.order?.customer?.name || '-';
+  }
+
+  customerAddress(c: SalesInvoiceRow['order']): string {
+    const cust = c?.customer;
+    if (!cust) return '';
+    return [cust.addressLine1, cust.addressLine2, cust.city, cust.state, cust.postalCode, cust.country]
+      .map((s) => (s || '').trim())
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  computeSubtotal(row: SalesInvoiceRow): number {
+    return +((row.amount ?? 0) / 1.12).toFixed(2);
   }
 
   private isInCurrentQuarter(dateStr: string): boolean {
