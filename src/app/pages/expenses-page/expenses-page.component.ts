@@ -970,7 +970,7 @@ export class ExpensesPageComponent {
         expenseDate: [new Date().toISOString().slice(0, 10), [Validators.required]],
         dueDate: [''],
         status: ['paid', [Validators.required]],
-        paymentMethod: ['bank_transfer', [Validators.required]],
+        paymentMethod: ['cash', [Validators.required]],
         amount: [0, [Validators.required, Validators.min(0.01)]],
         discountAmount: [0, [Validators.required, Validators.min(0)]],
         serviceCharge: [0, [Validators.min(0)]],
