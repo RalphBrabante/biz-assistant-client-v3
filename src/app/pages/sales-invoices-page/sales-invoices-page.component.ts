@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { ConfirmDialogService } from '../../core/confirm-dialog.service';
@@ -53,7 +54,7 @@ interface SalesInvoiceImportSummary {
   imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, TooltipDirective],
   templateUrl: './sales-invoices-page.component.html',
 })
-export class SalesInvoicesPageComponent {
+export class SalesInvoicesPageComponent implements OnDestroy {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
@@ -88,8 +89,15 @@ export class SalesInvoicesPageComponent {
   private readonly tablePrefsKey = 'sales-invoices-page';
 
   createInvoiceForm: FormGroup = this.newCreateInvoiceForm();
+  private computeSub: Subscription | null = null;
   private importFile: File | null = null;
   forceImport = false;
+
+  computedSubtotal = 0;
+  computedTaxableAmount = 0;
+  computedTaxAmount = 0;
+  computedTotalAmount = 0;
+  scPwdEnabled = false;
 
   readonly sortIcon = computed(() =>
     this.sortDirection === 'asc' ? 'bi-sort-up-alt' : 'bi-sort-down-alt'
@@ -186,9 +194,14 @@ export class SalesInvoicesPageComponent {
     });
   }
 
+  ngOnDestroy(): void {
+    this.computeSub?.unsubscribe();
+  }
+
   openCreateModal(): void {
     if (this.isContextLocked) return;
     this.createInvoiceForm = this.newCreateInvoiceForm();
+    this.setupInvoiceAutoCompute();
     this.error.set('');
     this.message.set('');
     this.isCreateModalOpen.set(true);
@@ -608,12 +621,15 @@ export class SalesInvoicesPageComponent {
         dueDate: [defaults['dueDate']],
         status: [defaults['status'], [Validators.required]],
         paymentStatus: [defaults['paymentStatus'], [Validators.required]],
-        amount: [defaults['amount'], [Validators.required, Validators.min(0)]],
-        taxAmount: [defaults['taxAmount'], [Validators.min(0)]],
-        taxableAmount: [defaults['taxableAmount'], [Validators.min(0)]],
-        withHoldingTaxAmount: [defaults['withHoldingTaxAmount'], [Validators.min(0)]],
+        amount: [defaults['amount'], [Validators.required, Validators.min(0.01)]],
         discountAmount: [defaults['discountAmount'], [Validators.min(0)]],
-        totalAmount: [defaults['totalAmount'], [Validators.required, Validators.min(0)]],
+        scPwdDiscount: [0, [Validators.min(0)]],
+        serviceCharge: [0, [Validators.min(0)]],
+        withHoldingTaxAmount: [defaults['withHoldingTaxAmount'], [Validators.min(0)]],
+        subtotalAmount: [defaults['subtotalAmount']],
+        taxableAmount: [defaults['taxableAmount']],
+        taxAmount: [defaults['taxAmount']],
+        totalAmount: [defaults['totalAmount']],
         paidAt: [defaults['paidAt']],
         notes: [defaults['notes'], [Validators.maxLength(2000)]],
       },
@@ -633,6 +649,56 @@ export class SalesInvoicesPageComponent {
     return null;
   }
 
+  toggleScPwdDiscount(): void {
+    this.scPwdEnabled = !this.scPwdEnabled;
+    if (this.scPwdEnabled) {
+      const amount = Math.max(0, Number(this.createInvoiceForm.get('amount')?.value) || 0);
+      const subtotal = +(amount / 1.12).toFixed(2);
+      this.createInvoiceForm.patchValue({ scPwdDiscount: +(subtotal * 0.20).toFixed(2) });
+    } else {
+      this.createInvoiceForm.patchValue({ scPwdDiscount: 0 });
+    }
+  }
+
+  private setupInvoiceAutoCompute(): void {
+    this.computeSub?.unsubscribe();
+    this.recomputeInvoiceBreakdown();
+    this.computeSub = this.createInvoiceForm.valueChanges.subscribe(() => {
+      this.recomputeInvoiceBreakdown();
+    });
+  }
+
+  private recomputeInvoiceBreakdown(): void {
+    const amount = Math.max(0, Number(this.createInvoiceForm.get('amount')?.value) || 0);
+    const discount = Math.max(0, Number(this.createInvoiceForm.get('discountAmount')?.value) || 0);
+    const serviceCharge = Math.max(0, Number(this.createInvoiceForm.get('serviceCharge')?.value) || 0);
+    const withholding = Math.max(0, Number(this.createInvoiceForm.get('withHoldingTaxAmount')?.value) || 0);
+
+    const subtotal = +(amount / 1.12).toFixed(2);
+
+    let scPwdDiscount = Math.max(0, Number(this.createInvoiceForm.get('scPwdDiscount')?.value) || 0);
+    if (this.scPwdEnabled) {
+      scPwdDiscount = +(subtotal * 0.20).toFixed(2);
+      this.createInvoiceForm.patchValue({ scPwdDiscount }, { emitEvent: false });
+    }
+
+    const taxableAmount = +Math.max(0, subtotal - discount - scPwdDiscount).toFixed(2);
+    const taxAmount = +(taxableAmount * 0.12).toFixed(2);
+    const totalAmount = +(taxableAmount + taxAmount + serviceCharge - withholding).toFixed(2);
+
+    this.computedSubtotal = subtotal;
+    this.computedTaxableAmount = taxableAmount;
+    this.computedTaxAmount = taxAmount;
+    this.computedTotalAmount = totalAmount;
+
+    this.createInvoiceForm.patchValue({
+      subtotalAmount: subtotal,
+      taxableAmount,
+      taxAmount,
+      totalAmount,
+    }, { emitEvent: false });
+  }
+
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
     return {
       organizationId: this.asString(form['organizationId']),
@@ -648,6 +714,8 @@ export class SalesInvoicesPageComponent {
       subtotalAmount: this.optionalNumber(form['subtotalAmount']),
       taxAmount: this.optionalNumber(form['taxAmount']),
       discountAmount: this.optionalNumber(form['discountAmount']),
+      scPwdDiscount: this.optionalNumber(form['scPwdDiscount']),
+      serviceCharge: this.optionalNumber(form['serviceCharge']),
       totalAmount: this.optionalNumber(form['totalAmount']),
       paidAt: this.optionalString(form['paidAt']),
       notes: this.optionalString(form['notes']),

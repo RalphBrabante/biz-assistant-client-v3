@@ -140,6 +140,13 @@ export class ExpensesPageComponent {
   readonly pageSizeOptions = [10, 20, 50, 100];
 
   createExpenseForm: FormGroup = this.newCreateExpenseForm();
+  private expenseComputeSub: Subscription | null = null;
+  computedVatExclusive = 0;
+  computedVatableInclusive = 0;
+  computedTaxableAmount = 0;
+  computedTaxAmount = 0;
+  computedWithholdingTaxAmount = 0;
+  computedTotalAmount = 0;
   vendorCreateForm: FormGroup = this.newVendorCreateForm();
   editingId = '';
   editForm: Record<string, unknown> = this.newExpenseForm();
@@ -221,6 +228,7 @@ export class ExpensesPageComponent {
 
   ngOnDestroy(): void {
     this.vendorSearchSub?.unsubscribe();
+    this.expenseComputeSub?.unsubscribe();
   }
 
   load(resetPage = false): void {
@@ -314,6 +322,7 @@ export class ExpensesPageComponent {
   openCreateModal(): void {
     if (this.isContextLocked) return;
     this.createExpenseForm = this.newCreateExpenseForm();
+    this.setupExpenseAutoCompute();
     this.loadWithholdingTaxTypes();
     this.vendorSearch.set('');
     this.selectedCreateVendor.set(null);
@@ -930,6 +939,7 @@ export class ExpensesPageComponent {
         paymentMethod: ['bank_transfer', [Validators.required]],
         amount: [0, [Validators.required, Validators.min(0.01)]],
         discountAmount: [0, [Validators.required, Validators.min(0)]],
+        serviceCharge: [0, [Validators.min(0)]],
         notes: ['', [Validators.maxLength(2000)]],
         file: [''],
       },
@@ -1001,6 +1011,38 @@ export class ExpensesPageComponent {
     this.vendorCreateForm.get('taxId')?.updateValueAndValidity();
   }
 
+  private setupExpenseAutoCompute(): void {
+    this.expenseComputeSub?.unsubscribe();
+    this.recomputeExpenseBreakdown();
+    this.expenseComputeSub = this.createExpenseForm.valueChanges.subscribe(() => {
+      this.recomputeExpenseBreakdown();
+    });
+  }
+
+  private recomputeExpenseBreakdown(): void {
+    const amount = Math.max(0, Number(this.createExpenseForm.get('amount')?.value) || 0);
+    const vatExempt = Math.max(0, Number(this.createExpenseForm.get('vatExemptAmount')?.value) || 0);
+    const discount = Math.max(0, Number(this.createExpenseForm.get('discountAmount')?.value) || 0);
+
+    const selectedEwtId = String(this.createExpenseForm.get('withholdingTaxTypeId')?.value || '').trim();
+    const ewtType = this.withholdingTaxTypes().find((t) => t.id === selectedEwtId);
+    const ewtRate = ewtType ? (ewtType.percentage / 100) : 0;
+
+    const vatExclusive = +(amount / 1.12).toFixed(2);
+    const taxableAmount = +Math.max(0, vatExclusive - vatExempt).toFixed(2);
+    const taxAmount = +(taxableAmount * 0.12).toFixed(2);
+    const vatableInclusive = +(taxableAmount + taxAmount).toFixed(2);
+    const withholdingTaxAmount = +(taxableAmount * ewtRate).toFixed(2);
+    const totalAmount = +(amount - discount - withholdingTaxAmount).toFixed(2);
+
+    this.computedVatExclusive = vatExclusive;
+    this.computedVatableInclusive = vatableInclusive;
+    this.computedTaxableAmount = taxableAmount;
+    this.computedTaxAmount = taxAmount;
+    this.computedWithholdingTaxAmount = withholdingTaxAmount;
+    this.computedTotalAmount = totalAmount;
+  }
+
   private buildPayload(form: Record<string, unknown>): Record<string, unknown> {
     return {
       organizationId: this.optionalString(form['organizationId']),
@@ -1008,6 +1050,10 @@ export class ExpensesPageComponent {
       vendorTaxId: this.optionalString(form['vendorTaxId']),
       expenseNumber: this.optionalString(form['expenseNumber']),
       vatExemptAmount: this.optionalNumber(form['vatExemptAmount']),
+      taxableAmount: this.computedTaxableAmount,
+      taxAmount: this.computedTaxAmount,
+      withHoldingTaxAmount: this.computedWithholdingTaxAmount,
+      totalAmount: this.computedTotalAmount,
       withholdingTaxTypeId: this.optionalString(form['withholdingTaxTypeId']),
       category: this.optionalString(form['category']),
       description: this.optionalString(form['description']),
@@ -1017,6 +1063,7 @@ export class ExpensesPageComponent {
       paymentMethod: this.optionalString(form['paymentMethod']),
       amount: this.optionalNumber(form['amount']),
       discountAmount: this.optionalNumber(form['discountAmount']),
+      serviceCharge: this.optionalNumber(form['serviceCharge']),
       notes: this.optionalString(form['notes']),
       createdBy: this.optionalString(form['createdBy']),
       updatedBy: this.optionalString(form['updatedBy']),

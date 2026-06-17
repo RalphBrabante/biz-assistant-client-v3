@@ -445,29 +445,108 @@
             <input class="form-control" formControlName="paymentStatus" />
           </div>
 
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Amount</label>
-            <input type="number" step="0.01" class="form-control" formControlName="amount" />
+          <!-- ── Amount Entry ────────────────────────────────── -->
+          <div class="col-12">
+            <div class="d-flex align-items-center gap-2 mb-1 mt-2">
+              <i class="bi bi-receipt text-primary"></i>
+              <span class="small fw-semibold text-uppercase text-secondary">Amount Entry</span>
+            </div>
+            <hr class="mt-1 mb-0" />
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Gross Sales <span class="text-secondary fw-normal">(VAT-inclusive)</span> <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
+              <input type="number" step="0.01" min="0" class="form-control" formControlName="amount" placeholder="0.00" />
+            </div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Tax</label>
-            <input type="number" step="0.01" class="form-control" formControlName="taxAmount" />
+            <label class="form-label fw-semibold">Promo / Regular Discount</label>
+            <div class="input-group">
+              <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
+              <input type="number" step="0.01" min="0" class="form-control" formControlName="discountAmount" placeholder="0.00" />
+            </div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Taxable Amount</label>
-            <input type="number" step="0.01" class="form-control" formControlName="taxableAmount" />
+            <label class="form-label fw-semibold d-flex align-items-center gap-1">
+              SC/PWD Discount
+              <div class="form-check form-switch mb-0 ms-auto">
+                <input class="form-check-input" type="checkbox" id="scPwdToggle" [checked]="scPwdEnabled" (change)="toggleScPwdDiscount()" />
+                <label class="form-check-label small text-muted" for="scPwdToggle">20%</label>
+              </div>
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
+              <input type="number" step="0.01" min="0" class="form-control" formControlName="scPwdDiscount" placeholder="0.00" [readonly]="scPwdEnabled" />
+            </div>
+            <div *ngIf="scPwdEnabled" class="form-text text-primary">
+              <i class="bi bi-person-wheelchair me-1"></i>Auto: 20% of VAT-exclusive amount (VAT-exempt)
+            </div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Withholding Tax Amount</label>
-            <input type="number" step="0.01" class="form-control" formControlName="withHoldingTaxAmount" />
+            <label class="form-label fw-semibold">Service Charge</label>
+            <div class="input-group">
+              <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
+              <input type="number" step="0.01" min="0" class="form-control" formControlName="serviceCharge" placeholder="0.00" />
+            </div>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Discount</label>
-            <input type="number" step="0.01" class="form-control" formControlName="discountAmount" />
+            <label class="form-label fw-semibold">Withholding Tax <span class="text-secondary fw-normal">(EWT)</span></label>
+            <div class="input-group">
+              <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
+              <input type="number" step="0.01" min="0" class="form-control" formControlName="withHoldingTaxAmount" placeholder="0.00" />
+            </div>
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Total</label>
-            <input type="number" step="0.01" class="form-control" formControlName="totalAmount" />
+
+          <!-- ── Auto-Computed BIR Breakdown ──────────────────── -->
+          <div class="col-12">
+            <div class="d-flex align-items-center gap-2 mb-1 mt-2">
+              <i class="bi bi-calculator text-primary"></i>
+              <span class="small fw-semibold text-uppercase text-secondary">Computed Breakdown</span>
+              <span class="badge text-bg-light border small ms-1">Auto-calculated</span>
+            </div>
+            <hr class="mt-1 mb-0" />
+          </div>
+
+          <div class="col-12">
+            <div class="bg-body-tertiary rounded-3 p-3">
+              <div class="row g-2 small">
+                <div class="col-8 text-secondary">Gross Sales (VAT-inclusive)</div>
+                <div class="col-4 text-end font-monospace">{{ formatMoney(createInvoiceForm.get('amount')?.value || 0, currentOrganizationCurrency) }}</div>
+
+                <div class="col-8 text-secondary">Less: 12% VAT <span class="text-muted">(extracted)</span></div>
+                <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-((createInvoiceForm.get('amount')?.value || 0) - computedSubtotal), currentOrganizationCurrency) }}</div>
+
+                <div class="col-8 fw-semibold">VAT-Exclusive Amount</div>
+                <div class="col-4 text-end font-monospace fw-semibold">{{ formatMoney(computedSubtotal, currentOrganizationCurrency) }}</div>
+
+                <div class="col-12"><hr class="my-1" /></div>
+
+                <div class="col-8 text-secondary">Less: Promo / Regular Discount</div>
+                <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-(createInvoiceForm.get('discountAmount')?.value || 0), currentOrganizationCurrency) }}</div>
+
+                <div class="col-8 text-secondary">Less: SC/PWD Discount (20%)</div>
+                <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-(createInvoiceForm.get('scPwdDiscount')?.value || 0), currentOrganizationCurrency) }}</div>
+
+                <div class="col-8 fw-semibold">Taxable Amount <span class="text-muted fw-normal">(VATable Sales)</span></div>
+                <div class="col-4 text-end font-monospace fw-semibold">{{ formatMoney(computedTaxableAmount, currentOrganizationCurrency) }}</div>
+
+                <div class="col-8 text-secondary">Add: 12% VAT</div>
+                <div class="col-4 text-end font-monospace text-success">{{ formatMoney(computedTaxAmount, currentOrganizationCurrency) }}</div>
+
+                <div class="col-8 text-secondary">Add: Service Charge</div>
+                <div class="col-4 text-end font-monospace text-success">{{ formatMoney(createInvoiceForm.get('serviceCharge')?.value || 0, currentOrganizationCurrency) }}</div>
+
+                <div class="col-8 text-secondary">Less: Withholding Tax (EWT)</div>
+                <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-(createInvoiceForm.get('withHoldingTaxAmount')?.value || 0), currentOrganizationCurrency) }}</div>
+
+                <div class="col-12"><hr class="my-1" /></div>
+
+                <div class="col-8 fw-bold">Total Amount Due</div>
+                <div class="col-4 text-end font-monospace fw-bold fs-6">{{ formatMoney(computedTotalAmount, currentOrganizationCurrency) }}</div>
+              </div>
+            </div>
           </div>
 
           <div class="col-12 col-md-6">
