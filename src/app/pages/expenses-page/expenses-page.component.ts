@@ -227,6 +227,9 @@ export class ExpensesPageComponent {
             limit: '20',
             activeOnly: 'true',
           });
+          if (this.currentOrganizationId) {
+            params.set('organizationId', this.currentOrganizationId);
+          }
           if (cleaned) {
             params.set('q', cleaned);
           }
