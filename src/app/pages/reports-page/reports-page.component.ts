@@ -74,6 +74,7 @@ export class ReportsPageComponent {
   readonly latestSalesReport = signal<QuarterlySalesReportRow | null>(null);
   readonly loadingSales = signal(false);
   readonly generatingSales = signal(false);
+  readonly regeneratingSalesReportId = signal('');
   readonly deletingSalesReportId = signal('');
   readonly salesError = signal('');
   readonly salesMessage = signal('');
@@ -82,6 +83,7 @@ export class ReportsPageComponent {
   readonly latestExpenseReport = signal<QuarterlyExpenseReportRow | null>(null);
   readonly loadingExpenses = signal(false);
   readonly generatingExpenses = signal(false);
+  readonly regeneratingExpenseReportId = signal('');
   readonly deletingExpenseReportId = signal('');
   readonly expenseError = signal('');
   readonly expenseMessage = signal('');
@@ -278,22 +280,29 @@ export class ReportsPageComponent {
     });
   }
 
-  generateQuarterlySalesReport(): void {
+  generateQuarterlySalesReport(report?: QuarterlySalesReportRow): void {
     if (this.isContextLocked) return;
-    this.generatingSales.set(true);
+    const isRowRegeneration = Boolean(report?.id);
+    if (isRowRegeneration) {
+      this.regeneratingSalesReportId.set(report?.id || '');
+    } else {
+      this.generatingSales.set(true);
+    }
     this.salesError.set('');
     this.salesMessage.set('');
 
     const payload = {
-      year: this.selectedYear(),
-      quarter: this.selectedQuarter(),
+      year: report?.year || this.selectedYear(),
+      quarter: report?.quarter || this.selectedQuarter(),
       currency: this.currentOrganizationCurrency,
-      ...(this.orgParamValue ? { organizationId: this.orgParamValue } : {}),
+      ...(report?.organizationId ? { organizationId: report.organizationId } : {}),
+      ...(!report?.organizationId && this.orgParamValue ? { organizationId: this.orgParamValue } : {}),
     };
 
     this.api.create<QuarterlySalesReportRow>('/api/v1/reports/quarterly-sales', payload).subscribe({
       next: (response) => {
         this.generatingSales.set(false);
+        this.regeneratingSalesReportId.set('');
         this.salesMessage.set(response.message || 'Quarterly sales report generated successfully.');
         if (response.data) {
           this.latestSalesReport.set(response.data);
@@ -303,27 +312,35 @@ export class ReportsPageComponent {
       },
       error: (err) => {
         this.generatingSales.set(false);
+        this.regeneratingSalesReportId.set('');
         this.salesError.set(err?.error?.message || 'Unable to generate sales report.');
       },
     });
   }
 
-  generateQuarterlyExpenseReport(): void {
+  generateQuarterlyExpenseReport(report?: QuarterlyExpenseReportRow): void {
     if (this.isContextLocked) return;
-    this.generatingExpenses.set(true);
+    const isRowRegeneration = Boolean(report?.id);
+    if (isRowRegeneration) {
+      this.regeneratingExpenseReportId.set(report?.id || '');
+    } else {
+      this.generatingExpenses.set(true);
+    }
     this.expenseError.set('');
     this.expenseMessage.set('');
 
     const payload = {
-      year: this.selectedYear(),
-      quarter: this.selectedQuarter(),
+      year: report?.year || this.selectedYear(),
+      quarter: report?.quarter || this.selectedQuarter(),
       currency: this.currentOrganizationCurrency,
-      ...(this.orgParamValue ? { organizationId: this.orgParamValue } : {}),
+      ...(report?.organizationId ? { organizationId: report.organizationId } : {}),
+      ...(!report?.organizationId && this.orgParamValue ? { organizationId: this.orgParamValue } : {}),
     };
 
     this.api.create<QuarterlyExpenseReportRow>('/api/v1/reports/quarterly-expenses', payload).subscribe({
       next: (response) => {
         this.generatingExpenses.set(false);
+        this.regeneratingExpenseReportId.set('');
         this.expenseMessage.set(response.message || 'Quarterly expense report generated successfully.');
         if (response.data) {
           this.latestExpenseReport.set(response.data);
@@ -333,9 +350,59 @@ export class ReportsPageComponent {
       },
       error: (err) => {
         this.generatingExpenses.set(false);
+        this.regeneratingExpenseReportId.set('');
         this.expenseError.set(err?.error?.message || 'Unable to generate expense report.');
       },
     });
+  }
+
+  selectedQuarterSalesReport(): QuarterlySalesReportRow | null {
+    return this.findSelectedSalesReport(this.salesRows());
+  }
+
+  selectedQuarterExpenseReport(): QuarterlyExpenseReportRow | null {
+    return this.findSelectedExpenseReport(this.expenseRows());
+  }
+
+  selectedQuarterExpenseWarning(): string {
+    return this.expenseComparisonWarning(
+      this.selectedQuarterSalesReport(),
+      this.selectedQuarterExpenseReport()
+    );
+  }
+
+  expenseComparisonWarning(
+    salesReport: QuarterlySalesReportRow | null | undefined,
+    expenseReport: QuarterlyExpenseReportRow | null | undefined
+  ): string {
+    if (!salesReport || !expenseReport) {
+      return '';
+    }
+    const salesTotal = Number(salesReport.totalAmount || 0);
+    const expenseTotal = Number(expenseReport.totalAmount || 0);
+    const difference = expenseTotal - salesTotal;
+    if (salesTotal <= 0 || expenseTotal <= 0 || difference < -0.005) {
+      return '';
+    }
+    const relation = Math.abs(difference) < 0.005 ? 'equal to' : 'greater than';
+    return `Expense total is ${relation} sales total for ${this.quarterLabel(expenseReport.quarter)} ${expenseReport.year}. Consider transferring eligible expenses to another organization, then regenerate the quarterly expense report.`;
+  }
+
+  matchingSalesReportForExpense(expenseReport: QuarterlyExpenseReportRow): QuarterlySalesReportRow | null {
+    return (
+      this.salesRows().find((row) =>
+        row.organizationId === expenseReport.organizationId &&
+        Number(row.year) === Number(expenseReport.year) &&
+        Number(row.quarter) === Number(expenseReport.quarter)
+      ) || null
+    );
+  }
+
+  expenseReportWarning(expenseReport: QuarterlyExpenseReportRow): string {
+    return this.expenseComparisonWarning(
+      this.matchingSalesReportForExpense(expenseReport),
+      expenseReport
+    );
   }
 
   onFilterChange(): void {

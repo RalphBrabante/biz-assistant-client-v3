@@ -460,6 +460,19 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     this.load();
   }
 
+  applyIssueQuarterFilter(quarter: 1 | 2 | 3 | 4): void {
+    if (this.isContextLocked) return;
+    const range = this.quarterDateRange(quarter);
+    this.issueDateFrom = range.from;
+    this.issueDateTo = range.to;
+    this.onFilterChange();
+  }
+
+  isIssueQuarterActive(quarter: 1 | 2 | 3 | 4): boolean {
+    const range = this.quarterDateRange(quarter);
+    return this.issueDateFrom === range.from && this.issueDateTo === range.to;
+  }
+
   setSort(value: string): void {
     if (this.isContextLocked) return;
     this.sortBy = String(value || 'createdAt');
@@ -764,6 +777,22 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     const currentQuarter = Math.floor(now.getMonth() / 3);
     const dateQuarter = Math.floor(d.getMonth() / 3);
     return d.getFullYear() === now.getFullYear() && dateQuarter === currentQuarter;
+  }
+
+  private quarterDateRange(quarter: 1 | 2 | 3 | 4): { from: string; to: string } {
+    const year = new Date().getFullYear();
+    const startMonth = (quarter - 1) * 3;
+    return {
+      from: this.formatDateOnly(new Date(year, startMonth, 1)),
+      to: this.formatDateOnly(new Date(year, startMonth + 3, 0)),
+    };
+  }
+
+  private formatDateOnly(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private setupInvoiceAutoCompute(): void {

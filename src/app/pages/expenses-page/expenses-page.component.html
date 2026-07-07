@@ -127,6 +127,12 @@
           <span class="input-group-text text-secondary small px-2">to</span>
           <input type="date" class="form-control" [(ngModel)]="expenseDateTo" (change)="applyFilters()" [class.border-primary]="expenseDateTo" title="To date" />
         </div>
+        <div class="btn-group btn-group-sm w-100 mt-2" role="group" aria-label="Set expense date quarter">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isExpenseQuarterActive(1)" (click)="applyExpenseQuarterFilter(1)">Q1</button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isExpenseQuarterActive(2)" (click)="applyExpenseQuarterFilter(2)">Q2</button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isExpenseQuarterActive(3)" (click)="applyExpenseQuarterFilter(3)">Q3</button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isExpenseQuarterActive(4)" (click)="applyExpenseQuarterFilter(4)">Q4</button>
+        </div>
       </div>
     </div>
 
@@ -266,6 +272,12 @@
                 <li>
                   <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="startEdit(row)">
                     <i class="bi bi-pencil-square"></i> Edit
+                  </button>
+                </li>
+                <li>
+                  <button class="dropdown-item d-flex align-items-center gap-2" type="button"
+                    [disabled]="transferringId() === row.id" (click)="openTransferModal(row)">
+                    <i class="bi bi-arrow-left-right"></i> {{ transferringId() === row.id ? 'Transferring...' : 'Transfer' }}
                   </button>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
@@ -648,6 +660,71 @@
         </button>
         <button *ngIf="editingId" class="btn btn-primary" [disabled]="submitting()" (click)="saveEdit()">
           {{ submitting() ? 'Saving...' : 'Save Expense' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="isTransferModalOpen()"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isTransferModalOpen() ? 'block' : 'none'"
+  [attr.aria-hidden]="!isTransferModalOpen()"
+  *ngIf="isTransferModalOpen()"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title d-flex align-items-center gap-2">
+          <i class="bi bi-arrow-left-right text-primary"></i>
+          Transfer Expense
+        </h5>
+        <button type="button" class="btn-close" (click)="closeTransferModal()" [disabled]="!!transferringId()"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div *ngIf="transferRow as row" class="bg-body-tertiary rounded-3 p-3 mb-3">
+          <div class="small text-secondary text-uppercase fw-semibold mb-1">Expense</div>
+          <div class="fw-semibold">{{ row.category }}</div>
+          <div class="small text-secondary">
+            {{ row.expenseDate ? (row.expenseDate | date: 'mediumDate') : '-' }}
+            &middot;
+            {{ formatMoney(row.totalAmount ?? 0, row.currency || currentOrganizationCurrency) }}
+          </div>
+          <div class="small text-secondary mt-1">
+            From: {{ organizationLabel(row) }}
+          </div>
+        </div>
+
+        <div *ngIf="loadingTransferTargets()" class="d-flex align-items-center gap-2 text-secondary small py-2">
+          <span class="spinner-border spinner-border-sm" role="status"></span>
+          Loading organizations...
+        </div>
+
+        <ng-container *ngIf="!loadingTransferTargets()">
+          <label class="form-label fw-semibold">Target Organization <span class="text-danger">*</span></label>
+          <select class="form-select" [(ngModel)]="selectedTransferOrganizationId">
+            <option value="">Select organization</option>
+            <option *ngFor="let organization of transferTargetOrganizations()" [value]="organization.id">
+              {{ organizationOptionLabel(organization) }}
+            </option>
+          </select>
+          <div *ngIf="transferTargetOrganizations().length === 0" class="alert alert-warning py-2 mt-3 mb-0">
+            No other active organization memberships are available for transfer.
+          </div>
+        </ng-container>
+
+        <div *ngIf="transferModalError()" class="alert alert-danger py-2 mt-3 mb-0">{{ transferModalError() }}</div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeTransferModal()" [disabled]="!!transferringId()">Cancel</button>
+        <button
+          class="btn btn-primary"
+          [disabled]="!!transferringId() || loadingTransferTargets() || !selectedTransferOrganizationId"
+          (click)="transferExpense()"
+        >
+          {{ transferringId() ? 'Transferring...' : 'Transfer Expense' }}
         </button>
       </div>
     </div>

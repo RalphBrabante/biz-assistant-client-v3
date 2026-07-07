@@ -91,6 +91,13 @@ interface WithholdingTaxTypeOption {
   isActive?: boolean;
 }
 
+interface OrganizationOption {
+  id: string;
+  name?: string;
+  legalName?: string;
+  currency?: string;
+}
+
 interface ExpenseImportSummary {
   imported: number;
   skipped: number;
@@ -115,12 +122,16 @@ export class ExpensesPageComponent {
   readonly loading = signal(false);
   readonly submitting = signal(false);
   readonly deletingId = signal('');
+  readonly transferringId = signal('');
   readonly isCreateModalOpen = signal(false);
   readonly isImportModalOpen = signal(false);
+  readonly isTransferModalOpen = signal(false);
   readonly exporting = signal(false);
+  readonly loadingTransferTargets = signal(false);
   readonly loadingVendors = signal(false);
   readonly vendors = signal<VendorOption[]>([]);
   readonly withholdingTaxTypes = signal<WithholdingTaxTypeOption[]>([]);
+  readonly transferTargetOrganizations = signal<OrganizationOption[]>([]);
   readonly vendorSearch = signal('');
   readonly selectedCreateVendor = signal<VendorOption | null>(null);
   readonly vendorDropdownOpen = signal(false);
@@ -133,6 +144,7 @@ export class ExpensesPageComponent {
   readonly error = signal('');
   readonly createModalError = signal('');
   readonly importModalError = signal('');
+  readonly transferModalError = signal('');
   readonly importSummary = signal<ExpenseImportSummary | null>(null);
   viewMode: TableViewMode = 'table';
   private readonly tablePrefsKey = 'expenses-page';
@@ -157,6 +169,8 @@ export class ExpensesPageComponent {
   computedTotalAmount = 0;
   vendorCreateForm: FormGroup = this.newVendorCreateForm();
   editingId = '';
+  transferRow: ExpenseRow | null = null;
+  selectedTransferOrganizationId = '';
   private readonly vendorSearchInput$ = new Subject<string>();
   private vendorSearchSub?: Subscription;
   private createFile: File | null = null;
@@ -561,6 +575,88 @@ export class ExpensesPageComponent {
     });
   }
 
+  openTransferModal(row: ExpenseRow): void {
+    if (this.isContextLocked) return;
+    this.transferRow = row;
+    this.selectedTransferOrganizationId = '';
+    this.transferModalError.set('');
+    this.transferTargetOrganizations.set([]);
+    this.loadingTransferTargets.set(true);
+    this.isTransferModalOpen.set(true);
+
+    const params = new URLSearchParams();
+    if (row.organizationId) {
+      params.set('excludeOrganizationId', row.organizationId);
+    }
+
+    this.api.get<OrganizationOption[]>(`/api/v1/expenses/transfer-targets?${params.toString()}`).subscribe({
+      next: (response) => {
+        this.loadingTransferTargets.set(false);
+        const organizations = response.data || [];
+        this.transferTargetOrganizations.set(organizations);
+        if (organizations.length === 1) {
+          this.selectedTransferOrganizationId = organizations[0].id;
+        }
+      },
+      error: (err) => {
+        this.loadingTransferTargets.set(false);
+        this.transferModalError.set(err?.error?.message || 'Unable to load transfer target organizations.');
+      },
+    });
+  }
+
+  closeTransferModal(): void {
+    if (this.transferringId()) return;
+    this.isTransferModalOpen.set(false);
+    this.transferRow = null;
+    this.selectedTransferOrganizationId = '';
+    this.transferModalError.set('');
+    this.transferTargetOrganizations.set([]);
+  }
+
+  async transferExpense(): Promise<void> {
+    const row = this.transferRow;
+    const targetOrganizationId = String(this.selectedTransferOrganizationId || '').trim();
+    if (!row?.id) {
+      this.transferModalError.set('Expense is required.');
+      return;
+    }
+    if (!targetOrganizationId) {
+      this.transferModalError.set('Select a target organization.');
+      return;
+    }
+
+    const target = this.transferTargetOrganizations().find((organization) => organization.id === targetOrganizationId);
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Transfer Expense',
+      message: `Transfer this expense to ${this.organizationOptionLabel(target)}?`,
+      confirmText: 'Transfer Expense',
+      confirmButtonClass: 'btn-primary',
+      iconClass: 'bi-arrow-left-right',
+    });
+    if (!confirmed) return;
+
+    this.transferringId.set(row.id);
+    this.transferModalError.set('');
+    this.error.set('');
+    this.message.set('');
+
+    this.api.create<ExpenseRow>(`/api/v1/expenses/${row.id}/transfer`, {
+      targetOrganizationId,
+    }).subscribe({
+      next: (response) => {
+        this.transferringId.set('');
+        this.message.set(response.message || 'Expense transferred successfully.');
+        this.closeTransferModal();
+        this.load();
+      },
+      error: (err) => {
+        this.transferringId.set('');
+        this.transferModalError.set(err?.error?.message || 'Unable to transfer expense.');
+      },
+    });
+  }
+
   setViewMode(mode: TableViewMode): void {
     if (this.isContextLocked) return;
     this.viewMode = mode;
@@ -572,6 +668,19 @@ export class ExpensesPageComponent {
     this.page = 1;
     this.persistTablePreferences();
     this.load();
+  }
+
+  applyExpenseQuarterFilter(quarter: 1 | 2 | 3 | 4): void {
+    if (this.isContextLocked) return;
+    const range = this.quarterDateRange(quarter);
+    this.expenseDateFrom = range.from;
+    this.expenseDateTo = range.to;
+    this.applyFilters();
+  }
+
+  isExpenseQuarterActive(quarter: 1 | 2 | 3 | 4): boolean {
+    const range = this.quarterDateRange(quarter);
+    return this.expenseDateFrom === range.from && this.expenseDateTo === range.to;
   }
 
   get hasActiveFilters(): boolean {
@@ -633,6 +742,11 @@ export class ExpensesPageComponent {
 
   organizationLabel(row: ExpenseRow): string {
     return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
+  }
+
+  organizationOptionLabel(organization?: OrganizationOption): string {
+    if (!organization) return 'the selected organization';
+    return organization.name || organization.legalName || organization.id || 'the selected organization';
   }
 
   vendorLabel(row: ExpenseRow): string {
@@ -1034,6 +1148,22 @@ export class ExpensesPageComponent {
     const currentQuarter = Math.floor(now.getMonth() / 3);
     const dateQuarter = Math.floor(d.getMonth() / 3);
     return d.getFullYear() === now.getFullYear() && dateQuarter === currentQuarter;
+  }
+
+  private quarterDateRange(quarter: 1 | 2 | 3 | 4): { from: string; to: string } {
+    const year = new Date().getFullYear();
+    const startMonth = (quarter - 1) * 3;
+    return {
+      from: this.formatDateOnly(new Date(year, startMonth, 1)),
+      to: this.formatDateOnly(new Date(year, startMonth + 3, 0)),
+    };
+  }
+
+  private formatDateOnly(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private optionalEmailValidator(control: AbstractControl): ValidationErrors | null {

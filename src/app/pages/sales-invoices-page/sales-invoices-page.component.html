@@ -177,6 +177,12 @@
             title="To date"
           />
         </div>
+        <div class="btn-group btn-group-sm w-100 mt-2" role="group" aria-label="Set issue date quarter">
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isIssueQuarterActive(1)" (click)="applyIssueQuarterFilter(1)">Q1</button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isIssueQuarterActive(2)" (click)="applyIssueQuarterFilter(2)">Q2</button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isIssueQuarterActive(3)" (click)="applyIssueQuarterFilter(3)">Q3</button>
+          <button class="btn btn-outline-secondary" type="button" [class.active]="isIssueQuarterActive(4)" (click)="applyIssueQuarterFilter(4)">Q4</button>
+        </div>
       </div>
 
     </div>
