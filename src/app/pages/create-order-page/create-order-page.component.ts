@@ -1,7 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Subject, Subscription, of } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, switchMap, map } from 'rxjs/operators';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { ConfirmDialogService } from '../../core/confirm-dialog.service';
@@ -65,7 +67,7 @@ interface WithholdingTaxTypeOption {
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './create-order-page.component.html',
 })
-export class CreateOrderPageComponent {
+export class CreateOrderPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
@@ -89,10 +91,15 @@ export class CreateOrderPageComponent {
   private readonly catalogLoadMoreLimit = 5;
   cart: CartItem[] = [];
   customerResults: CustomerRow[] = [];
-  selectedCustomerId = '';
+  selectedCustomer: CustomerRow | null = null;
   searchingCustomers = false;
-  customerSearchPerformed = false;
-  customerSearchStatus = '';
+  customerDropdownOpen = false;
+  isCustomerCreateModalOpen = false;
+  creatingCustomer = false;
+  customerCreateError = '';
+  newCustomer = this.emptyCustomerForm();
+  private readonly customerSearchInput$ = new Subject<string>();
+  private customerSearchSub?: Subscription;
   organizationVatRate = 0;
   organizationCurrency = '';
   applyWithholdingTax = false;
@@ -166,6 +173,40 @@ export class CreateOrderPageComponent {
     this.loadOrganizationTaxRate();
     this.loadWithholdingTaxTypes();
     this.showOrganizationWarningModal = this.needsOrganizationSelectionWarning;
+    this.setupCustomerSearch();
+  }
+
+  ngOnDestroy(): void {
+    this.customerSearchSub?.unsubscribe();
+  }
+
+  private setupCustomerSearch(): void {
+    const orgId = this.currentOrganizationId.trim();
+    this.customerSearchSub = this.customerSearchInput$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap((query) => {
+        const q = query.trim();
+        if (!q || q.length < 1 || !orgId) {
+          return of([]);
+        }
+        this.searchingCustomers = true;
+        const params = new URLSearchParams({
+          organizationId: orgId,
+          q,
+          isActive: 'true',
+          limit: '15',
+        });
+        return this.api.list<CustomerRow>(`/api/v1/customers?${params.toString()}`).pipe(
+          map((res) => (res.data || []).filter((r) => r.isActive !== false)),
+          catchError(() => of([]))
+        );
+      })
+    ).subscribe((results) => {
+      this.searchingCustomers = false;
+      this.customerResults = results;
+      this.customerDropdownOpen = results.length > 0;
+    });
   }
 
   closeOrganizationWarningModal(): void {
@@ -233,46 +274,99 @@ export class CreateOrderPageComponent {
     });
   }
 
-  searchCustomers(): void {
-    if (!this.currentOrganizationId.trim()) {
-      this.showError(this.organizationContext.isAllOrganizationsSelected()
-        ? 'Select a specific organization first.'
-        : 'Logged in user has no organization assigned.');
+  onCustomerSearchInput(value: string): void {
+    this.customerSearchQuery = value;
+    if (!value.trim()) {
       this.customerResults = [];
-      this.customerSearchStatus = '';
+      this.customerDropdownOpen = false;
+      return;
+    }
+    this.customerSearchInput$.next(value);
+  }
+
+  selectCustomer(customer: CustomerRow): void {
+    this.selectedCustomer = customer;
+    this.customerSearchQuery = customer.name;
+    this.customerDropdownOpen = false;
+    this.customerResults = [];
+  }
+
+  clearCustomer(): void {
+    this.selectedCustomer = null;
+    this.customerSearchQuery = '';
+    this.customerResults = [];
+    this.customerDropdownOpen = false;
+  }
+
+  get selectedCustomerId(): string {
+    return this.selectedCustomer?.id || '';
+  }
+
+  openCustomerCreateModal(): void {
+    this.newCustomer = this.emptyCustomerForm();
+    if (this.customerSearchQuery.trim()) {
+      this.newCustomer['name'] = this.customerSearchQuery.trim();
+    }
+    this.customerCreateError = '';
+    this.customerDropdownOpen = false;
+    this.isCustomerCreateModalOpen = true;
+  }
+
+  closeCustomerCreateModal(): void {
+    this.isCustomerCreateModalOpen = false;
+    this.customerCreateError = '';
+  }
+
+  createCustomer(): void {
+    const name = String(this.newCustomer['name'] || '').trim();
+    if (!name) {
+      this.customerCreateError = 'Customer name is required.';
       return;
     }
 
-    this.searchingCustomers = true;
-    this.customerSearchPerformed = true;
-    this.customerSearchStatus = '';
-    this.error = '';
+    this.creatingCustomer = true;
+    this.customerCreateError = '';
 
-    const query = encodeURIComponent(this.customerSearchQuery.trim());
-    const orgId = encodeURIComponent(this.currentOrganizationId.trim());
-    const endpoint = `/api/v1/customers?organizationId=${orgId}&q=${query}&isActive=true&limit=30`;
+    const payload: Record<string, unknown> = {
+      organizationId: this.currentOrganizationId,
+      name,
+      legalName: String(this.newCustomer['legalName'] || '').trim() || undefined,
+      taxId: String(this.newCustomer['taxId'] || '').trim() || undefined,
+      contactPerson: String(this.newCustomer['contactPerson'] || '').trim() || undefined,
+      email: String(this.newCustomer['email'] || '').trim() || undefined,
+      phone: String(this.newCustomer['phone'] || '').trim() || undefined,
+      addressLine1: String(this.newCustomer['addressLine1'] || '').trim() || undefined,
+      addressLine2: String(this.newCustomer['addressLine2'] || '').trim() || undefined,
+      city: String(this.newCustomer['city'] || '').trim() || undefined,
+      state: String(this.newCustomer['state'] || '').trim() || undefined,
+      postalCode: String(this.newCustomer['postalCode'] || '').trim() || undefined,
+      country: String(this.newCustomer['country'] || '').trim() || undefined,
+      status: 'active',
+      isActive: true,
+    };
 
-    this.api.list<CustomerRow>(endpoint).subscribe({
-      next: (response: ApiResponse<CustomerRow[]>) => {
-        this.searchingCustomers = false;
-        this.customerResults = (response.data || []).filter((row) => row.isActive !== false);
-        const count = this.customerResults.length;
-        this.customerSearchStatus =
-          count > 0
-            ? `${count} customer${count > 1 ? 's' : ''} found. Please select one.`
-            : 'No matching customers found.';
+    this.api.create<CustomerRow>('/api/v1/customers', payload).subscribe({
+      next: (response) => {
+        this.creatingCustomer = false;
+        const created = response.data;
+        if (created) {
+          this.selectCustomer(created);
+        }
+        this.isCustomerCreateModalOpen = false;
       },
       error: (err) => {
-        this.searchingCustomers = false;
-        this.customerResults = [];
-        this.customerSearchStatus = 'Customer search failed.';
-        this.showError(err?.error?.message || 'Unable to search customers.');
+        this.creatingCustomer = false;
+        this.customerCreateError = err?.error?.message || 'Unable to create customer.';
       },
     });
   }
 
-  get selectedCustomer(): CustomerRow | undefined {
-    return this.customerResults.find((row) => row.id === this.selectedCustomerId);
+  private emptyCustomerForm(): Record<string, string> {
+    return {
+      name: '', legalName: '', taxId: '', contactPerson: '',
+      email: '', phone: '', addressLine1: '', addressLine2: '',
+      city: '', state: '', postalCode: '', country: '',
+    };
   }
 
   addToCart(item: ItemRow): void {

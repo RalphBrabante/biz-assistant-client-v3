@@ -108,6 +108,7 @@
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
+            <th>Order Date</th>
             <th *ngIf="isSuperuser">Organization</th>
             <th>Order Number</th>
             <th>Status</th>
@@ -118,15 +119,16 @@
         </thead>
         <tbody>
           <tr *ngIf="loading">
-            <td [attr.colspan]="isSuperuser ? 6 : 5" class="text-center py-5 border-0">
+            <td [attr.colspan]="isSuperuser ? 7 : 6" class="text-center py-5 border-0">
               <span class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></span>
               <span class="text-secondary small">Loading...</span>
             </td>
           </tr>
           <tr *ngIf="!loading && rows.length === 0">
-            <td [attr.colspan]="isSuperuser ? 6 : 5" class="text-center text-secondary py-4">No orders found.</td>
+            <td [attr.colspan]="isSuperuser ? 7 : 6" class="text-center text-secondary py-4">No orders found.</td>
           </tr>
           <tr *ngFor="let row of rows; trackBy: trackById">
+            <td>{{ row['orderDate'] ? ($any(row['orderDate']) | date: 'mediumDate') : '-' }}</td>
             <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
             <td>{{ row['orderNumber'] }}</td>
             <td>

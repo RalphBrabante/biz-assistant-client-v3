@@ -71,40 +71,77 @@
         <input class="form-control" [ngModel]="orderNumber" name="orderNumber" readonly />
       </div>
       <div class="col-12 col-md-8">
-        <label class="form-label">Customer (search by name or tax ID)</label>
-        <div class="input-group">
-          <input
-            class="form-control"
-            [(ngModel)]="customerSearchQuery"
-            name="customerSearchQuery"
-            placeholder="Type customer name or tax ID"
-            (keyup.enter)="searchCustomers()"
-          />
-          <button class="btn btn-outline-primary" type="button" (click)="searchCustomers()" [disabled]="searchingCustomers">
-            <i class="bi bi-search me-1"></i>{{ searchingCustomers ? 'Searching...' : 'Search Customer' }}
-          </button>
-        </div>
-      </div>
+        <label class="form-label">Customer <span class="text-danger">*</span></label>
+        <div class="position-relative">
+          <div class="position-relative">
+            <i class="bi bi-search position-absolute text-secondary" style="left:0.75rem;top:50%;transform:translateY(-50%);pointer-events:none;"></i>
+            <input
+              class="form-control ps-5"
+              [class.pe-5]="customerSearchQuery"
+              [value]="customerSearchQuery"
+              (input)="onCustomerSearchInput($any($event.target).value)"
+              (focus)="customerResults.length > 0 && (customerDropdownOpen = true)"
+              name="customerSearchQuery"
+              placeholder="Search customer by name or TIN..."
+              autocomplete="off"
+            />
+            <button
+              *ngIf="customerSearchQuery"
+              class="btn position-absolute p-0 border-0 bg-transparent text-secondary"
+              style="right:0.75rem;top:50%;transform:translateY(-50%);"
+              type="button"
+              (click)="clearCustomer()"
+            >
+              <i class="bi bi-x-circle-fill"></i>
+            </button>
+          </div>
 
-      <div class="col-12 col-md-6">
-        <label class="form-label">Select Customer</label>
-        <select class="form-select" [(ngModel)]="selectedCustomerId" name="selectedCustomerId">
-          <option value="">Select customer</option>
-          <option *ngFor="let customer of customerResults; trackBy: trackByCustomerId" [value]="customer.id">
-            {{ customerLabel(customer) }}
-          </option>
-        </select>
-        <div class="small mt-2" *ngIf="customerSearchPerformed" [ngClass]="customerResults.length > 0 ? 'text-success' : 'text-secondary'">
-          {{ customerSearchStatus }}
+          <!-- Dropdown results -->
+          <div *ngIf="customerDropdownOpen || (!searchingCustomers && customerSearchQuery.trim().length >= 1 && customerResults.length === 0 && !selectedCustomer)"
+            class="position-absolute w-100 bg-body border rounded-3 shadow-lg mt-1 overflow-auto" style="z-index:1060;max-height:280px;">
+            <button
+              *ngFor="let customer of customerResults; trackBy: trackByCustomerId"
+              class="btn btn-link text-start text-decoration-none d-block w-100 px-3 py-2 border-0"
+              [class.bg-primary-subtle]="selectedCustomer?.id === customer.id"
+              type="button"
+              (mousedown)="selectCustomer(customer)"
+            >
+              <div class="fw-semibold text-body">{{ customer.name }}</div>
+              <div class="small text-secondary">
+                TIN: {{ customer.taxId || '-' }}
+                <span *ngIf="customer.customerCode"> &middot; {{ customer.customerCode }}</span>
+              </div>
+            </button>
+            <!-- No results + Create button -->
+            <div *ngIf="customerResults.length === 0 && !searchingCustomers" class="px-3 py-2 text-center">
+              <div class="small text-secondary mb-2">No customers found for "{{ customerSearchQuery.trim() }}"</div>
+              <button type="button" class="btn btn-sm btn-primary" (mousedown)="openCustomerCreateModal()">
+                <i class="bi bi-person-plus me-1"></i>Create New Customer
+              </button>
+            </div>
+            <!-- Create button at bottom when results exist -->
+            <div *ngIf="customerResults.length > 0" class="border-top px-3 py-2 text-center">
+              <button type="button" class="btn btn-sm btn-outline-primary" (mousedown)="openCustomerCreateModal()">
+                <i class="bi bi-person-plus me-1"></i>Create New Customer
+              </button>
+            </div>
+          </div>
+
+          <!-- Searching indicator -->
+          <div *ngIf="searchingCustomers" class="position-absolute w-100 bg-body border rounded-3 shadow-sm mt-1 px-3 py-2 text-secondary small" style="z-index:1060;">
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span> Searching...
+          </div>
         </div>
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">Selected Customer Details</label>
-        <input
-          class="form-control"
-          [value]="selectedCustomer ? (selectedCustomer.name + ' | Tax ID: ' + selectedCustomer.taxId) : 'No customer selected'"
-          readonly
-        />
+
+        <!-- Selected customer chip -->
+        <div *ngIf="selectedCustomer" class="d-flex align-items-center gap-2 mt-2 p-2 bg-success-subtle border border-success-subtle rounded-3">
+          <i class="bi bi-person-check text-success"></i>
+          <div class="small flex-grow-1">
+            <span class="fw-semibold">{{ selectedCustomer.name }}</span>
+            <span class="text-secondary ms-2">TIN: {{ selectedCustomer.taxId || '-' }}</span>
+          </div>
+          <button type="button" class="btn-close" style="font-size:0.6rem;" (click)="clearCustomer()" aria-label="Remove customer"></button>
+        </div>
       </div>
 
       <div class="col-12 col-md-3">
@@ -314,4 +351,84 @@
     <span>{{ submitting ? 'Placing Order...' : 'Place Order' }}</span>
   </button>
 </div>
+</div>
+
+<!-- Create Customer Modal -->
+<div class="modal-backdrop fade show" *ngIf="isCustomerCreateModalOpen"></div>
+<div
+  class="modal fade show"
+  tabindex="-1"
+  [style.display]="isCustomerCreateModalOpen ? 'block' : 'none'"
+  *ngIf="isCustomerCreateModalOpen"
+>
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Create New Customer</h5>
+        <button type="button" class="btn-close" (click)="closeCustomerCreateModal()"></button>
+      </div>
+      <div class="modal-body pt-3 position-relative">
+        <div *ngIf="creatingCustomer" class="modal-loading-overlay">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+        <div *ngIf="customerCreateError" class="alert alert-danger py-2 mb-3">{{ customerCreateError }}</div>
+        <div class="row g-3" [class.pe-none]="creatingCustomer" [class.opacity-50]="creatingCustomer">
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+            <input class="form-control" [(ngModel)]="newCustomer['name']" placeholder="Customer name" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Legal Name</label>
+            <input class="form-control" [(ngModel)]="newCustomer['legalName']" placeholder="Legal / registered name" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">TIN</label>
+            <input class="form-control" [(ngModel)]="newCustomer['taxId']" placeholder="000-000-000-00000" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Contact Person</label>
+            <input class="form-control" [(ngModel)]="newCustomer['contactPerson']" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Phone</label>
+            <input class="form-control" [(ngModel)]="newCustomer['phone']" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Email</label>
+            <input type="email" class="form-control" [(ngModel)]="newCustomer['email']" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Address Line 1</label>
+            <input class="form-control" [(ngModel)]="newCustomer['addressLine1']" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Address Line 2</label>
+            <input class="form-control" [(ngModel)]="newCustomer['addressLine2']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">City</label>
+            <input class="form-control" [(ngModel)]="newCustomer['city']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">State / Province</label>
+            <input class="form-control" [(ngModel)]="newCustomer['state']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Postal Code</label>
+            <input class="form-control" [(ngModel)]="newCustomer['postalCode']" />
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label fw-semibold">Country</label>
+            <input class="form-control" [(ngModel)]="newCustomer['country']" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary" (click)="closeCustomerCreateModal()"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+        <button class="btn btn-primary" [disabled]="creatingCustomer" (click)="createCustomer()">
+          {{ creatingCustomer ? 'Creating...' : 'Create & Select Customer' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
