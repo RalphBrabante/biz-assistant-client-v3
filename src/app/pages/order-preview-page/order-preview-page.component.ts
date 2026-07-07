@@ -401,21 +401,33 @@ export class OrderPreviewPageComponent {
       .map((row) => {
         const itemId = String(row.itemId || '');
         if (!itemId) return null;
-        // Prefer live catalog row; fallback to snapshot-derived stub so historical rows always render.
-        const item =
-          byId.get(itemId) ||
-          ({
-            id: itemId,
-            organizationId: this.organizationId,
-            type: row.type || 'product',
-            name: row.name || 'Unknown Item',
-            sku: row.sku || '',
-            price: Number(row.unitPrice ?? 0),
-            discountedPrice: Number(row.discountedUnitPrice ?? row.unitPrice ?? 0),
-            currency: row.currency || this.orderCurrency,
-            stock: 0,
-            isActive: true,
-          } as ItemRow);
+        const liveItem = byId.get(itemId);
+        // Keep historical snapshot pricing immutable in order details.
+        // We still borrow live stock/type flags for validation and item behavior.
+        const snapshotUnitPrice = Number(row.unitPrice ?? NaN);
+        const snapshotDiscounted =
+          row.discountedUnitPrice === null || row.discountedUnitPrice === undefined
+            ? null
+            : Number(row.discountedUnitPrice);
+        const item = {
+          id: itemId,
+          organizationId: liveItem?.organizationId || this.organizationId,
+          type: row.type || liveItem?.type || 'product',
+          name: row.name || liveItem?.name || 'Unknown Item',
+          sku: row.sku || liveItem?.sku || '',
+          category: liveItem?.category,
+          price: Number.isFinite(snapshotUnitPrice)
+            ? snapshotUnitPrice
+            : Number(liveItem?.price ?? 0),
+          discountedPrice:
+            snapshotDiscounted !== null && Number.isFinite(snapshotDiscounted)
+              ? snapshotDiscounted
+              : null,
+          taxRate: Number(row.taxRate ?? liveItem?.taxRate ?? 0),
+          stock: Number(liveItem?.stock ?? 0),
+          currency: row.currency || liveItem?.currency || this.orderCurrency,
+          isActive: liveItem?.isActive ?? true,
+        } as ItemRow;
         return {
           item,
           quantity: Math.max(1, Number(row.quantity || 1)),
