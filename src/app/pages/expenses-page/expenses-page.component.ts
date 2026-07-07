@@ -74,6 +74,12 @@ interface ExpenseRow {
 
 interface VendorOption {
   id: string;
+  organizationId?: string;
+  organization?: {
+    id: string;
+    name?: string;
+    legalName?: string;
+  };
   name: string;
   category?: string;
   legalName?: string;
@@ -226,6 +232,7 @@ export class ExpensesPageComponent {
           const params = new URLSearchParams({
             limit: '20',
             activeOnly: 'true',
+            includeShared: 'true',
           });
           if (this.currentOrganizationId) {
             params.set('organizationId', this.currentOrganizationId);
@@ -754,6 +761,10 @@ export class ExpensesPageComponent {
 
   vendorLabel(row: ExpenseRow): string {
     return row.vendor?.name || row.vendorTaxId || row.vendorId || '-';
+  }
+
+  vendorOrganizationLabel(vendor: VendorOption): string {
+    return vendor.organization?.name || vendor.organization?.legalName || vendor.organizationId || '';
   }
 
   taxTypeLabel(row: ExpenseRow): string {

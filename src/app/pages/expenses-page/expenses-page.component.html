@@ -395,6 +395,9 @@
                         TIN: {{ vendor.taxId || '—' }}
                         <span *ngIf="vendor.category"> &middot; {{ vendor.category }}</span>
                       </div>
+                      <div class="small text-secondary" *ngIf="vendorOrganizationLabel(vendor)">
+                        Organization: {{ vendorOrganizationLabel(vendor) }}
+                      </div>
                     </button>
                   </div>
 
@@ -438,6 +441,11 @@
                 <div class="flex-grow-1 min-w-0">
                   <div class="fw-semibold text-truncate">{{ selectedCreateVendor()?.name || selectedCreateVendor()?.legalName || '—' }}</div>
                   <div class="small text-secondary">TIN: {{ selectedCreateVendor()?.taxId || '—' }}</div>
+                  <div class="small text-secondary" *ngIf="selectedCreateVendor() as selectedVendor">
+                    <span *ngIf="vendorOrganizationLabel(selectedVendor)">
+                      Organization: {{ vendorOrganizationLabel(selectedVendor) }}
+                    </span>
+                  </div>
                 </div>
                 <button
                   type="button"
