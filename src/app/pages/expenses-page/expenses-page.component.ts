@@ -61,6 +61,7 @@ interface ExpenseRow {
     id: string;
     code?: string;
     name?: string;
+    description?: string;
     percentage?: number;
   };
   withholdingTaxTypeId?: string;
@@ -111,6 +112,7 @@ interface OrganizationTaxInfo {
     id: string;
     code?: string;
     name?: string;
+    description?: string;
     percentage?: number;
   };
 }
@@ -222,7 +224,7 @@ export class ExpensesPageComponent {
   }
 
   get isPercentageTaxOrganization(): boolean {
-    return this.organizationTaxTypeCode === 'PT';
+    return this.isPercentageTaxType(this.organizationTaxTypeCode, this.organizationTaxTypeName);
   }
 
   get taxModeLabel(): string {
@@ -399,7 +401,7 @@ export class ExpensesPageComponent {
         const taxType = response.data?.taxType;
         this.organizationCurrency = String(response.data?.currency || '').toUpperCase();
         this.organizationTaxTypeCode = String(taxType?.code || '').toUpperCase();
-        this.organizationTaxTypeName = String(taxType?.name || taxType?.code || '').trim();
+        this.organizationTaxTypeName = String(taxType?.name || taxType?.description || taxType?.code || '').trim();
         const rate = Number(taxType?.percentage || 0);
         this.organizationTaxRate = Number.isFinite(rate) && rate > 0 ? rate : 0;
         this.recomputeExpenseBreakdown();
@@ -411,6 +413,25 @@ export class ExpensesPageComponent {
         this.organizationTaxRate = 0;
       },
     });
+  }
+
+  isPercentageTaxRow(row: ExpenseRow): boolean {
+    return this.isPercentageTaxType(row.taxType?.code, row.taxType?.name || row.taxType?.description || '');
+  }
+
+  private isPercentageTaxType(code: unknown, name = ''): boolean {
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    const normalizedName = String(name || '').trim().toUpperCase();
+    return [
+      'PT',
+      'PERCENTAGE_TAX',
+      'PERCENTAGE',
+      'NONVAT',
+      'NON_VAT',
+    ].includes(normalizedCode)
+      || normalizedName.includes('PERCENTAGE TAX')
+      || normalizedName.includes('NON-VAT')
+      || normalizedName.includes('NON VAT');
   }
 
   openCreateModal(): void {
@@ -1336,7 +1357,7 @@ export class ExpensesPageComponent {
       ? +amount.toFixed(2)
       : +(amount / (1 + (vatRate || 0.12))).toFixed(2);
     const taxableAmount = this.isPercentageTaxOrganization
-      ? +Math.max(0, amount).toFixed(2)
+      ? +Math.max(0, amount - vatExempt).toFixed(2)
       : +Math.max(0, vatExclusive - vatExempt).toFixed(2);
     const taxAmount = this.isPercentageTaxOrganization
       ? 0
