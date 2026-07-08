@@ -528,7 +528,12 @@
           </div>
 
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Total on Receipt <span class="text-secondary fw-normal">(VAT-inclusive)</span> <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold">
+              Total on Receipt
+              <span class="text-secondary fw-normal" *ngIf="!isPercentageTaxOrganization">(VAT-inclusive)</span>
+              <span class="text-secondary fw-normal" *ngIf="isPercentageTaxOrganization">(non-VAT)</span>
+              <span class="text-danger">*</span>
+            </label>
             <div class="input-group">
               <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
               <input type="number" step="0.01" min="0" class="form-control" formControlName="amount" placeholder="0.00" />
@@ -539,7 +544,7 @@
           </div>
 
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">VAT-Exempt Portion</label>
+            <label class="form-label fw-semibold">{{ isPercentageTaxOrganization ? 'Non-VAT / VAT-Exempt Amount' : 'VAT-Exempt Portion' }}</label>
             <div class="input-group">
               <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
               <input type="number" step="0.01" min="0" class="form-control" formControlName="vatExemptAmount" placeholder="0.00" />
@@ -593,22 +598,38 @@
           <div class="col-12">
             <div class="bg-body-tertiary rounded-3 p-3">
               <div class="row g-2 small">
-                <div class="col-8 text-secondary">Total on Receipt (VAT-inclusive)</div>
+                <div class="col-8 text-secondary">
+                  Total on Receipt
+                  <span *ngIf="!isPercentageTaxOrganization">(VAT-inclusive)</span>
+                  <span *ngIf="isPercentageTaxOrganization">(non-VAT)</span>
+                </div>
                 <div class="col-4 text-end font-monospace">{{ formatMoney(createExpenseForm.get('amount')?.value || 0, currentOrganizationCurrency) }}</div>
 
-                <div class="col-8 text-secondary">VAT-Exclusive Amount <span class="text-muted">(&divide; 1.12)</span></div>
-                <div class="col-4 text-end font-monospace">{{ formatMoney(computedVatExclusive, currentOrganizationCurrency) }}</div>
+                <ng-container *ngIf="!isPercentageTaxOrganization">
+                  <div class="col-8 text-secondary">VAT-Exclusive Amount <span class="text-muted">(&divide; 1.12)</span></div>
+                  <div class="col-4 text-end font-monospace">{{ formatMoney(computedVatExclusive, currentOrganizationCurrency) }}</div>
+                </ng-container>
 
-                <div class="col-8 text-secondary">Less: VAT-Exempt Portion</div>
-                <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-(createExpenseForm.get('vatExemptAmount')?.value || 0), currentOrganizationCurrency) }}</div>
+                <div class="col-8 text-secondary">{{ isPercentageTaxOrganization ? 'Non-VAT / VAT-Exempt Expense' : 'Less: VAT-Exempt Portion' }}</div>
+                <div class="col-4 text-end font-monospace text-danger">
+                  {{ formatMoney(-(isPercentageTaxOrganization ? (createExpenseForm.get('amount')?.value || 0) : (createExpenseForm.get('vatExemptAmount')?.value || 0)), currentOrganizationCurrency) }}
+                </div>
 
                 <div class="col-12"><hr class="my-1" /></div>
 
-                <div class="col-8 fw-semibold">Taxable Amount <span class="text-muted fw-normal">(VATable Sales)</span></div>
+                <div class="col-8 fw-semibold">
+                  {{ isPercentageTaxOrganization ? 'EWT Base / Gross Expense' : 'Taxable Amount' }}
+                  <span class="text-muted fw-normal" *ngIf="!isPercentageTaxOrganization">(VATable Purchase)</span>
+                </div>
                 <div class="col-4 text-end font-monospace fw-semibold">{{ formatMoney(computedTaxableAmount, currentOrganizationCurrency) }}</div>
 
-                <div class="col-8 text-secondary">VAT Amount (12%)</div>
+                <div class="col-8 text-secondary">{{ isPercentageTaxOrganization ? 'Input VAT' : 'VAT Amount (12%)' }}</div>
                 <div class="col-4 text-end font-monospace text-success">{{ formatMoney(computedTaxAmount, currentOrganizationCurrency) }}</div>
+
+                <ng-container *ngIf="isPercentageTaxOrganization">
+                  <div class="col-8 text-secondary">{{ taxModeLabel }} <span class="text-muted">(supplier/filing reference)</span></div>
+                  <div class="col-4 text-end font-monospace">{{ formatMoney(computedPercentageTaxAmount, currentOrganizationCurrency) }}</div>
+                </ng-container>
 
                 <div class="col-12"><hr class="my-1" /></div>
 
@@ -910,18 +931,20 @@
       <div class="col-7 text-secondary">Total on Receipt</div>
       <div class="col-5 text-end font-monospace">{{ formatMoney(r.amount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
-      <div class="col-7 text-secondary">VAT-Exclusive (&divide; 1.12)</div>
-      <div class="col-5 text-end font-monospace">{{ formatMoney(computeVatExclusive(r), r.currency || currentOrganizationCurrency) }}</div>
+      <ng-container *ngIf="r.taxType?.code !== 'PT'">
+        <div class="col-7 text-secondary">VAT-Exclusive (&divide; 1.12)</div>
+        <div class="col-5 text-end font-monospace">{{ formatMoney(computeVatExclusive(r), r.currency || currentOrganizationCurrency) }}</div>
+      </ng-container>
 
-      <div class="col-7 text-secondary">Less: VAT-Exempt</div>
+      <div class="col-7 text-secondary">{{ r.taxType?.code === 'PT' ? 'Non-VAT / VAT-Exempt Expense' : 'Less: VAT-Exempt' }}</div>
       <div class="col-5 text-end font-monospace text-danger">{{ formatMoney(-(r.vatExemptAmount ?? 0), r.currency || currentOrganizationCurrency) }}</div>
 
       <div class="col-12"><hr class="my-1" /></div>
 
-      <div class="col-7 fw-semibold">Taxable Amount</div>
+      <div class="col-7 fw-semibold">{{ r.taxType?.code === 'PT' ? 'EWT Base / Gross Expense' : 'Taxable Amount' }}</div>
       <div class="col-5 text-end font-monospace fw-semibold">{{ formatMoney(r.taxableAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
-      <div class="col-7 text-secondary">VAT (12%)</div>
+      <div class="col-7 text-secondary">{{ r.taxType?.code === 'PT' ? 'Input VAT' : 'VAT (12%)' }}</div>
       <div class="col-5 text-end font-monospace text-success">{{ formatMoney(r.taxAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
       <div class="col-12"><hr class="my-1" /></div>

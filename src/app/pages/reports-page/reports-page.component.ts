@@ -51,6 +51,168 @@ interface QuarterlyExpenseReportRow {
   generatedAt: string;
 }
 
+interface OrganizationTaxInfo {
+  id: string;
+  currency?: string;
+  taxType?: {
+    id: string;
+    code?: string;
+    name?: string;
+    percentage?: number;
+  };
+}
+
+interface WithholdingPayeeSummary {
+  payeeId: string;
+  payeeName: string;
+  payeeTin: string;
+  withholdingTaxTypeId: string;
+  atcCode: string;
+  withholdingTypeName: string;
+  rate: number;
+  taxableBase: number;
+  amountWithheld: number;
+  transactionCount: number;
+}
+
+interface BirFilingSummary {
+  organization?: OrganizationTaxInfo & {
+    name?: string;
+    legalName?: string;
+    taxpayerClassification?: string;
+    taxpayerClassificationLabel?: string;
+    deductionMethod?: string;
+    incomeTaxRate?: number;
+    isIncomeTaxExempt?: boolean;
+  };
+  year: number;
+  quarter: number;
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  sales: {
+    invoiceCount: number;
+    grossReceipts: number;
+    outputVat: number;
+    discountAmount: number;
+    totalAmount: number;
+  };
+  expenses: {
+    expenseCount: number;
+    grossAmount: number;
+    inputVat: number;
+    discountAmount: number;
+    deductibleExpenses: number;
+    taxableBase: number;
+    amountWithheld: number;
+  };
+  businessTax: {
+    form: string;
+    taxTypeCode: string;
+    taxTypeName: string;
+    rate: number;
+    grossReceipts: number;
+    outputVat: number;
+    inputVat: number;
+    netVatPayable: number;
+    inputVatExcess: number;
+    percentageTaxDue: number;
+  };
+  incomeTax: {
+    forms: string[];
+    taxpayerClassification: string;
+    taxpayerClassificationLabel: string;
+    deductionMethod: string;
+    incomeTaxRate: number;
+    isIncomeTaxExempt: boolean;
+    grossIncome: number;
+    deductibleExpenses: number;
+    netTaxableIncomeEstimate: number;
+    estimatedIncomeTaxDue: number;
+    caveats?: string[];
+  };
+  withholding: {
+    currency: string;
+    taxableBase: number;
+    amountWithheld: number;
+    expenseCount: number;
+    groups: Array<{
+      withholdingTaxTypeId: string;
+      code: string;
+      name: string;
+      percentage: number;
+      taxableBase: number;
+      amountWithheld: number;
+      expenseCount: number;
+    }>;
+    payees: WithholdingPayeeSummary[];
+  };
+  certificates2307: {
+    payeeCount: number;
+    totalTaxableBase: number;
+    totalAmountWithheld: number;
+    payees: WithholdingPayeeSummary[];
+  };
+  attachments: {
+    sawt: {
+      supported: boolean;
+      lineCount: number;
+      incomePayment: number;
+      taxWithheld: number;
+      lines: Array<{
+        date: string;
+        referenceNumber: string;
+        customerName: string;
+        customerTin: string;
+        atcCode?: string;
+        withholdingTypeName?: string;
+        rate?: number;
+        incomePayment: number;
+        taxWithheld: number;
+      }>;
+    };
+    qap: {
+      supported: boolean;
+      lineCount: number;
+      incomePayment: number;
+      taxWithheld: number;
+      lines: Array<{
+        date: string;
+        referenceNumber: string;
+        payeeName: string;
+        payeeTin: string;
+        atcCode: string;
+        incomePayment: number;
+        rate: number;
+        taxWithheld: number;
+      }>;
+    };
+    slsp: {
+      supported: boolean;
+      salesLineCount: number;
+      purchaseLineCount: number;
+      sales: Array<{
+        date: string;
+        referenceNumber: string;
+        customerName: string;
+        customerTin: string;
+        grossSales: number;
+        taxableSales: number;
+        outputVat: number;
+      }>;
+      purchases: Array<{
+        date: string;
+        referenceNumber: string;
+        vendorName: string;
+        vendorTin: string;
+        grossPurchases: number;
+        taxablePurchases: number;
+        inputVat: number;
+      }>;
+    };
+  };
+}
+
 @Component({
   selector: 'app-reports-page',
   standalone: true,
@@ -90,6 +252,14 @@ export class ReportsPageComponent {
 
   readonly selectedYear = signal(new Date().getFullYear());
   readonly selectedQuarter = signal(this.getCurrentQuarter());
+  readonly organizationTaxTypeCode = signal('');
+  readonly organizationTaxTypeName = signal('');
+  readonly organizationTaxRate = signal(0);
+  readonly organizationCurrency = signal('');
+  readonly filingSummary = signal<BirFilingSummary | null>(null);
+  readonly loadingFilingSummary = signal(false);
+  readonly filingSummaryError = signal('');
+  readonly generatingFilingReports = signal(false);
 
   salesPage = 1;
   salesPageSize = 20;
@@ -111,8 +281,49 @@ export class ReportsPageComponent {
     return Array.from({ length: 8 }, (_, index) => currentYear - index);
   });
 
+  readonly filingWorksheet = computed(() => {
+    const salesReport = this.findSelectedSalesReport(this.salesRows());
+    const expenseReport = this.findSelectedExpenseReport(this.expenseRows());
+    const summary = this.filingSummary();
+    const currency =
+      summary?.currency ||
+      salesReport?.currency ||
+      expenseReport?.currency ||
+      this.organizationCurrency() ||
+      this.currentOrganizationCurrency;
+    const grossReceipts = Number(summary?.businessTax?.grossReceipts ?? salesReport?.subtotalAmount ?? 0);
+    const outputVat = Number(summary?.businessTax?.outputVat ?? salesReport?.taxAmount ?? 0);
+    const inputVat = Number(summary?.businessTax?.inputVat ?? expenseReport?.taxAmount ?? 0);
+    const netVatPayable = Number(summary?.businessTax?.netVatPayable ?? Math.max(outputVat - inputVat, 0));
+    const inputVatExcess = Number(summary?.businessTax?.inputVatExcess ?? Math.max(inputVat - outputVat, 0));
+    const deductibleExpenses = Number(summary?.incomeTax?.deductibleExpenses ?? expenseReport?.totalAmount ?? 0);
+    const netTaxableIncomeEstimate = Number(
+      summary?.incomeTax?.netTaxableIncomeEstimate ?? Math.max(grossReceipts - deductibleExpenses, 0)
+    );
+    const percentageTaxDue = Number(
+      summary?.businessTax?.percentageTaxDue ??
+      (this.isPercentageTaxOrganization ? Number((grossReceipts * (this.organizationTaxRate() / 100)).toFixed(2)) : 0)
+    );
+
+    return {
+      summary,
+      salesReport,
+      expenseReport,
+      currency,
+      grossReceipts,
+      outputVat,
+      inputVat,
+      netVatPayable,
+      inputVatExcess,
+      deductibleExpenses,
+      netTaxableIncomeEstimate,
+      percentageTaxDue,
+      withholding: summary?.withholding || null,
+    };
+  });
+
   get currentOrganizationCurrency(): string {
-    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
+    return String(this.organizationCurrency() || this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
   get isSuperuser(): boolean {
@@ -138,6 +349,34 @@ export class ReportsPageComponent {
     return this.isSuperuser && !this.hasOrganizationContext;
   }
 
+  get isPercentageTaxOrganization(): boolean {
+    return this.organizationTaxTypeCode() === 'PT';
+  }
+
+  get isVatOrganization(): boolean {
+    return this.organizationTaxTypeCode() === 'VAT';
+  }
+
+  get organizationTaxLabel(): string {
+    if (this.isPercentageTaxOrganization) {
+      return `Percentage Tax (${this.organizationTaxRate() || 0}%)`;
+    }
+    if (this.isVatOrganization) {
+      return `VAT (${this.organizationTaxRate() || 12}%)`;
+    }
+    return this.organizationTaxTypeName() || 'Tax type not set';
+  }
+
+  get businessTaxFormLabel(): string {
+    return this.isPercentageTaxOrganization ? 'BIR 2551Q' : 'BIR 2550Q';
+  }
+
+  get businessTaxWorksheetTitle(): string {
+    return this.isPercentageTaxOrganization
+      ? 'Percentage Tax Worksheet'
+      : 'VAT Worksheet';
+  }
+
   showOrganizationWarningModal = false;
 
   private get orgParamValue(): string {
@@ -157,8 +396,10 @@ export class ReportsPageComponent {
     if (this.isSuperuser) {
       this.loadOrganizations();
     }
+    this.loadOrganizationTaxInfo();
     this.loadSalesReports();
     this.loadExpenseReports();
+    this.loadBirFilingSummary();
   }
 
   closeOrganizationWarningModal(): void {
@@ -178,6 +419,81 @@ export class ReportsPageComponent {
       },
       error: () => {
         this.organizationNameMap.set({});
+      },
+    });
+  }
+
+  private loadOrganizationTaxInfo(): void {
+    const organizationId = this.orgParamValue;
+    if (!organizationId) {
+      this.organizationTaxTypeCode.set('');
+      this.organizationTaxTypeName.set('');
+      this.organizationTaxRate.set(0);
+      this.organizationCurrency.set('');
+      return;
+    }
+
+    this.api.get<OrganizationTaxInfo>(`/api/v1/organizations/${encodeURIComponent(organizationId)}`).subscribe({
+      next: (response) => {
+        const taxType = response.data?.taxType;
+        this.organizationTaxTypeCode.set(String(taxType?.code || '').toUpperCase());
+        this.organizationTaxTypeName.set(String(taxType?.name || taxType?.code || '').trim());
+        const rate = Number(taxType?.percentage || 0);
+        this.organizationTaxRate.set(Number.isFinite(rate) && rate > 0 ? rate : 0);
+        this.organizationCurrency.set(String(response.data?.currency || '').toUpperCase());
+      },
+      error: () => {
+        this.organizationTaxTypeCode.set('');
+        this.organizationTaxTypeName.set('');
+        this.organizationTaxRate.set(0);
+        this.organizationCurrency.set('');
+      },
+    });
+  }
+
+  loadBirFilingSummary(): void {
+    if (this.isContextLocked) {
+      this.loadingFilingSummary.set(false);
+      this.filingSummary.set(null);
+      this.filingSummaryError.set('');
+      return;
+    }
+    const organizationId = this.orgParamValue;
+    if (!organizationId) {
+      this.loadingFilingSummary.set(false);
+      this.filingSummary.set(null);
+      this.filingSummaryError.set('Select an organization to prepare BIR filing worksheets.');
+      return;
+    }
+
+    this.loadingFilingSummary.set(true);
+    this.filingSummaryError.set('');
+    const params = new URLSearchParams({
+      organizationId,
+      year: String(this.selectedYear()),
+      quarter: String(this.selectedQuarter()),
+    });
+
+    this.api.get<BirFilingSummary>(`/api/v1/reports/bir-filing-summary?${params.toString()}`).subscribe({
+      next: (response) => {
+        this.loadingFilingSummary.set(false);
+        const summary = response.data || null;
+        this.filingSummary.set(summary);
+        const taxType = summary?.organization?.taxType;
+        if (taxType) {
+          this.organizationTaxTypeCode.set(String(taxType.code || '').toUpperCase());
+          this.organizationTaxTypeName.set(String(taxType.name || taxType.code || '').trim());
+          const rate = Number(taxType.percentage || 0);
+          this.organizationTaxRate.set(Number.isFinite(rate) && rate > 0 ? rate : 0);
+        }
+        if (summary?.currency) {
+          this.organizationCurrency.set(String(summary.currency).toUpperCase());
+        }
+      },
+      error: (err) => {
+        this.loadingFilingSummary.set(false);
+        this.filingSummary.set(null);
+        this.filingSummaryError.set(err?.error?.message || 'Unable to load BIR filing summary.');
       },
     });
   }
@@ -309,6 +625,7 @@ export class ReportsPageComponent {
         }
         this.salesPage = 1;
         this.loadSalesReports();
+        this.loadBirFilingSummary();
       },
       error: (err) => {
         this.generatingSales.set(false);
@@ -347,6 +664,7 @@ export class ReportsPageComponent {
         }
         this.expensePage = 1;
         this.loadExpenseReports();
+        this.loadBirFilingSummary();
       },
       error: (err) => {
         this.generatingExpenses.set(false);
@@ -362,6 +680,156 @@ export class ReportsPageComponent {
 
   selectedQuarterExpenseReport(): QuarterlyExpenseReportRow | null {
     return this.findSelectedExpenseReport(this.expenseRows());
+  }
+
+  generateSelectedQuarterFilingReports(): void {
+    if (this.isContextLocked || this.generatingFilingReports()) return;
+    this.generatingFilingReports.set(true);
+    this.salesError.set('');
+    this.expenseError.set('');
+    this.salesMessage.set('');
+    this.expenseMessage.set('');
+
+    const payload = {
+      year: this.selectedYear(),
+      quarter: this.selectedQuarter(),
+      currency: this.currentOrganizationCurrency,
+      ...(this.orgParamValue ? { organizationId: this.orgParamValue } : {}),
+    };
+    let remaining = 2;
+    const completeOne = () => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        this.generatingFilingReports.set(false);
+        this.salesPage = 1;
+        this.expensePage = 1;
+        this.loadSalesReports();
+        this.loadExpenseReports();
+        this.loadBirFilingSummary();
+      }
+    };
+
+    this.api.create<QuarterlySalesReportRow>('/api/v1/reports/quarterly-sales', payload).subscribe({
+      next: (response) => {
+        if (response.data) {
+          this.latestSalesReport.set(response.data);
+        }
+        this.salesMessage.set(response.message || 'Quarterly sales report generated successfully.');
+        completeOne();
+      },
+      error: (err) => {
+        this.salesError.set(err?.error?.message || 'Unable to generate sales report.');
+        completeOne();
+      },
+    });
+
+    this.api.create<QuarterlyExpenseReportRow>('/api/v1/reports/quarterly-expenses', payload).subscribe({
+      next: (response) => {
+        if (response.data) {
+          this.latestExpenseReport.set(response.data);
+        }
+        this.expenseMessage.set(response.message || 'Quarterly expense report generated successfully.');
+        completeOne();
+      },
+      error: (err) => {
+        this.expenseError.set(err?.error?.message || 'Unable to generate expense report.');
+        completeOne();
+      },
+    });
+  }
+
+  downloadFilingCsv(type: '2307' | 'sawt' | 'qap' | 'slsp-sales' | 'slsp-purchases'): void {
+    const summary = this.filingSummary();
+    if (!summary) return;
+
+    let filename = '';
+    let rows: Array<Record<string, string | number>> = [];
+    let templateRow: Record<string, string | number> = {};
+    switch (type) {
+      case '2307':
+        filename = 'bir-2307-payees';
+        templateRow = {
+          payeeName: '',
+          payeeTin: '',
+          atcCode: '',
+          withholdingType: '',
+          rate: '',
+          taxableBase: '',
+          amountWithheld: '',
+          transactionCount: '',
+        };
+        rows = summary.certificates2307.payees.map((payee) => ({
+          payeeName: payee.payeeName,
+          payeeTin: payee.payeeTin,
+          atcCode: payee.atcCode,
+          withholdingType: payee.withholdingTypeName,
+          rate: payee.rate,
+          taxableBase: payee.taxableBase,
+          amountWithheld: payee.amountWithheld,
+          transactionCount: payee.transactionCount,
+        }));
+        break;
+      case 'sawt':
+        filename = 'bir-sawt-lines';
+        templateRow = {
+          date: '',
+          referenceNumber: '',
+          customerName: '',
+          customerTin: '',
+          atcCode: '',
+          withholdingTypeName: '',
+          rate: '',
+          incomePayment: '',
+          taxWithheld: '',
+        };
+        rows = summary.attachments.sawt.lines;
+        break;
+      case 'qap':
+        filename = 'bir-qap-lines';
+        templateRow = {
+          date: '',
+          referenceNumber: '',
+          payeeName: '',
+          payeeTin: '',
+          atcCode: '',
+          incomePayment: '',
+          rate: '',
+          taxWithheld: '',
+        };
+        rows = summary.attachments.qap.lines;
+        break;
+      case 'slsp-sales':
+        filename = 'bir-slsp-sales';
+        templateRow = {
+          date: '',
+          referenceNumber: '',
+          customerName: '',
+          customerTin: '',
+          grossSales: '',
+          taxableSales: '',
+          outputVat: '',
+        };
+        rows = summary.attachments.slsp.sales;
+        break;
+      case 'slsp-purchases':
+        filename = 'bir-slsp-purchases';
+        templateRow = {
+          date: '',
+          referenceNumber: '',
+          vendorName: '',
+          vendorTin: '',
+          grossPurchases: '',
+          taxablePurchases: '',
+          inputVat: '',
+        };
+        rows = summary.attachments.slsp.purchases;
+        break;
+    }
+
+    this.downloadCsv(
+      `${filename}-${summary.year}-q${summary.quarter}.csv`,
+      rows.length ? rows : [templateRow]
+    );
   }
 
   selectedQuarterExpenseWarning(): string {
@@ -410,8 +878,10 @@ export class ReportsPageComponent {
     this.salesPage = 1;
     this.expensePage = 1;
     this.persistTablePreferences();
+    this.loadOrganizationTaxInfo();
     this.loadSalesReports();
     this.loadExpenseReports();
+    this.loadBirFilingSummary();
   }
 
   onSalesPageSizeChange(value: string): void {
@@ -481,6 +951,7 @@ export class ReportsPageComponent {
         this.deletingSalesReportId.set('');
         this.salesMessage.set(response.message || 'Quarterly sales report deleted successfully.');
         this.loadSalesReports();
+        this.loadBirFilingSummary();
       },
       error: (err) => {
         this.deletingSalesReportId.set('');
@@ -514,6 +985,7 @@ export class ReportsPageComponent {
         this.deletingExpenseReportId.set('');
         this.expenseMessage.set(response.message || 'Quarterly expense report deleted successfully.');
         this.loadExpenseReports();
+        this.loadBirFilingSummary();
       },
       error: (err) => {
         this.deletingExpenseReportId.set('');
@@ -538,6 +1010,26 @@ export class ReportsPageComponent {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(Number.isFinite(numeric) ? numeric : 0);
+  }
+
+  private downloadCsv(filename: string, rows: Array<Record<string, string | number>>): void {
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const escape = (value: string | number) => {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => headers.map((header) => escape(row[header])).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   private getCurrentQuarter(): number {

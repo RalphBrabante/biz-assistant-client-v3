@@ -81,6 +81,397 @@
   </div>
 </section>
 
+<section class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+      <div>
+        <div class="text-uppercase small fw-semibold text-secondary mb-1">BIR Filing Center</div>
+        <h2 class="h5 mb-1">Filing Worksheets</h2>
+        <div class="text-secondary small">
+          {{ quarterLabel(selectedQuarter()) }} {{ selectedYear() }} preparation summary based on saved quarterly reports.
+        </div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="badge rounded-pill text-bg-light border">{{ organizationTaxLabel }}</span>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          [disabled]="loadingFilingSummary()"
+          (click)="loadBirFilingSummary()"
+          title="Refresh filing summary"
+          aria-label="Refresh filing summary"
+        >
+          <i class="bi" [ngClass]="loadingFilingSummary() ? 'bi-hourglass-split' : 'bi-arrow-clockwise'"></i>
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          *ngIf="canGenerateReports"
+          [disabled]="generatingFilingReports()"
+          (click)="generateSelectedQuarterFilingReports()"
+        >
+          <i class="bi bi-file-earmark-spreadsheet me-1"></i>{{ generatingFilingReports() ? 'Generating...' : 'Generate Filing Reports' }}
+        </button>
+      </div>
+    </div>
+
+    <ng-container *ngIf="filingWorksheet() as worksheet">
+      <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" *ngIf="filingSummaryError()">
+        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+        <div>{{ filingSummaryError() }}</div>
+      </div>
+
+      <div class="alert alert-info d-flex align-items-start gap-2 mb-4">
+        <i class="bi bi-info-circle-fill mt-1"></i>
+        <div>
+          <div class="fw-semibold">Worksheet only</div>
+          <div>
+            These figures prepare filing review. Generate exact BIR forms only after validating taxpayer type,
+            adjustments, credits, prior payments, and BIR form line requirements.
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="small text-secondary text-uppercase fw-semibold">Business Tax</div>
+                <div class="fw-semibold">{{ businessTaxWorksheetTitle }}</div>
+              </div>
+              <span class="badge text-bg-primary">{{ businessTaxFormLabel }}</span>
+            </div>
+
+            <ng-container *ngIf="worksheet.summary || worksheet.salesReport; else missingSalesFilingReport">
+              <ng-container *ngIf="isPercentageTaxOrganization; else vatFilingWorksheet">
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Gross Receipts / PT Base</span>
+                  <strong>{{ toCurrency(worksheet.grossReceipts, worksheet.currency) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Percentage Tax Rate</span>
+                  <strong>{{ organizationTaxRate() | number : '1.0-2' }}%</strong>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Sales Invoices Count</span>
+                  <strong>{{ worksheet.summary?.sales?.invoiceCount || worksheet.salesReport?.invoiceCount || 0 }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>VAT Amount</span>
+                  <strong>{{ toCurrency(0, worksheet.currency) }}</strong>
+                </div>
+                <hr class="my-2" />
+                <div class="d-flex justify-content-between">
+                  <span class="fw-semibold">Percentage Tax Due</span>
+                  <strong>{{ toCurrency(worksheet.percentageTaxDue, worksheet.currency) }}</strong>
+                </div>
+              </ng-container>
+
+              <ng-template #vatFilingWorksheet>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Output VAT</span>
+                  <strong>{{ toCurrency(worksheet.outputVat, worksheet.currency) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Input VAT</span>
+                  <strong>{{ toCurrency(worksheet.inputVat, worksheet.currency) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Sales / Expense Count</span>
+                  <strong>{{ worksheet.summary?.sales?.invoiceCount || worksheet.salesReport?.invoiceCount || 0 }} / {{ worksheet.summary?.expenses?.expenseCount || worksheet.expenseReport?.expenseCount || 0 }}</strong>
+                </div>
+                <hr class="my-2" />
+                <div class="d-flex justify-content-between mb-1">
+                  <span class="fw-semibold">Net VAT Payable</span>
+                  <strong>{{ toCurrency(worksheet.netVatPayable, worksheet.currency) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small text-secondary">
+                  <span>Input VAT Excess / Review</span>
+                  <span>{{ toCurrency(worksheet.inputVatExcess, worksheet.currency) }}</span>
+                </div>
+              </ng-template>
+            </ng-container>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="small text-secondary text-uppercase fw-semibold">Income Tax</div>
+                <div class="fw-semibold">Quarterly Income Tax Estimate</div>
+              </div>
+              <span class="badge text-bg-light border">{{ worksheet.summary?.incomeTax?.forms?.join(' / ') || '1701Q / 1702Q' }}</span>
+            </div>
+
+            <ng-container *ngIf="worksheet.summary || worksheet.salesReport || worksheet.expenseReport; else missingIncomeReports">
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Taxpayer Classification</span>
+                <strong>{{ worksheet.summary?.incomeTax?.taxpayerClassificationLabel || 'Not configured' }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Deduction Method</span>
+                <strong>{{ worksheet.summary?.incomeTax?.deductionMethod || 'itemized' }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Gross Income</span>
+                <strong>{{ toCurrency(worksheet.grossReceipts, worksheet.currency) }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Deductible Expenses Estimate</span>
+                <strong>{{ toCurrency(worksheet.deductibleExpenses, worksheet.currency) }}</strong>
+              </div>
+              <hr class="my-2" />
+              <div class="d-flex justify-content-between">
+                <span class="fw-semibold">Net Taxable Income Estimate</span>
+                <strong>{{ toCurrency(worksheet.netTaxableIncomeEstimate, worksheet.currency) }}</strong>
+              </div>
+              <div class="d-flex justify-content-between mt-2">
+                <span class="fw-semibold">Estimated Income Tax Due</span>
+                <strong>{{ toCurrency(worksheet.summary?.incomeTax?.estimatedIncomeTaxDue || 0, worksheet.currency) }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small text-secondary mt-2">
+                <span>Income Tax Rate</span>
+                <span>{{ worksheet.summary?.incomeTax?.isIncomeTaxExempt ? 'Exempt' : ((worksheet.summary?.incomeTax?.incomeTaxRate || 0) | number : '1.0-2') + '%' }}</span>
+              </div>
+              <div class="small text-secondary mt-2">
+                {{ worksheet.summary?.incomeTax?.caveats?.[0] || 'Final income tax requires credits, prior payments, and BIR form validation.' }}
+              </div>
+            </ng-container>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="small text-secondary text-uppercase fw-semibold">Withholding</div>
+                <div class="fw-semibold">EWT Filing Preparation</div>
+              </div>
+              <span class="badge text-bg-light border">0619-E / 1601-EQ / 2307</span>
+            </div>
+            <ng-container *ngIf="worksheet.withholding as withholding">
+              <div class="d-flex justify-content-between small mb-2">
+                <span>EWT Taxable Base</span>
+                <strong>{{ toCurrency(withholding.taxableBase, worksheet.currency) }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small mb-2">
+                <span>Amount Withheld</span>
+                <strong>{{ toCurrency(withholding.amountWithheld, worksheet.currency) }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small mb-3">
+                <span>Withholding Expense Count</span>
+                <strong>{{ withholding.expenseCount }}</strong>
+              </div>
+              <div class="border-top pt-2" *ngIf="withholding.groups.length; else noWithholdingGroups">
+                <div class="small text-secondary text-uppercase fw-semibold mb-2">By Withholding Type</div>
+                <div class="d-flex justify-content-between small mb-2" *ngFor="let group of withholding.groups">
+                  <span>{{ group.code || group.name }} ({{ group.percentage | number : '1.0-2' }}%)</span>
+                  <strong>{{ toCurrency(group.amountWithheld, worksheet.currency) }}</strong>
+                </div>
+              </div>
+              <ng-template #noWithholdingGroups>
+                <div class="d-flex align-items-center gap-2 small text-secondary">
+                  <i class="bi bi-info-circle"></i>
+                  <span>No withholding tax entries found for this quarter.</span>
+                </div>
+              </ng-template>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <div class="border rounded-3 p-3 mt-3">
+        <div class="small text-secondary text-uppercase fw-semibold mb-2">Selected Quarter Filing Checklist</div>
+        <div class="row g-2 small">
+          <div class="col-12 col-md-4 d-flex align-items-center gap-2">
+            <i class="bi" [ngClass]="worksheet.summary || worksheet.salesReport ? 'bi-check-circle-fill text-success' : 'bi-circle text-secondary'"></i>
+            <span>{{ isPercentageTaxOrganization ? '2551Q percentage tax worksheet' : '2550Q VAT worksheet' }}</span>
+          </div>
+          <div class="col-12 col-md-4 d-flex align-items-center gap-2">
+            <i class="bi" [ngClass]="worksheet.summary || worksheet.salesReport || worksheet.expenseReport ? 'bi-check-circle-fill text-success' : 'bi-circle text-secondary'"></i>
+            <span>Income tax worksheet</span>
+          </div>
+          <div class="col-12 col-md-4 d-flex align-items-center gap-2">
+            <i class="bi" [ngClass]="(worksheet.withholding?.payees?.length || 0) > 0 ? 'bi-check-circle-fill text-success' : 'bi-circle text-secondary'"></i>
+            <span>EWT detail worksheet</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1" *ngIf="worksheet.summary as summary">
+        <div class="col-12 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="small text-secondary text-uppercase fw-semibold">Certificates</div>
+                <div class="fw-semibold">BIR 2307 Preparation</div>
+              </div>
+              <span class="badge text-bg-light border">2307</span>
+            </div>
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm mb-3"
+              (click)="downloadFilingCsv('2307')"
+            >
+              <i class="bi bi-download me-1"></i>CSV
+            </button>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>Payees</span>
+              <strong>{{ summary.certificates2307.payeeCount }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>Taxable Base</span>
+              <strong>{{ toCurrency(summary.certificates2307.totalTaxableBase, worksheet.currency) }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small mb-3">
+              <span>Amount Withheld</span>
+              <strong>{{ toCurrency(summary.certificates2307.totalAmountWithheld, worksheet.currency) }}</strong>
+            </div>
+            <div class="table-responsive" *ngIf="summary.certificates2307.payees.length; else no2307Payees">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Payee</th>
+                    <th>ATC</th>
+                    <th class="text-end">Withheld</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let payee of summary.certificates2307.payees.slice(0, 5)">
+                    <td>
+                      <div class="fw-semibold small">{{ payee.payeeName }}</div>
+                      <div class="text-secondary small">{{ payee.payeeTin || 'TIN missing' }}</div>
+                    </td>
+                    <td class="small">{{ payee.atcCode || '-' }}</td>
+                    <td class="text-end small">{{ toCurrency(payee.amountWithheld, worksheet.currency) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <ng-template #no2307Payees>
+              <div class="small text-secondary">No expenses with withholding tax for this quarter.</div>
+            </ng-template>
+            <div class="small text-secondary mt-2" *ngIf="!summary.certificates2307.payeeCount">
+              CSV export will download a blank 2307 payee template.
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="small text-secondary text-uppercase fw-semibold">Attachments</div>
+                <div class="fw-semibold">SAWT Preparation</div>
+              </div>
+              <span class="badge text-bg-light border">SAWT</span>
+            </div>
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm mb-3"
+              (click)="downloadFilingCsv('sawt')"
+            >
+              <i class="bi bi-download me-1"></i>CSV
+            </button>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>Lines</span>
+              <strong>{{ summary.attachments.sawt.lineCount }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>Income Payment</span>
+              <strong>{{ toCurrency(summary.attachments.sawt.incomePayment, worksheet.currency) }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small mb-3">
+              <span>Tax Withheld</span>
+              <strong>{{ toCurrency(summary.attachments.sawt.taxWithheld, worksheet.currency) }}</strong>
+            </div>
+            <div class="small text-secondary" *ngIf="!summary.attachments.sawt.supported">
+              No customer withholding credits found from sales invoices.
+            </div>
+            <div class="small text-secondary mt-2" *ngIf="!summary.attachments.sawt.lineCount">
+              CSV export will download a blank SAWT template.
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="small text-secondary text-uppercase fw-semibold">Attachments</div>
+                <div class="fw-semibold">QAP / SLSP Preparation</div>
+              </div>
+              <span class="badge text-bg-light border">QAP / SLSP</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                (click)="downloadFilingCsv('qap')"
+              >
+                <i class="bi bi-download me-1"></i>QAP
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                (click)="downloadFilingCsv('slsp-sales')"
+              >
+                <i class="bi bi-download me-1"></i>Sales
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                (click)="downloadFilingCsv('slsp-purchases')"
+              >
+                <i class="bi bi-download me-1"></i>Purchases
+              </button>
+            </div>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>QAP Lines</span>
+              <strong>{{ summary.attachments.qap.lineCount }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>QAP Tax Withheld</span>
+              <strong>{{ toCurrency(summary.attachments.qap.taxWithheld, worksheet.currency) }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>SLSP Sales Lines</span>
+              <strong>{{ summary.attachments.slsp.salesLineCount }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small">
+              <span>SLSP Purchase Lines</span>
+              <strong>{{ summary.attachments.slsp.purchaseLineCount }}</strong>
+            </div>
+            <div class="small text-secondary mt-2" *ngIf="!summary.attachments.slsp.supported">
+              SLSP is shown only for VAT organizations.
+            </div>
+            <div class="small text-secondary mt-2" *ngIf="summary.attachments.slsp.supported && !summary.attachments.slsp.salesLineCount && !summary.attachments.slsp.purchaseLineCount">
+              No VAT sales or purchase source lines found for this quarter. CSV export will download a blank template.
+            </div>
+            <div class="small text-secondary mt-2" *ngIf="!summary.attachments.qap.lineCount">
+              No expense withholding lines found for QAP. CSV export will download a blank template.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #missingSalesFilingReport>
+        <div class="alert alert-warning py-2 mb-0">
+          Generate the selected quarter's sales report to prepare this worksheet.
+        </div>
+      </ng-template>
+
+      <ng-template #missingIncomeReports>
+        <div class="alert alert-warning py-2 mb-0">
+          Generate sales or expense reports for this quarter to prepare the income tax estimate.
+        </div>
+      </ng-template>
+    </ng-container>
+  </div>
+</section>
+
 <section class="alert alert-warning d-flex align-items-start gap-2 mb-4" *ngIf="selectedQuarterExpenseWarning() as warning">
   <i class="bi bi-exclamation-triangle-fill mt-1"></i>
   <div>

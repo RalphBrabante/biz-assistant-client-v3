@@ -19,6 +19,12 @@ interface SalesInvoiceRow {
     id: string;
     name?: string;
     legalName?: string;
+    taxType?: {
+      id: string;
+      code?: string;
+      name?: string;
+      percentage?: number;
+    };
   };
   orderId?: string;
   order?: {
@@ -47,6 +53,14 @@ interface SalesInvoiceRow {
   amount?: number;
   taxableAmount?: number;
   withHoldingTaxAmount?: number;
+  withholdingTaxTypeId?: string;
+  withholdingTaxType?: {
+    id?: string;
+    code?: string;
+    name?: string;
+    percentage?: number;
+    appliesTo?: string;
+  };
   subtotalAmount?: number;
   taxAmount?: number;
   discountAmount?: number;
@@ -65,6 +79,25 @@ interface SalesInvoiceImportSummary {
   skipped: number;
   totalRows: number;
   errors: string[];
+}
+
+interface OrganizationTaxInfo {
+  id: string;
+  currency?: string;
+  taxType?: {
+    id: string;
+    code?: string;
+    name?: string;
+    percentage?: number;
+  };
+}
+
+interface WithholdingTaxTypeOption {
+  id: string;
+  code?: string;
+  name: string;
+  percentage: number;
+  appliesTo?: string;
 }
 
 @Component({
@@ -115,8 +148,15 @@ export class SalesInvoicesPageComponent implements OnDestroy {
   computedSubtotal = 0;
   computedTaxableAmount = 0;
   computedTaxAmount = 0;
+  computedWithholdingTaxAmount = 0;
   computedTotalAmount = 0;
   scPwdEnabled = false;
+  organizationCurrency = '';
+  organizationTaxTypeCode = '';
+  organizationTaxTypeName = '';
+  organizationTaxRate = 12;
+  readonly withholdingTaxTypes = signal<WithholdingTaxTypeOption[]>([]);
+  readonly withholdingTaxLoading = signal(false);
 
   readonly sortIcon = computed(() =>
     this.sortDirection === 'asc' ? 'bi-sort-up-alt' : 'bi-sort-down-alt'
@@ -127,7 +167,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
   }
 
   get currentOrganizationCurrency(): string {
-    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
+    return String(this.organizationCurrency || this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
   get isSuperuser(): boolean {
@@ -142,11 +182,31 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     return this.isSuperuser && !this.hasOrganizationContext;
   }
 
+  get isPercentageTaxOrganization(): boolean {
+    return this.organizationTaxTypeCode === 'PT';
+  }
+
+  get taxModeLabel(): string {
+    if (this.isPercentageTaxOrganization) {
+      return `Percentage Tax (${this.organizationTaxRate || 0}%)`;
+    }
+    return this.organizationTaxTypeName || `VAT (${this.organizationTaxRate || 12}%)`;
+  }
+
+  get computedPercentageTaxAmount(): number {
+    if (!this.isPercentageTaxOrganization) {
+      return 0;
+    }
+    return +((this.createInvoiceForm.get('amount')?.value || 0) * ((this.organizationTaxRate || 0) / 100)).toFixed(2);
+  }
+
   showOrganizationWarningModal = false;
 
   ngOnInit(): void {
     this.restoreTablePreferences();
     this.showOrganizationWarningModal = this.isContextLocked;
+    this.loadOrganizationTaxInfo();
+    this.loadWithholdingTaxTypes();
     this.load();
   }
 
@@ -220,6 +280,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
   openCreateModal(): void {
     if (this.isContextLocked) return;
     this.createInvoiceForm = this.newCreateInvoiceForm();
+    this.loadWithholdingTaxTypes();
     this.setupInvoiceAutoCompute();
     this.error.set('');
     this.message.set('');
@@ -644,6 +705,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
       amount: 0,
       taxableAmount: 0,
       withHoldingTaxAmount: 0,
+      withholdingTaxTypeId: '',
       subtotalAmount: 0,
       taxAmount: 0,
       discountAmount: 0,
@@ -669,6 +731,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
         discountAmount: [defaults['discountAmount'], [Validators.min(0)]],
         scPwdDiscount: [0, [Validators.min(0)]],
         serviceCharge: [0, [Validators.min(0)]],
+        withholdingTaxTypeId: [defaults['withholdingTaxTypeId']],
         withHoldingTaxAmount: [defaults['withHoldingTaxAmount'], [Validators.min(0)]],
         subtotalAmount: [defaults['subtotalAmount']],
         taxableAmount: [defaults['taxableAmount']],
@@ -694,6 +757,11 @@ export class SalesInvoicesPageComponent implements OnDestroy {
   }
 
   toggleScPwdDiscount(): void {
+    if (this.isPercentageTaxOrganization) {
+      this.scPwdEnabled = false;
+      this.createInvoiceForm.patchValue({ scPwdDiscount: 0 });
+      return;
+    }
     this.scPwdEnabled = !this.scPwdEnabled;
     if (this.scPwdEnabled) {
       const amount = Math.max(0, Number(this.createInvoiceForm.get('amount')?.value) || 0);
@@ -757,6 +825,20 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     return row.order?.customer?.name || '-';
   }
 
+  withholdingTaxTypeLabel(row: SalesInvoiceRow): string {
+    if (row.withholdingTaxType?.name) {
+      return row.withholdingTaxType.name;
+    }
+    if (row.withholdingTaxType?.code) {
+      return row.withholdingTaxType.code;
+    }
+    return row.withholdingTaxTypeId ? row.withholdingTaxTypeId : '-';
+  }
+
+  trackByWithholdingTaxTypeId(_index: number, row: WithholdingTaxTypeOption): string {
+    return row.id;
+  }
+
   customerAddress(c: SalesInvoiceRow['order']): string {
     const cust = c?.customer;
     if (!cust) return '';
@@ -767,7 +849,64 @@ export class SalesInvoicesPageComponent implements OnDestroy {
   }
 
   computeSubtotal(row: SalesInvoiceRow): number {
+    if (String(row.organization?.taxType?.code || '').toUpperCase() === 'PT') {
+      return +(row.amount ?? 0).toFixed(2);
+    }
     return +((row.amount ?? 0) / 1.12).toFixed(2);
+  }
+
+  private loadOrganizationTaxInfo(): void {
+    const orgId = this.currentOrganizationId.trim();
+    if (!orgId) {
+      this.organizationCurrency = '';
+      this.organizationTaxTypeCode = '';
+      this.organizationTaxTypeName = '';
+      this.organizationTaxRate = 12;
+      return;
+    }
+
+    this.api.get<OrganizationTaxInfo>(`/api/v1/organizations/${encodeURIComponent(orgId)}`).subscribe({
+      next: (response) => {
+        const taxType = response.data?.taxType;
+        this.organizationCurrency = String(response.data?.currency || '').toUpperCase();
+        this.organizationTaxTypeCode = String(taxType?.code || '').toUpperCase();
+        this.organizationTaxTypeName = String(taxType?.name || taxType?.code || '').trim();
+        const rate = Number(taxType?.percentage || 0);
+        this.organizationTaxRate = Number.isFinite(rate) && rate > 0 ? rate : 12;
+        this.recomputeInvoiceBreakdown();
+      },
+      error: () => {
+        this.organizationCurrency = '';
+        this.organizationTaxTypeCode = '';
+        this.organizationTaxTypeName = '';
+        this.organizationTaxRate = 12;
+      },
+    });
+  }
+
+  private loadWithholdingTaxTypes(): void {
+    const orgId = this.currentOrganizationId.trim();
+    if (!orgId) {
+      this.withholdingTaxTypes.set([]);
+      return;
+    }
+    this.withholdingTaxLoading.set(true);
+    const params = new URLSearchParams({
+      organizationId: orgId,
+      activeOnly: 'true',
+      appliesTo: 'invoice',
+    });
+    this.api.list<WithholdingTaxTypeOption>(`/api/v1/withholding-tax-types?${params.toString()}`).subscribe({
+      next: (response) => {
+        this.withholdingTaxLoading.set(false);
+        this.withholdingTaxTypes.set(response.data || []);
+        this.recomputeInvoiceBreakdown();
+      },
+      error: () => {
+        this.withholdingTaxLoading.set(false);
+        this.withholdingTaxTypes.set([]);
+      },
+    });
   }
 
   private isInCurrentQuarter(dateStr: string): boolean {
@@ -807,29 +946,41 @@ export class SalesInvoicesPageComponent implements OnDestroy {
     const amount = Math.max(0, Number(this.createInvoiceForm.get('amount')?.value) || 0);
     const discount = Math.max(0, Number(this.createInvoiceForm.get('discountAmount')?.value) || 0);
     const serviceCharge = Math.max(0, Number(this.createInvoiceForm.get('serviceCharge')?.value) || 0);
-    const withholding = Math.max(0, Number(this.createInvoiceForm.get('withHoldingTaxAmount')?.value) || 0);
+    const selectedWithholdingId = String(this.createInvoiceForm.get('withholdingTaxTypeId')?.value || '').trim();
+    const withholdingTaxType = this.withholdingTaxTypes().find((row) => row.id === selectedWithholdingId);
 
-    const subtotal = +(amount / 1.12).toFixed(2);
+    const taxRate = this.organizationTaxRate > 0 ? this.organizationTaxRate / 100 : 0.12;
+    const subtotal = this.isPercentageTaxOrganization
+      ? +amount.toFixed(2)
+      : +(amount / (1 + taxRate)).toFixed(2);
 
     let scPwdDiscount = Math.max(0, Number(this.createInvoiceForm.get('scPwdDiscount')?.value) || 0);
-    if (this.scPwdEnabled) {
+    if (this.scPwdEnabled && !this.isPercentageTaxOrganization) {
       scPwdDiscount = +(subtotal * 0.20).toFixed(2);
       this.createInvoiceForm.patchValue({ scPwdDiscount }, { emitEvent: false });
+    } else if (this.isPercentageTaxOrganization && scPwdDiscount > 0) {
+      scPwdDiscount = 0;
+      this.createInvoiceForm.patchValue({ scPwdDiscount: 0 }, { emitEvent: false });
     }
 
     const taxableAmount = +Math.max(0, subtotal - discount - scPwdDiscount).toFixed(2);
-    const taxAmount = +(taxableAmount * 0.12).toFixed(2);
+    const taxAmount = this.isPercentageTaxOrganization ? 0 : +(taxableAmount * taxRate).toFixed(2);
+    const withholding = withholdingTaxType
+      ? +(taxableAmount * (Number(withholdingTaxType.percentage || 0) / 100)).toFixed(2)
+      : 0;
     const totalAmount = +(taxableAmount + taxAmount + serviceCharge - withholding).toFixed(2);
 
     this.computedSubtotal = subtotal;
     this.computedTaxableAmount = taxableAmount;
     this.computedTaxAmount = taxAmount;
+    this.computedWithholdingTaxAmount = withholding;
     this.computedTotalAmount = totalAmount;
 
     this.createInvoiceForm.patchValue({
       subtotalAmount: subtotal,
       taxableAmount,
       taxAmount,
+      withHoldingTaxAmount: withholding,
       totalAmount,
     }, { emitEvent: false });
   }
@@ -846,6 +997,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
       amount: this.optionalNumber(form['amount']),
       taxableAmount: this.optionalNumber(form['taxableAmount']),
       withHoldingTaxAmount: this.optionalNumber(form['withHoldingTaxAmount']),
+      withholdingTaxTypeId: this.optionalString(form['withholdingTaxTypeId']),
       subtotalAmount: this.optionalNumber(form['subtotalAmount']),
       taxAmount: this.optionalNumber(form['taxAmount']),
       discountAmount: this.optionalNumber(form['discountAmount']),

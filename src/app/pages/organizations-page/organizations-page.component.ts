@@ -24,6 +24,10 @@ interface OrganizationRow {
   country?: string;
   currency?: string;
   taxTypeId?: string;
+  taxpayerClassification?: string;
+  deductionMethod?: string;
+  incomeTaxRate?: number;
+  isIncomeTaxExempt?: boolean;
   taxType?: {
     id: string;
     code?: string;
@@ -88,6 +92,9 @@ export class OrganizationsPageComponent {
     country: 'Country',
     currency: 'Currency',
     taxTypeId: 'Tax Type',
+    taxpayerClassification: 'Taxpayer Classification',
+    deductionMethod: 'Deduction Method',
+    incomeTaxRate: 'Income Tax Rate',
     contactName: 'Contact Name',
     contactEmail: 'Contact Email',
     phone: 'Phone',
@@ -318,6 +325,10 @@ export class OrganizationsPageComponent {
       country: row.country || this.currentUserCountry,
       currency: row.currency || this.currentOrganizationCurrency,
       taxTypeId: row.taxTypeId || row.taxType?.id || '',
+      taxpayerClassification: row.taxpayerClassification || '',
+      deductionMethod: row.deductionMethod || 'itemized',
+      incomeTaxRate: row.incomeTaxRate ?? null,
+      isIncomeTaxExempt: row.isIncomeTaxExempt === true,
       contactName: row.contactName || '',
       contactEmail: row.contactEmail || '',
       phone: row.phone || '',
@@ -472,6 +483,18 @@ export class OrganizationsPageComponent {
     return `${match.code} - ${match.name}`;
   }
 
+  taxpayerClassificationLabel(value: unknown): string {
+    const labels: Record<string, string> = {
+      individual: 'Individual / Sole Proprietor',
+      corporation: 'Corporation',
+      partnership: 'Partnership',
+      estate_trust: 'Estate / Trust',
+      non_stock_non_profit: 'Non-stock / Non-profit',
+      other: 'Other',
+    };
+    return labels[String(value || '').toLowerCase()] || '-';
+  }
+
   loadTaxTypes(): void {
     this.api.list<TaxTypeOption>('/api/v1/tax-types?activeOnly=true').subscribe({
       next: (response) => {
@@ -496,6 +519,10 @@ export class OrganizationsPageComponent {
       country: this.currentUserCountry,
       currency: this.currentOrganizationCurrency,
       taxTypeId: '',
+      taxpayerClassification: '',
+      deductionMethod: 'itemized',
+      incomeTaxRate: null,
+      isIncomeTaxExempt: false,
       contactName: '',
       contactEmail: '',
       phone: '',
@@ -555,6 +582,10 @@ export class OrganizationsPageComponent {
       country: [defaults['country'], [Validators.required]],
       currency: [defaults['currency'], [Validators.required]],
       taxTypeId: [defaults['taxTypeId'], [Validators.required]],
+      taxpayerClassification: [defaults['taxpayerClassification']],
+      deductionMethod: [defaults['deductionMethod']],
+      incomeTaxRate: [defaults['incomeTaxRate'], [Validators.min(0)]],
+      isIncomeTaxExempt: [defaults['isIncomeTaxExempt']],
       contactName: [defaults['contactName'], [Validators.maxLength(120)]],
       contactEmail: [defaults['contactEmail'], [Validators.required, Validators.email]],
       phone: [defaults['phone'], [Validators.required, Validators.maxLength(40)]],
@@ -579,6 +610,10 @@ export class OrganizationsPageComponent {
       country: this.optionalString(form['country']),
       currency: this.optionalString(form['currency']),
       taxTypeId: this.asString(form['taxTypeId']),
+      taxpayerClassification: this.optionalString(form['taxpayerClassification']),
+      deductionMethod: this.optionalString(form['deductionMethod']),
+      incomeTaxRate: this.optionalNumber(form['incomeTaxRate']),
+      isIncomeTaxExempt: Boolean(form['isIncomeTaxExempt']),
       contactName: this.optionalString(form['contactName']),
       contactEmail: this.asString(form['contactEmail']),
       phone: this.asString(form['phone']),

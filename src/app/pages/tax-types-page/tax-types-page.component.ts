@@ -135,7 +135,7 @@ export class TaxTypesPageComponent {
     if (q) {
       taxParams.set('q', q);
     }
-    const withholdingParams = new URLSearchParams({ appliesTo: 'expense' });
+    const withholdingParams = new URLSearchParams();
     if (q) {
       withholdingParams.set('q', q);
     }

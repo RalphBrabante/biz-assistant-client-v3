@@ -73,6 +73,7 @@
           <th>Legal Name</th>
           <th>Contact Email</th>
           <th>Tax Type</th>
+          <th>Taxpayer</th>
           <th>Phone</th>
           <th>City</th>
           <th>Active</th>
@@ -81,7 +82,7 @@
       </thead>
       <tbody>
         <tr *ngIf="!loading() && filteredRows().length === 0">
-          <td colspan="8" class="text-center text-secondary py-4">No organizations found.</td>
+          <td colspan="9" class="text-center text-secondary py-4">No organizations found.</td>
         </tr>
 
         <tr *ngFor="let row of filteredRows(); trackBy: trackById">
@@ -89,6 +90,7 @@
           <td>{{ row.legalName || '-' }}</td>
           <td>{{ row.contactEmail || '-' }}</td>
           <td>{{ taxTypeLabel(row) }}</td>
+          <td>{{ taxpayerClassificationLabel(row.taxpayerClassification) }}</td>
           <td>{{ row.phone || '-' }}</td>
           <td>{{ row.city || '-' }}</td>
           <td>{{ row.isActive ? 'Yes' : 'No' }}</td>

@@ -101,6 +101,8 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
   private readonly customerSearchInput$ = new Subject<string>();
   private customerSearchSub?: Subscription;
   organizationVatRate = 0;
+  organizationTaxTypeCode = '';
+  organizationTaxTypeName = '';
   organizationCurrency = '';
   applyWithholdingTax = false;
   withholdingTaxTypeId = '';
@@ -162,11 +164,32 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
   }
 
   get taxableAmount(): number {
+    if (this.isPercentageTaxOrganization) {
+      return this.subtotalAmount;
+    }
     const rate = this.organizationVatRate / 100;
     if (rate <= 0) {
       return this.subtotalAmount;
     }
     return Number((this.subtotalAmount / (1 + rate)).toFixed(2));
+  }
+
+  get isPercentageTaxOrganization(): boolean {
+    return this.organizationTaxTypeCode === 'PT';
+  }
+
+  get organizationTaxLabel(): string {
+    if (this.isPercentageTaxOrganization) {
+      return 'Percentage Tax';
+    }
+    return this.organizationTaxTypeName || 'VAT';
+  }
+
+  get percentageTaxAmount(): number {
+    if (!this.isPercentageTaxOrganization || this.organizationVatRate <= 0) {
+      return 0;
+    }
+    return Number((this.subtotalAmount * (this.organizationVatRate / 100)).toFixed(2));
   }
 
   ngOnInit(): void {
@@ -476,7 +499,7 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
   }
 
   get taxAmount(): number {
-    if (this.organizationVatRate <= 0) {
+    if (this.isPercentageTaxOrganization || this.organizationVatRate <= 0) {
       return 0;
     }
     const tax = this.taxableAmount * (this.organizationVatRate / 100);
@@ -676,18 +699,25 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
     const orgId = this.currentOrganizationId.trim();
     if (!orgId) {
       this.organizationVatRate = 0;
+      this.organizationTaxTypeCode = '';
+      this.organizationTaxTypeName = '';
       this.organizationCurrency = this.currentOrganizationCurrency;
       return;
     }
 
     this.api.get<OrganizationTaxInfo>(`/api/v1/organizations/${encodeURIComponent(orgId)}`).subscribe({
       next: (response) => {
-        const taxPercentage = Number(response.data?.taxType?.percentage ?? 0);
+        const taxType = response.data?.taxType;
+        const taxPercentage = Number(taxType?.percentage ?? 0);
         this.organizationVatRate = Number.isFinite(taxPercentage) && taxPercentage > 0 ? taxPercentage : 0;
+        this.organizationTaxTypeCode = String(taxType?.code || '').toUpperCase();
+        this.organizationTaxTypeName = String(taxType?.name || taxType?.code || '').trim();
         this.organizationCurrency = String(response.data?.currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
       },
       error: () => {
         this.organizationVatRate = 0;
+        this.organizationTaxTypeCode = '';
+        this.organizationTaxTypeName = '';
         this.organizationCurrency = this.currentOrganizationCurrency;
       },
     });

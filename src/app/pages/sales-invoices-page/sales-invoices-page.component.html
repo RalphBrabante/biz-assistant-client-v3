@@ -374,10 +374,15 @@
           <td class="invoice-breakdown-cell"
             (mouseenter)="showBreakdown($event, row)"
             (mouseleave)="hideBreakdown()">
-            <span class="d-inline-flex align-items-center gap-1">
-              {{ formatMoney(row.totalAmount ?? 0, row.currency || currentOrganizationCurrency) }}
-              <i class="bi bi-info-circle text-secondary small opacity-50"></i>
-            </span>
+            <div class="d-inline-flex flex-column align-items-start gap-1">
+              <span class="d-inline-flex align-items-center gap-1">
+                {{ formatMoney(row.totalAmount ?? 0, row.currency || currentOrganizationCurrency) }}
+                <i class="bi bi-info-circle text-secondary small opacity-50"></i>
+              </span>
+              <span class="badge rounded-pill text-bg-light border" *ngIf="(row.withHoldingTaxAmount || 0) > 0">
+                EWT {{ formatMoney(row.withHoldingTaxAmount ?? 0, row.currency || currentOrganizationCurrency) }}
+              </span>
+            </div>
           </td>
           <td class="text-end">
             <div class="btn-group table-actions-menu">
@@ -474,7 +479,12 @@
           </div>
 
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Gross Sales <span class="text-secondary fw-normal">(VAT-inclusive)</span> <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold">
+              Gross Sales
+              <span class="text-secondary fw-normal" *ngIf="!isPercentageTaxOrganization">(VAT-inclusive)</span>
+              <span class="text-secondary fw-normal" *ngIf="isPercentageTaxOrganization">(non-VAT gross receipts)</span>
+              <span class="text-danger">*</span>
+            </label>
             <div class="input-group">
               <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
               <input type="number" step="0.01" min="0" class="form-control" formControlName="amount" placeholder="0.00" />
@@ -490,7 +500,7 @@
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold d-flex align-items-center gap-1">
               SC/PWD Discount
-              <div class="form-check form-switch mb-0 ms-auto">
+              <div class="form-check form-switch mb-0 ms-auto" *ngIf="!isPercentageTaxOrganization">
                 <input class="form-check-input" type="checkbox" id="scPwdToggle" [checked]="scPwdEnabled" (change)="toggleScPwdDiscount()" />
                 <label class="form-check-label small text-muted" for="scPwdToggle">20%</label>
               </div>
@@ -499,8 +509,11 @@
               <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
               <input type="number" step="0.01" min="0" class="form-control" formControlName="scPwdDiscount" placeholder="0.00" [readonly]="scPwdEnabled" />
             </div>
-            <div *ngIf="scPwdEnabled" class="form-text text-primary">
+            <div *ngIf="scPwdEnabled && !isPercentageTaxOrganization" class="form-text text-primary">
               <i class="bi bi-person-wheelchair me-1"></i>Auto: 20% of VAT-exclusive amount (VAT-exempt)
+            </div>
+            <div *ngIf="isPercentageTaxOrganization" class="form-text text-secondary">
+              VAT-specific SC/PWD auto extraction is disabled for non-VAT mode.
             </div>
           </div>
           <div class="col-12 col-md-3">
@@ -510,11 +523,24 @@
               <input type="number" step="0.01" min="0" class="form-control" formControlName="serviceCharge" placeholder="0.00" />
             </div>
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold">Withholding Tax <span class="text-secondary fw-normal">(EWT)</span></label>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Withholding Tax Type <span class="text-secondary fw-normal">(EWT)</span></label>
+            <select class="form-select" formControlName="withholdingTaxTypeId">
+              <option value="">No sales withholding</option>
+              <option *ngFor="let row of withholdingTaxTypes(); trackBy: trackByWithholdingTaxTypeId" [value]="row.id">
+                {{ row.name }} ({{ row.percentage | number : '1.0-2' }}%)
+              </option>
+            </select>
+            <div class="form-text text-secondary" *ngIf="withholdingTaxLoading()">Loading withholding tax types...</div>
+            <div class="form-text text-secondary" *ngIf="!withholdingTaxLoading() && withholdingTaxTypes().length === 0">
+              Create an active withholding tax type that applies to invoices or both.
+            </div>
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label fw-semibold">EWT Amount</label>
             <div class="input-group">
               <span class="input-group-text">{{ currentOrganizationCurrency }}</span>
-              <input type="number" step="0.01" min="0" class="form-control" formControlName="withHoldingTaxAmount" placeholder="0.00" />
+              <input type="number" step="0.01" min="0" class="form-control" formControlName="withHoldingTaxAmount" placeholder="0.00" readonly />
             </div>
           </div>
 
@@ -531,14 +557,20 @@
           <div class="col-12">
             <div class="bg-body-tertiary rounded-3 p-3">
               <div class="row g-2 small">
-                <div class="col-8 text-secondary">Gross Sales (VAT-inclusive)</div>
+                <div class="col-8 text-secondary">
+                  Gross Sales
+                  <span *ngIf="!isPercentageTaxOrganization">(VAT-inclusive)</span>
+                  <span *ngIf="isPercentageTaxOrganization">(non-VAT gross receipts)</span>
+                </div>
                 <div class="col-4 text-end font-monospace">{{ formatMoney(createInvoiceForm.get('amount')?.value || 0, currentOrganizationCurrency) }}</div>
 
-                <div class="col-8 text-secondary">Less: 12% VAT <span class="text-muted">(extracted)</span></div>
-                <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-((createInvoiceForm.get('amount')?.value || 0) - computedSubtotal), currentOrganizationCurrency) }}</div>
+                <ng-container *ngIf="!isPercentageTaxOrganization">
+                  <div class="col-8 text-secondary">Less: 12% VAT <span class="text-muted">(extracted)</span></div>
+                  <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-((createInvoiceForm.get('amount')?.value || 0) - computedSubtotal), currentOrganizationCurrency) }}</div>
 
-                <div class="col-8 fw-semibold">VAT-Exclusive Amount</div>
-                <div class="col-4 text-end font-monospace fw-semibold">{{ formatMoney(computedSubtotal, currentOrganizationCurrency) }}</div>
+                  <div class="col-8 fw-semibold">VAT-Exclusive Amount</div>
+                  <div class="col-4 text-end font-monospace fw-semibold">{{ formatMoney(computedSubtotal, currentOrganizationCurrency) }}</div>
+                </ng-container>
 
                 <div class="col-12"><hr class="my-1" /></div>
 
@@ -548,11 +580,19 @@
                 <div class="col-8 text-secondary">Less: SC/PWD Discount (20%)</div>
                 <div class="col-4 text-end font-monospace text-danger">{{ formatMoney(-(createInvoiceForm.get('scPwdDiscount')?.value || 0), currentOrganizationCurrency) }}</div>
 
-                <div class="col-8 fw-semibold">Taxable Amount <span class="text-muted fw-normal">(VATable Sales)</span></div>
+                <div class="col-8 fw-semibold">
+                  {{ isPercentageTaxOrganization ? 'Non-VAT Sales / Gross Receipts' : 'Taxable Amount' }}
+                  <span class="text-muted fw-normal" *ngIf="!isPercentageTaxOrganization">(VATable Sales)</span>
+                </div>
                 <div class="col-4 text-end font-monospace fw-semibold">{{ formatMoney(computedTaxableAmount, currentOrganizationCurrency) }}</div>
 
-                <div class="col-8 text-secondary">Add: 12% VAT</div>
+                <div class="col-8 text-secondary">{{ isPercentageTaxOrganization ? 'VAT Amount' : 'Add: 12% VAT' }}</div>
                 <div class="col-4 text-end font-monospace text-success">{{ formatMoney(computedTaxAmount, currentOrganizationCurrency) }}</div>
+
+                <ng-container *ngIf="isPercentageTaxOrganization">
+                  <div class="col-8 text-secondary">{{ taxModeLabel }} <span class="text-muted">(filing, not customer-added VAT)</span></div>
+                  <div class="col-4 text-end font-monospace">{{ formatMoney(computedPercentageTaxAmount, currentOrganizationCurrency) }}</div>
+                </ng-container>
 
                 <div class="col-8 text-secondary">Add: Service Charge</div>
                 <div class="col-4 text-end font-monospace text-success">{{ formatMoney(createInvoiceForm.get('serviceCharge')?.value || 0, currentOrganizationCurrency) }}</div>
@@ -609,7 +649,7 @@
           Required columns: <code>invoiceNumber</code>, <code>issueDate</code>
         </div>
         <div class="small text-secondary mb-3">
-          Optional columns: orderId, dueDate, status, paymentStatus, amount, taxableAmount, taxAmount, withHoldingTaxAmount, discountAmount, totalAmount, paidAt, notes
+          Optional columns: orderId, dueDate, status, paymentStatus, amount, taxableAmount, taxAmount, withholdingTaxTypeId, withholdingTaxTypeCode, withHoldingTaxAmount, discountAmount, totalAmount, paidAt, notes
         </div>
         <div class="form-check mb-3">
           <input class="form-check-input" type="checkbox" id="forceImportInvoices" [(ngModel)]="forceImport" />
@@ -642,11 +682,17 @@
       <span class="small fw-semibold text-uppercase text-secondary">Tax Breakdown</span>
     </div>
     <div class="row g-1 small" style="min-width: 300px;">
-      <div class="col-7 text-secondary">Gross Sales (VAT-inclusive)</div>
+      <div class="col-7 text-secondary">
+        Gross Sales
+        <span *ngIf="r.organization?.taxType?.code !== 'PT'">(VAT-inclusive)</span>
+        <span *ngIf="r.organization?.taxType?.code === 'PT'">(non-VAT)</span>
+      </div>
       <div class="col-5 text-end font-monospace">{{ formatMoney(r.amount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
-      <div class="col-7 text-secondary">VAT-Exclusive (&divide; 1.12)</div>
-      <div class="col-5 text-end font-monospace">{{ formatMoney(computeSubtotal(r), r.currency || currentOrganizationCurrency) }}</div>
+      <ng-container *ngIf="r.organization?.taxType?.code !== 'PT'">
+        <div class="col-7 text-secondary">VAT-Exclusive (&divide; 1.12)</div>
+        <div class="col-5 text-end font-monospace">{{ formatMoney(computeSubtotal(r), r.currency || currentOrganizationCurrency) }}</div>
+      </ng-container>
 
       <div class="col-7 text-secondary">Less: Discount</div>
       <div class="col-5 text-end font-monospace text-danger">{{ formatMoney(-(r.discountAmount ?? 0), r.currency || currentOrganizationCurrency) }}</div>
@@ -656,10 +702,10 @@
 
       <div class="col-12"><hr class="my-1" /></div>
 
-      <div class="col-7 fw-semibold">Taxable Amount</div>
+      <div class="col-7 fw-semibold">{{ r.organization?.taxType?.code === 'PT' ? 'Non-VAT Sales' : 'Taxable Amount' }}</div>
       <div class="col-5 text-end font-monospace fw-semibold">{{ formatMoney(r.taxableAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
-      <div class="col-7 text-secondary">VAT (12%)</div>
+      <div class="col-7 text-secondary">{{ r.organization?.taxType?.code === 'PT' ? 'VAT Amount' : 'VAT (12%)' }}</div>
       <div class="col-5 text-end font-monospace text-success">{{ formatMoney(r.taxAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
       <div class="col-7 text-secondary">Service Charge</div>
@@ -667,6 +713,8 @@
 
       <div class="col-7 text-secondary">Less: Withholding Tax</div>
       <div class="col-5 text-end font-monospace text-danger">{{ formatMoney(-(r.withHoldingTaxAmount ?? 0), r.currency || currentOrganizationCurrency) }}</div>
+      <div class="col-7 text-secondary" *ngIf="(r.withHoldingTaxAmount || 0) > 0">Withholding Type</div>
+      <div class="col-5 text-end small" *ngIf="(r.withHoldingTaxAmount || 0) > 0">{{ withholdingTaxTypeLabel(r) }}</div>
 
       <div class="col-12"><hr class="my-1" /></div>
 

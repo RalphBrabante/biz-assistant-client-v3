@@ -104,6 +104,17 @@ interface OrganizationOption {
   currency?: string;
 }
 
+interface OrganizationTaxInfo {
+  id: string;
+  currency?: string;
+  taxType?: {
+    id: string;
+    code?: string;
+    name?: string;
+    percentage?: number;
+  };
+}
+
 interface ExpenseImportSummary {
   imported: number;
   skipped: number;
@@ -181,6 +192,10 @@ export class ExpensesPageComponent {
   private vendorSearchSub?: Subscription;
   private createFile: File | null = null;
   private importFile: File | null = null;
+  organizationCurrency = '';
+  organizationTaxTypeCode = '';
+  organizationTaxTypeName = '';
+  organizationTaxRate = 0;
 
   get currentOrganizationId(): string {
     return this.organizationContext.getActiveOrganizationId();
@@ -191,7 +206,7 @@ export class ExpensesPageComponent {
   }
 
   get currentOrganizationCurrency(): string {
-    return String(this.auth.currentUser()?.currency || 'USD').toUpperCase();
+    return String(this.organizationCurrency || this.auth.currentUser()?.currency || 'USD').toUpperCase();
   }
 
   get isSuperuser(): boolean {
@@ -206,11 +221,30 @@ export class ExpensesPageComponent {
     return this.isSuperuser && !this.hasOrganizationContext;
   }
 
+  get isPercentageTaxOrganization(): boolean {
+    return this.organizationTaxTypeCode === 'PT';
+  }
+
+  get taxModeLabel(): string {
+    if (this.isPercentageTaxOrganization) {
+      return `Percentage Tax (${this.organizationTaxRate || 0}%)`;
+    }
+    return this.organizationTaxTypeName || `VAT (${this.organizationTaxRate || 12}%)`;
+  }
+
+  get computedPercentageTaxAmount(): number {
+    if (!this.isPercentageTaxOrganization) {
+      return 0;
+    }
+    return +((this.computedTaxableAmount || 0) * ((this.organizationTaxRate || 0) / 100)).toFixed(2);
+  }
+
   showOrganizationWarningModal = false;
 
   ngOnInit(): void {
     this.restoreTablePreferences();
     this.showOrganizationWarningModal = this.isContextLocked;
+    this.loadOrganizationTaxInfo();
     this.loadWithholdingTaxTypes();
     this.load();
     this.vendorSearchSub = this.vendorSearchInput$
@@ -348,6 +382,35 @@ export class ExpensesPageComponent {
           this.withholdingTaxTypes.set([]);
         },
       });
+  }
+
+  private loadOrganizationTaxInfo(): void {
+    const orgId = this.currentOrganizationId.trim();
+    if (!orgId) {
+      this.organizationCurrency = '';
+      this.organizationTaxTypeCode = '';
+      this.organizationTaxTypeName = '';
+      this.organizationTaxRate = 0;
+      return;
+    }
+
+    this.api.get<OrganizationTaxInfo>(`/api/v1/organizations/${encodeURIComponent(orgId)}`).subscribe({
+      next: (response) => {
+        const taxType = response.data?.taxType;
+        this.organizationCurrency = String(response.data?.currency || '').toUpperCase();
+        this.organizationTaxTypeCode = String(taxType?.code || '').toUpperCase();
+        this.organizationTaxTypeName = String(taxType?.name || taxType?.code || '').trim();
+        const rate = Number(taxType?.percentage || 0);
+        this.organizationTaxRate = Number.isFinite(rate) && rate > 0 ? rate : 0;
+        this.recomputeExpenseBreakdown();
+      },
+      error: () => {
+        this.organizationCurrency = '';
+        this.organizationTaxTypeCode = '';
+        this.organizationTaxTypeName = '';
+        this.organizationTaxRate = 0;
+      },
+    });
   }
 
   openCreateModal(): void {
@@ -856,6 +919,9 @@ export class ExpensesPageComponent {
   }
 
   computeVatExclusive(row: ExpenseRow): number {
+    if (String(row.taxType?.code || '').toUpperCase() === 'PT') {
+      return +(row.amount ?? 0).toFixed(2);
+    }
     const amount = Number(row.amount ?? 0);
     return +(amount / 1.12).toFixed(2);
   }
@@ -1265,9 +1331,16 @@ export class ExpensesPageComponent {
     const ewtType = this.withholdingTaxTypes().find((t) => t.id === selectedEwtId);
     const ewtRate = ewtType ? (ewtType.percentage / 100) : 0;
 
-    const vatExclusive = +(amount / 1.12).toFixed(2);
-    const taxableAmount = +Math.max(0, vatExclusive - vatExempt).toFixed(2);
-    const taxAmount = +(taxableAmount * 0.12).toFixed(2);
+    const vatRate = this.organizationTaxRate > 0 ? this.organizationTaxRate / 100 : 0;
+    const vatExclusive = this.isPercentageTaxOrganization
+      ? +amount.toFixed(2)
+      : +(amount / (1 + (vatRate || 0.12))).toFixed(2);
+    const taxableAmount = this.isPercentageTaxOrganization
+      ? +Math.max(0, amount).toFixed(2)
+      : +Math.max(0, vatExclusive - vatExempt).toFixed(2);
+    const taxAmount = this.isPercentageTaxOrganization
+      ? 0
+      : +(taxableAmount * (vatRate || 0.12)).toFixed(2);
     const vatableInclusive = +(taxableAmount + taxAmount).toFixed(2);
     const withholdingTaxAmount = +(taxableAmount * ewtRate).toFixed(2);
     const totalAmount = +(amount - discount - withholdingTaxAmount).toFixed(2);
