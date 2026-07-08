@@ -14,6 +14,7 @@ import { VendorFormFieldsComponent } from './forms/vendor-form-fields.component'
 interface VendorRow {
   id: string;
   organizationId: string;
+  organizations?: OrganizationOption[];
   name: string;
   category?: string;
   legalName?: string;
@@ -37,6 +38,12 @@ interface VendorRow {
     name?: string;
     legalName?: string;
   };
+}
+
+interface OrganizationOption {
+  id: string;
+  name?: string;
+  legalName?: string;
 }
 
 @Component({
@@ -68,6 +75,7 @@ export class VendorsPageComponent {
   readonly importModalError = signal('');
   readonly vendorModalError = signal('');
   readonly countryOptions = this.buildCountryOptions();
+  readonly organizations = signal<OrganizationOption[]>([]);
 
   readonly message = signal('');
   readonly error = signal('');
@@ -85,6 +93,7 @@ export class VendorsPageComponent {
   vendorFormSubmitted = false;
   vendorForm: FormGroup = this.newVendorFormGroup();
   editingId = '';
+  vendorOwnerOrganizationId = '';
   private importFile: File | null = null;
 
   get currentUserId(): string {
@@ -105,7 +114,23 @@ export class VendorsPageComponent {
 
   ngOnInit(): void {
     this.restoreTablePreferences();
+    this.loadOrganizations();
     this.load();
+  }
+
+  loadOrganizations(): void {
+    if (!this.isSuperuser) {
+      this.organizations.set([]);
+      return;
+    }
+    this.api.list<OrganizationOption>('/api/v1/organizations?limit=500&isActive=true').subscribe({
+      next: (response) => {
+        this.organizations.set(response.data || []);
+      },
+      error: () => {
+        this.organizations.set([]);
+      },
+    });
   }
 
   load(): void {
@@ -157,7 +182,10 @@ export class VendorsPageComponent {
       return;
     }
     this.vendorModalMode = 'create';
-    this.vendorForm = this.newVendorFormGroup();
+    this.vendorOwnerOrganizationId = this.currentOrganizationId;
+    this.vendorForm = this.newVendorFormGroup({
+      organizationIds: this.currentOrganizationId ? [this.currentOrganizationId] : [],
+    });
     this.vendorFormSubmitted = false;
     this.editingId = '';
     this.error.set('');
@@ -243,6 +271,7 @@ export class VendorsPageComponent {
     }
     this.vendorModalMode = 'edit';
     this.editingId = row.id;
+    this.vendorOwnerOrganizationId = row.organizationId || '';
     this.vendorForm = this.newVendorFormGroup({
       name: row.name || '',
       category: row.category || 'others',
@@ -262,6 +291,7 @@ export class VendorsPageComponent {
       paymentTerms: row.paymentTerms || '',
       notes: row.notes || '',
       status: row.status || 'active',
+      organizationIds: this.vendorAssignedOrganizationIds(row),
     });
     this.vendorFormSubmitted = false;
     this.error.set('');
@@ -272,6 +302,7 @@ export class VendorsPageComponent {
 
   closeEditModal(): void {
     this.editingId = '';
+    this.vendorOwnerOrganizationId = '';
     this.isEditModalOpen.set(false);
     this.vendorFormSubmitted = false;
     this.vendorModalError.set('');
@@ -508,6 +539,16 @@ export class VendorsPageComponent {
     return row.organization?.name || row.organization?.legalName || row.organizationId || '-';
   }
 
+  assignedOrganizationsLabel(row: VendorRow): string {
+    const labels = (row.organizations || [])
+      .map((organization) => this.organizationOptionLabel(organization))
+      .filter(Boolean);
+    if (labels.length === 0) {
+      return this.organizationLabel(row);
+    }
+    return Array.from(new Set(labels)).join(', ');
+  }
+
   statusBadgeClass(status: unknown): string {
     switch (String(status || '').toLowerCase()) {
       case 'active':
@@ -542,6 +583,7 @@ export class VendorsPageComponent {
       paymentTerms: '',
       notes: '',
       status: 'active',
+      organizationIds: [],
       createdBy: '',
       updatedBy: '',
     };
@@ -569,6 +611,7 @@ export class VendorsPageComponent {
       paymentTerms: [defaults['paymentTerms'], [Validators.maxLength(120)]],
       notes: [defaults['notes']],
       status: [defaults['status'], [Validators.required]],
+      organizationIds: [Array.isArray(defaults['organizationIds']) ? defaults['organizationIds'] : []],
     });
   }
 
@@ -617,6 +660,7 @@ export class VendorsPageComponent {
       paymentTerms: this.optionalString(form['paymentTerms']),
       notes: this.optionalString(form['notes']),
       status: this.optionalString(form['status']),
+      organizationIds: Array.isArray(form['organizationIds']) ? form['organizationIds'] : undefined,
       createdBy: this.optionalString(form['createdBy']),
       updatedBy: this.optionalString(form['updatedBy']),
     };
@@ -628,6 +672,20 @@ export class VendorsPageComponent {
       payload['organizationId'] = this.currentOrganizationId;
     }
     return payload;
+  }
+
+  organizationOptionLabel(org: OrganizationOption): string {
+    return org.name || org.legalName || org.id;
+  }
+
+  private vendorAssignedOrganizationIds(row: VendorRow): string[] {
+    const ids = (row.organizations || [])
+      .map((organization) => organization.id)
+      .filter(Boolean);
+    if (row.organizationId && !ids.includes(row.organizationId)) {
+      ids.unshift(row.organizationId);
+    }
+    return ids;
   }
 
   private optionalString(value: unknown): string | undefined {

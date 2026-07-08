@@ -115,6 +115,7 @@
       <thead class="table-light">
         <tr>
           <th *ngIf="isSuperuser">Organization</th>
+          <th>Organizations</th>
           <th>Name</th>
           <th>Legal Name</th>
           <th>TIN</th>
@@ -126,17 +127,18 @@
       </thead>
       <tbody>
         <tr *ngIf="loading()">
-          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center py-5 border-0">
+          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center py-5 border-0">
             <span class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></span>
             <span class="text-secondary small">Loading...</span>
           </td>
         </tr>
         <tr *ngIf="!loading() && rows().length === 0">
-          <td [attr.colspan]="isSuperuser ? 8 : 7" class="text-center text-secondary py-4">No vendors found.</td>
+          <td [attr.colspan]="isSuperuser ? 9 : 8" class="text-center text-secondary py-4">No vendors found.</td>
         </tr>
 
         <tr *ngFor="let row of rows(); trackBy: trackById">
           <td *ngIf="isSuperuser" class="small">{{ organizationLabel(row) }}</td>
+          <td class="small text-secondary">{{ assignedOrganizationsLabel(row) }}</td>
           <td class="fw-semibold">{{ row.name }}</td>
           <td>{{ row.legalName || '-' }}</td>
           <td>{{ row.taxId || '-' }}</td>
@@ -197,7 +199,15 @@
         </div>
         <div *ngIf="vendorModalError()" class="alert alert-danger py-2">{{ vendorModalError() }}</div>
         <form id="vendor-create-form" [formGroup]="vendorForm" (ngSubmit)="createVendor()" (input)="onVendorFormInput()" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
-          <app-vendor-form-fields [form]="vendorForm" [submitted]="vendorFormSubmitted" [countryOptions]="countryOptions" (taxIdInput)="onVendorTaxIdInput($event)"></app-vendor-form-fields>
+          <app-vendor-form-fields
+            [form]="vendorForm"
+            [submitted]="vendorFormSubmitted"
+            [countryOptions]="countryOptions"
+            [organizationOptions]="organizations()"
+            [showOrganizationAssignments]="isSuperuser"
+            [ownerOrganizationId]="vendorOwnerOrganizationId"
+            (taxIdInput)="onVendorTaxIdInput($event)"
+          ></app-vendor-form-fields>
         </form>
       </div>
       <div class="modal-footer border-0 pt-0">
@@ -262,7 +272,15 @@
         </div>
         <div *ngIf="vendorModalError()" class="alert alert-danger py-2">{{ vendorModalError() }}</div>
         <form id="vendor-edit-form" [formGroup]="vendorForm" (ngSubmit)="saveEdit()" (input)="onVendorFormInput()" [class.pe-none]="submitting()" [class.opacity-50]="submitting()">
-          <app-vendor-form-fields [form]="vendorForm" [submitted]="vendorFormSubmitted" [countryOptions]="countryOptions" (taxIdInput)="onVendorTaxIdInput($event)"></app-vendor-form-fields>
+          <app-vendor-form-fields
+            [form]="vendorForm"
+            [submitted]="vendorFormSubmitted"
+            [countryOptions]="countryOptions"
+            [organizationOptions]="organizations()"
+            [showOrganizationAssignments]="isSuperuser"
+            [ownerOrganizationId]="vendorOwnerOrganizationId"
+            (taxIdInput)="onVendorTaxIdInput($event)"
+          ></app-vendor-form-fields>
         </form>
       </div>
       <div class="modal-footer border-0 pt-0">

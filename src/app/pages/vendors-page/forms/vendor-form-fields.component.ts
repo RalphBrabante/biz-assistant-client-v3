@@ -3,6 +3,12 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { AbstractControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TooltipDirective } from '../../../shared/tooltip.directive';
 
+interface OrganizationOption {
+  id: string;
+  name?: string;
+  legalName?: string;
+}
+
 @Component({
   selector: 'app-vendor-form-fields',
   standalone: true,
@@ -13,6 +19,9 @@ export class VendorFormFieldsComponent {
   @Input({ required: true }) form!: FormGroup;
   @Input() submitted = false;
   @Input() countryOptions: string[] = [];
+  @Input() organizationOptions: OrganizationOption[] = [];
+  @Input() showOrganizationAssignments = false;
+  @Input() ownerOrganizationId = '';
 
   @Output() taxIdInput = new EventEmitter<Event>();
 
@@ -47,5 +56,9 @@ export class VendorFormFieldsComponent {
       return 'Value is too long.';
     }
     return 'Invalid value.';
+  }
+
+  organizationLabel(organization: OrganizationOption): string {
+    return organization.name || organization.legalName || organization.id;
   }
 }

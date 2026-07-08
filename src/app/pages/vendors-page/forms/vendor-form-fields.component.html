@@ -1,4 +1,13 @@
 <div class="row g-3" [formGroup]="form">
+  <div class="col-12" *ngIf="showOrganizationAssignments">
+    <label class="form-label fw-semibold">Assigned Organizations</label>
+    <select class="form-select" formControlName="organizationIds" multiple size="4">
+      <option *ngFor="let organization of organizationOptions" [value]="organization.id">
+        {{ organizationLabel(organization) }}{{ organization.id === ownerOrganizationId ? ' (Owner)' : '' }}
+      </option>
+    </select>
+    <div class="form-text">Hold Ctrl or Cmd to select multiple organizations.</div>
+  </div>
   <div class="col-12 col-md-4">
     <label class="form-label fw-semibold">
       Name
