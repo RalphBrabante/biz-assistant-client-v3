@@ -586,7 +586,7 @@
                 </div>
                 <div class="col-4 text-end font-monospace fw-semibold">{{ formatMoney(computedTaxableAmount, currentOrganizationCurrency) }}</div>
 
-                <div class="col-8 text-secondary">{{ isPercentageTaxOrganization ? 'VAT Amount' : 'Add: 12% VAT' }}</div>
+                <div class="col-8 text-secondary">{{ isPercentageTaxOrganization ? 'VAT / Output Tax' : 'Add: 12% VAT' }}</div>
                 <div class="col-4 text-end font-monospace text-success">{{ formatMoney(computedTaxAmount, currentOrganizationCurrency) }}</div>
 
                 <ng-container *ngIf="isPercentageTaxOrganization">
@@ -684,12 +684,12 @@
     <div class="row g-1 small" style="min-width: 300px;">
       <div class="col-7 text-secondary">
         Gross Sales
-        <span *ngIf="r.organization?.taxType?.code !== 'PT'">(VAT-inclusive)</span>
-        <span *ngIf="r.organization?.taxType?.code === 'PT'">(non-VAT)</span>
+        <span *ngIf="!isPercentageTaxRow(r)">(VAT-inclusive)</span>
+        <span *ngIf="isPercentageTaxRow(r)">(non-VAT)</span>
       </div>
       <div class="col-5 text-end font-monospace">{{ formatMoney(r.amount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
-      <ng-container *ngIf="r.organization?.taxType?.code !== 'PT'">
+      <ng-container *ngIf="!isPercentageTaxRow(r)">
         <div class="col-7 text-secondary">VAT-Exclusive (&divide; 1.12)</div>
         <div class="col-5 text-end font-monospace">{{ formatMoney(computeSubtotal(r), r.currency || currentOrganizationCurrency) }}</div>
       </ng-container>
@@ -702,10 +702,10 @@
 
       <div class="col-12"><hr class="my-1" /></div>
 
-      <div class="col-7 fw-semibold">{{ r.organization?.taxType?.code === 'PT' ? 'Non-VAT Sales' : 'Taxable Amount' }}</div>
+      <div class="col-7 fw-semibold">{{ isPercentageTaxRow(r) ? 'Non-VAT Sales' : 'Taxable Amount' }}</div>
       <div class="col-5 text-end font-monospace fw-semibold">{{ formatMoney(r.taxableAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
-      <div class="col-7 text-secondary">{{ r.organization?.taxType?.code === 'PT' ? 'VAT Amount' : 'VAT (12%)' }}</div>
+      <div class="col-7 text-secondary">{{ isPercentageTaxRow(r) ? 'VAT / Output Tax' : 'VAT (12%)' }}</div>
       <div class="col-5 text-end font-monospace text-success">{{ formatMoney(r.taxAmount ?? 0, r.currency || currentOrganizationCurrency) }}</div>
 
       <div class="col-7 text-secondary">Service Charge</div>

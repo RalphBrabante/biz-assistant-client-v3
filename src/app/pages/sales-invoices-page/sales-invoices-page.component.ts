@@ -23,6 +23,7 @@ interface SalesInvoiceRow {
       id: string;
       code?: string;
       name?: string;
+      description?: string;
       percentage?: number;
     };
   };
@@ -88,6 +89,7 @@ interface OrganizationTaxInfo {
     id: string;
     code?: string;
     name?: string;
+    description?: string;
     percentage?: number;
   };
 }
@@ -183,7 +185,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
   }
 
   get isPercentageTaxOrganization(): boolean {
-    return this.organizationTaxTypeCode === 'PT';
+    return this.isPercentageTaxType(this.organizationTaxTypeCode, this.organizationTaxTypeName);
   }
 
   get taxModeLabel(): string {
@@ -849,10 +851,14 @@ export class SalesInvoicesPageComponent implements OnDestroy {
   }
 
   computeSubtotal(row: SalesInvoiceRow): number {
-    if (String(row.organization?.taxType?.code || '').toUpperCase() === 'PT') {
+    if (this.isPercentageTaxType(row.organization?.taxType?.code, row.organization?.taxType?.name)) {
       return +(row.amount ?? 0).toFixed(2);
     }
     return +((row.amount ?? 0) / 1.12).toFixed(2);
+  }
+
+  isPercentageTaxRow(row: SalesInvoiceRow): boolean {
+    return this.isPercentageTaxType(row.organization?.taxType?.code, row.organization?.taxType?.name);
   }
 
   private loadOrganizationTaxInfo(): void {
@@ -870,7 +876,7 @@ export class SalesInvoicesPageComponent implements OnDestroy {
         const taxType = response.data?.taxType;
         this.organizationCurrency = String(response.data?.currency || '').toUpperCase();
         this.organizationTaxTypeCode = String(taxType?.code || '').toUpperCase();
-        this.organizationTaxTypeName = String(taxType?.name || taxType?.code || '').trim();
+        this.organizationTaxTypeName = String(taxType?.name || taxType?.description || taxType?.code || '').trim();
         const rate = Number(taxType?.percentage || 0);
         this.organizationTaxRate = Number.isFinite(rate) && rate > 0 ? rate : 12;
         this.recomputeInvoiceBreakdown();
@@ -882,6 +888,21 @@ export class SalesInvoicesPageComponent implements OnDestroy {
         this.organizationTaxRate = 12;
       },
     });
+  }
+
+  private isPercentageTaxType(code: unknown, name = ''): boolean {
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    const normalizedName = String(name || '').trim().toUpperCase();
+    return [
+      'PT',
+      'PERCENTAGE_TAX',
+      'PERCENTAGE',
+      'NONVAT',
+      'NON_VAT',
+    ].includes(normalizedCode)
+      || normalizedName.includes('PERCENTAGE TAX')
+      || normalizedName.includes('NON-VAT')
+      || normalizedName.includes('NON VAT');
   }
 
   private loadWithholdingTaxTypes(): void {

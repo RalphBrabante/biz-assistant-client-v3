@@ -48,6 +48,7 @@ interface OrganizationTaxInfo {
     id: string;
     code?: string;
     name?: string;
+    description?: string;
     percentage?: number;
   };
 }
@@ -175,7 +176,7 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
   }
 
   get isPercentageTaxOrganization(): boolean {
-    return this.organizationTaxTypeCode === 'PT';
+    return this.isPercentageTaxType(this.organizationTaxTypeCode, this.organizationTaxTypeName);
   }
 
   get organizationTaxLabel(): string {
@@ -190,6 +191,10 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
       return 0;
     }
     return Number((this.subtotalAmount * (this.organizationVatRate / 100)).toFixed(2));
+  }
+
+  get displayTaxAmountLabel(): string {
+    return this.isPercentageTaxOrganization ? 'VAT / Output Tax' : 'Tax';
   }
 
   ngOnInit(): void {
@@ -534,7 +539,8 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
     if (!Number.isFinite(percentage) || percentage <= 0) {
       return 0;
     }
-    // Withholding is derived from taxable amount (same basis used by backend recomputation).
+    // Withholding is derived from the taxable base. For non-VAT percentage tax,
+    // this remains the gross receipts amount; no VAT-inclusive extraction applies.
     return Number((this.taxableAmount * (percentage / 100)).toFixed(2));
   }
 
@@ -711,7 +717,9 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
         const taxPercentage = Number(taxType?.percentage ?? 0);
         this.organizationVatRate = Number.isFinite(taxPercentage) && taxPercentage > 0 ? taxPercentage : 0;
         this.organizationTaxTypeCode = String(taxType?.code || '').toUpperCase();
-        this.organizationTaxTypeName = String(taxType?.name || taxType?.code || '').trim();
+        this.organizationTaxTypeName = String(
+          taxType?.name || taxType?.description || taxType?.code || ''
+        ).trim();
         this.organizationCurrency = String(response.data?.currency || this.currentOrganizationCurrency || 'USD').toUpperCase();
       },
       error: () => {
@@ -721,5 +729,20 @@ export class CreateOrderPageComponent implements OnInit, OnDestroy {
         this.organizationCurrency = this.currentOrganizationCurrency;
       },
     });
+  }
+
+  private isPercentageTaxType(code: string, name = ''): boolean {
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    const normalizedName = String(name || '').trim().toUpperCase();
+    return [
+      'PT',
+      'PERCENTAGE_TAX',
+      'PERCENTAGE',
+      'NONVAT',
+      'NON_VAT',
+    ].includes(normalizedCode)
+      || normalizedName.includes('PERCENTAGE TAX')
+      || normalizedName.includes('NON-VAT')
+      || normalizedName.includes('NON VAT');
   }
 }

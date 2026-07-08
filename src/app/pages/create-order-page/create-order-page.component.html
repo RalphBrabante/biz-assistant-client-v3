@@ -322,15 +322,15 @@
         <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><strong>{{ formatMoney(subtotalAmount, activeCurrency) }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span>{{ organizationTaxLabel }} Rate</span><strong>{{ organizationVatRate | number: '1.0-2' }}%</strong></div>
         <div class="d-flex justify-content-between small mb-1">
-          <span>{{ isPercentageTaxOrganization ? 'Gross Receipts / EWT Base' : 'Taxable Amount' }}</span>
+          <span>{{ isPercentageTaxOrganization ? 'Non-VAT Gross Receipts / EWT Base' : 'Taxable Amount' }}</span>
           <strong>{{ formatMoney(taxableAmount, activeCurrency) }}</strong>
         </div>
         <div class="d-flex justify-content-between small mb-1">
-          <span>{{ isPercentageTaxOrganization ? 'VAT Amount' : 'Tax' }}</span>
+          <span>{{ displayTaxAmountLabel }}</span>
           <strong>{{ formatMoney(taxAmount, activeCurrency) }}</strong>
         </div>
         <div class="d-flex justify-content-between small mb-1" *ngIf="isPercentageTaxOrganization">
-          <span>Percentage Tax Due <span class="text-secondary">(filing)</span></span>
+          <span>Percentage Tax Due <span class="text-secondary">(BIR filing, not added to total)</span></span>
           <strong>{{ formatMoney(percentageTaxAmount, activeCurrency) }}</strong>
         </div>
         <div class="d-flex justify-content-between small mb-1"><span>Withholding Tax</span><strong>{{ formatMoney(withHoldingTaxAmount, activeCurrency) }}</strong></div>
