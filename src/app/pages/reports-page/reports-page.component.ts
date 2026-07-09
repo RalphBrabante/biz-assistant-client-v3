@@ -182,9 +182,14 @@ interface BirFilingSummary {
         payeeName: string;
         payeeTin: string;
         atcCode: string;
+        withholdingTaxTypeId?: string;
+        withholdingTypeName?: string;
+        grossAmount?: number;
         incomePayment: number;
+        inputVat?: number;
         rate: number;
         taxWithheld: number;
+        netPayable?: number;
       }>;
     };
     slsp: {
@@ -199,6 +204,11 @@ interface BirFilingSummary {
         grossSales: number;
         taxableSales: number;
         outputVat: number;
+        withholdingTaxTypeId?: string;
+        atcCode?: string;
+        withholdingTypeName?: string;
+        withholdingRate?: number;
+        taxWithheld?: number;
       }>;
       purchases: Array<{
         date: string;
@@ -208,6 +218,11 @@ interface BirFilingSummary {
         grossPurchases: number;
         taxablePurchases: number;
         inputVat: number;
+        withholdingTaxTypeId?: string;
+        atcCode?: string;
+        withholdingTypeName?: string;
+        withholdingRate?: number;
+        taxWithheld?: number;
       }>;
     };
   };
@@ -791,12 +806,31 @@ export class ReportsPageComponent {
           referenceNumber: '',
           payeeName: '',
           payeeTin: '',
+          withholdingTaxTypeId: '',
           atcCode: '',
+          withholdingTypeName: '',
+          grossAmount: '',
           incomePayment: '',
+          inputVat: '',
           rate: '',
           taxWithheld: '',
+          netPayable: '',
         };
-        rows = summary.attachments.qap.lines;
+        rows = summary.attachments.qap.lines.map((line) => ({
+          date: line.date,
+          referenceNumber: line.referenceNumber,
+          payeeName: line.payeeName,
+          payeeTin: line.payeeTin,
+          withholdingTaxTypeId: line.withholdingTaxTypeId || '',
+          atcCode: line.atcCode,
+          withholdingTypeName: line.withholdingTypeName || '',
+          grossAmount: line.grossAmount ?? '',
+          incomePayment: line.incomePayment,
+          inputVat: line.inputVat ?? '',
+          rate: line.rate,
+          taxWithheld: line.taxWithheld,
+          netPayable: line.netPayable ?? '',
+        }));
         break;
       case 'slsp-sales':
         filename = 'bir-slsp-sales';
@@ -808,8 +842,26 @@ export class ReportsPageComponent {
           grossSales: '',
           taxableSales: '',
           outputVat: '',
+          withholdingTaxTypeId: '',
+          atcCode: '',
+          withholdingTypeName: '',
+          withholdingRate: '',
+          taxWithheld: '',
         };
-        rows = summary.attachments.slsp.sales;
+        rows = summary.attachments.slsp.sales.map((line) => ({
+          date: line.date,
+          referenceNumber: line.referenceNumber,
+          customerName: line.customerName,
+          customerTin: line.customerTin,
+          grossSales: line.grossSales,
+          taxableSales: line.taxableSales,
+          outputVat: line.outputVat,
+          withholdingTaxTypeId: line.withholdingTaxTypeId || '',
+          atcCode: line.atcCode || '',
+          withholdingTypeName: line.withholdingTypeName || '',
+          withholdingRate: line.withholdingRate ?? '',
+          taxWithheld: line.taxWithheld ?? '',
+        }));
         break;
       case 'slsp-purchases':
         filename = 'bir-slsp-purchases';
@@ -821,8 +873,26 @@ export class ReportsPageComponent {
           grossPurchases: '',
           taxablePurchases: '',
           inputVat: '',
+          withholdingTaxTypeId: '',
+          atcCode: '',
+          withholdingTypeName: '',
+          withholdingRate: '',
+          taxWithheld: '',
         };
-        rows = summary.attachments.slsp.purchases;
+        rows = summary.attachments.slsp.purchases.map((line) => ({
+          date: line.date,
+          referenceNumber: line.referenceNumber,
+          vendorName: line.vendorName,
+          vendorTin: line.vendorTin,
+          grossPurchases: line.grossPurchases,
+          taxablePurchases: line.taxablePurchases,
+          inputVat: line.inputVat,
+          withholdingTaxTypeId: line.withholdingTaxTypeId || '',
+          atcCode: line.atcCode || '',
+          withholdingTypeName: line.withholdingTypeName || '',
+          withholdingRate: line.withholdingRate ?? '',
+          taxWithheld: line.taxWithheld ?? '',
+        }));
         break;
     }
 
