@@ -560,6 +560,8 @@ export class ExpensesPageComponent {
   startEdit(row: ExpenseRow): void {
     if (this.isContextLocked) return;
     this.editingId = row.id;
+    this.createFile = null;
+    this.createFileName.set('');
     this.createExpenseForm = this.newCreateExpenseForm();
     this.createExpenseForm.patchValue({
       vendorId: row.vendorId || '',
@@ -626,7 +628,16 @@ export class ExpensesPageComponent {
       organizationId: this.currentOrganizationId,
       updatedBy: this.currentUserId,
     });
-    this.api.update<ExpenseRow>('/api/v1/expenses', this.editingId, payload).subscribe({
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(payload)) {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    }
+    if (this.createFile) {
+      formData.append('file', this.createFile);
+    }
+    this.api.putFormData<ExpenseRow>(`/api/v1/expenses/${this.editingId}`, formData).subscribe({
       next: (response) => {
         this.submitting.set(false);
         this.message.set(response.message || 'Expense updated successfully.');

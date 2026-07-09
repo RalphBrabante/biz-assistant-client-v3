@@ -23,6 +23,7 @@ interface ExpenseDetail {
   taxAmount?: number;
   discountAmount?: number;
   totalAmount?: number;
+  receiptUrl?: string;
   file?: string;
   fileCdnUrl?: string;
   notes?: string;
@@ -78,6 +79,7 @@ export class ExpenseDetailPageComponent {
   readonly error = signal('');
   readonly expense = signal<ExpenseDetail | null>(null);
   readonly previewImageUrl = signal('');
+  readonly attachmentImageFailed = signal(false);
 
   ngOnInit(): void {
     const id = String(this.route.snapshot.paramMap.get('id') || '').trim();
@@ -94,6 +96,7 @@ export class ExpenseDetailPageComponent {
     this.api.get<ExpenseDetail>(`/api/v1/expenses/${id}`).subscribe({
       next: (response) => {
         this.loading.set(false);
+        this.attachmentImageFailed.set(false);
         this.expense.set(response.data || null);
       },
       error: (err) => {
@@ -155,7 +158,38 @@ export class ExpenseDetailPageComponent {
     if (!row) {
       return '';
     }
-    return String(row.fileCdnUrl || row.file || '').trim();
+    return String(row.fileCdnUrl || row.file || row.receiptUrl || '').trim();
+  }
+
+  attachmentName(): string {
+    const url = this.attachmentUrl();
+    if (!url) {
+      return '';
+    }
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    const name = cleanUrl.split('/').filter(Boolean).pop() || 'Expense attachment';
+    try {
+      return decodeURIComponent(name);
+    } catch (_err) {
+      return name;
+    }
+  }
+
+  isImageAttachment(url = this.attachmentUrl()): boolean {
+    const cleanUrl = String(url || '').split('?')[0].split('#')[0].toLowerCase();
+    return (
+      cleanUrl.startsWith('data:image/') ||
+      cleanUrl.endsWith('.jpg') ||
+      cleanUrl.endsWith('.jpeg') ||
+      cleanUrl.endsWith('.png') ||
+      cleanUrl.endsWith('.gif') ||
+      cleanUrl.endsWith('.webp') ||
+      cleanUrl.endsWith('.bmp')
+    );
+  }
+
+  onAttachmentImageError(): void {
+    this.attachmentImageFailed.set(true);
   }
 
   openImagePreview(url: string): void {
