@@ -416,16 +416,16 @@
               <button
                 type="button"
                 class="btn btn-outline-secondary btn-sm"
-                (click)="downloadFilingCsv('slsp-sales')"
+                (click)="downloadGimoStatement('sales')"
               >
-                <i class="bi bi-download me-1"></i>Sales
+                <i class="bi bi-file-earmark-excel me-1"></i>Sales XLSX
               </button>
               <button
                 type="button"
                 class="btn btn-outline-secondary btn-sm"
-                (click)="downloadFilingCsv('slsp-purchases')"
+                (click)="downloadGimoStatement('purchases')"
               >
-                <i class="bi bi-download me-1"></i>Purchases
+                <i class="bi bi-file-earmark-excel me-1"></i>Purchases XLSX
               </button>
             </div>
             <div class="d-flex justify-content-between small mb-2">
@@ -448,7 +448,7 @@
               SLSP is shown only for VAT organizations.
             </div>
             <div class="small text-secondary mt-2" *ngIf="summary.attachments.slsp.supported && !summary.attachments.slsp.salesLineCount && !summary.attachments.slsp.purchaseLineCount">
-              No VAT sales or purchase source lines found for this quarter. CSV export will download a blank template.
+              No VAT sales or purchase source lines found for this quarter. Excel export will download a blank GIMO template.
             </div>
             <div class="small text-secondary mt-2" *ngIf="!summary.attachments.qap.lineCount">
               No expense withholding lines found for QAP. CSV export will download a blank template.
