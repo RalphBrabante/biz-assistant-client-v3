@@ -7,6 +7,11 @@ import { AuthService } from '../../core/auth.service';
 import { ConfirmDialogService } from '../../core/confirm-dialog.service';
 import { OrganizationContextService } from '../../core/organization-context.service';
 import { ApiResponse } from '../../core/types';
+import {
+  downloadGimoFinancialStatement,
+  GimoPurchaseExportLine,
+  GimoSalesExportLine,
+} from '../../core/gimo-financial-statement-export';
 import { loadTablePreferences, saveTablePreferences, toPositiveInt, toTableViewMode, TableViewMode } from '../../core/table-preferences';
 
 interface QuarterlySalesReportRow {
@@ -753,7 +758,7 @@ export class ReportsPageComponent {
     });
   }
 
-  downloadFilingCsv(type: '2307' | 'sawt' | 'qap' | 'slsp-sales' | 'slsp-purchases'): void {
+  downloadFilingCsv(type: '2307' | 'sawt' | 'qap'): void {
     const summary = this.filingSummary();
     if (!summary) return;
 
@@ -832,74 +837,37 @@ export class ReportsPageComponent {
           netPayable: line.netPayable ?? '',
         }));
         break;
-      case 'slsp-sales':
-        filename = 'bir-slsp-sales';
-        templateRow = {
-          date: '',
-          referenceNumber: '',
-          customerName: '',
-          customerTin: '',
-          grossSales: '',
-          taxableSales: '',
-          outputVat: '',
-          withholdingTaxTypeId: '',
-          atcCode: '',
-          withholdingTypeName: '',
-          withholdingRate: '',
-          taxWithheld: '',
-        };
-        rows = summary.attachments.slsp.sales.map((line) => ({
-          date: line.date,
-          referenceNumber: line.referenceNumber,
-          customerName: line.customerName,
-          customerTin: line.customerTin,
-          grossSales: line.grossSales,
-          taxableSales: line.taxableSales,
-          outputVat: line.outputVat,
-          withholdingTaxTypeId: line.withholdingTaxTypeId || '',
-          atcCode: line.atcCode || '',
-          withholdingTypeName: line.withholdingTypeName || '',
-          withholdingRate: line.withholdingRate ?? '',
-          taxWithheld: line.taxWithheld ?? '',
-        }));
-        break;
-      case 'slsp-purchases':
-        filename = 'bir-slsp-purchases';
-        templateRow = {
-          date: '',
-          referenceNumber: '',
-          vendorName: '',
-          vendorTin: '',
-          grossPurchases: '',
-          taxablePurchases: '',
-          inputVat: '',
-          withholdingTaxTypeId: '',
-          atcCode: '',
-          withholdingTypeName: '',
-          withholdingRate: '',
-          taxWithheld: '',
-        };
-        rows = summary.attachments.slsp.purchases.map((line) => ({
-          date: line.date,
-          referenceNumber: line.referenceNumber,
-          vendorName: line.vendorName,
-          vendorTin: line.vendorTin,
-          grossPurchases: line.grossPurchases,
-          taxablePurchases: line.taxablePurchases,
-          inputVat: line.inputVat,
-          withholdingTaxTypeId: line.withholdingTaxTypeId || '',
-          atcCode: line.atcCode || '',
-          withholdingTypeName: line.withholdingTypeName || '',
-          withholdingRate: line.withholdingRate ?? '',
-          taxWithheld: line.taxWithheld ?? '',
-        }));
-        break;
     }
 
     this.downloadCsv(
       `${filename}-${summary.year}-q${summary.quarter}.csv`,
       rows.length ? rows : [templateRow]
     );
+  }
+
+  async downloadGimoStatement(type: 'sales' | 'purchases'): Promise<void> {
+    const summary = this.filingSummary();
+    if (!summary) return;
+
+    try {
+      if (type === 'sales') {
+        await downloadGimoFinancialStatement(
+          'sales',
+          summary.attachments.slsp.sales as GimoSalesExportLine[],
+          summary.year,
+          summary.quarter,
+        );
+      } else {
+        await downloadGimoFinancialStatement(
+          'purchases',
+          summary.attachments.slsp.purchases as GimoPurchaseExportLine[],
+          summary.year,
+          summary.quarter,
+        );
+      }
+    } catch (err) {
+      this.filingSummaryError.set(err instanceof Error ? err.message : 'Unable to export the GIMO statement.');
+    }
   }
 
   selectedQuarterExpenseWarning(): string {
